@@ -1,0 +1,116 @@
+.wrap {
+  display: grid;
+  min-height: 18rem;
+  overflow: hidden;
+  border: 1px solid rgb(var(--color-gold-500-rgb) / 0.3);
+  border-radius: var(--radius-large);
+  background: var(--color-purple-950);
+  box-shadow: var(--shadow-card);
+  color: var(--color-cream);
+  grid-template-columns: 1.18fr 0.82fr;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  padding: clamp(2rem, 5vw, 4rem);
+  background:
+    radial-gradient(circle at 0 100%, rgb(var(--color-purple-600-rgb) / 0.48), transparent 40%),
+    var(--color-purple-950);
+}
+
+.eyebrow {
+  margin-bottom: 0.65rem;
+  color: var(--color-gold-400);
+  font-size: var(--fs-sm);
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.content h2 {
+  margin-bottom: 0.8rem;
+  color: var(--color-cream);
+  font-size: var(--fs-4xl);
+}
+
+.content > p:not(.eyebrow) {
+  margin-bottom: 1.6rem;
+  color: rgba(255, 252, 245, 0.78);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  min-height: 3rem;
+  padding: 0.75rem 1.15rem;
+  border-radius: var(--radius-small);
+  align-items: center;
+  gap: 0.55rem;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: 750;
+  transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.primary {
+  background: linear-gradient(135deg, var(--color-gold-400), var(--color-gold-500));
+  color: #24100e;
+}
+
+.secondary {
+  border: 1px solid rgba(255, 252, 245, 0.35);
+  color: var(--color-cream);
+}
+
+.primary:hover,
+.secondary:hover {
+  transform: translateY(-2px);
+}
+
+.secondary:hover {
+  border-color: var(--color-gold-400);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.visual {
+  position: relative;
+  min-height: 18rem;
+}
+
+.visual::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--color-purple-950), transparent 48%);
+  content: "";
+}
+
+.visual img {
+  object-fit: cover;
+}
+
+@media (max-width: 720px) {
+  .wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .visual {
+    min-height: 13rem;
+    grid-row: 1;
+  }
+
+  .visual::after {
+    background: linear-gradient(0deg, var(--color-purple-950), transparent 66%);
+  }
+
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

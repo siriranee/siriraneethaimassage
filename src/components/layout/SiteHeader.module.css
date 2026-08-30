@@ -1,0 +1,395 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgb(var(--color-gold-500-rgb) / 0.22);
+  background: linear-gradient(
+    100deg,
+    rgb(var(--color-purple-950-rgb) / 0.99),
+    rgb(var(--color-purple-800-rgb) / 0.98) 58%,
+    rgb(var(--color-purple-950-rgb) / 0.99)
+  );
+  box-shadow: 0 0.5rem 2rem rgb(var(--color-purple-950-rgb) / 0.28);
+  color: white;
+}
+
+.mainBar {
+  display: grid;
+  min-height: var(--header-height);
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(1.25rem, 3vw, 3.25rem);
+}
+
+.logo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: fit-content;
+  align-self: stretch;
+  align-items: center;
+  justify-content: flex-start;
+  padding-block: 0.2rem;
+}
+
+.desktopNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1rem, 2vw, 2rem);
+}
+
+.desktopNav > a,
+.treatmentsIndex {
+  position: relative;
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding-block: 1.1rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+
+.desktopNav > a::after,
+.treatmentsIndex::after {
+  position: absolute;
+  right: 0;
+  bottom: 0.7rem;
+  left: 0;
+  height: 2px;
+  background: var(--color-gold-400);
+  content: "";
+  transform: scaleX(0);
+  transition: transform 160ms ease;
+}
+
+.desktopNav > a:hover,
+.treatmentsIndex:hover,
+.desktopNav .active {
+  color: var(--color-gold-400);
+}
+
+.desktopNav > .active::after,
+.treatmentsIndex.active::after {
+  transform: scaleX(1);
+}
+
+.desktopTreatments {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.treatmentsIndex {
+  padding-right: 0.1rem;
+}
+
+.treatmentsToggle {
+  display: inline-grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-left: -0.3rem;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.treatmentsToggle:hover,
+.treatmentsToggle[aria-expanded="true"] {
+  color: var(--color-gold-400);
+}
+
+.treatmentsToggle svg {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 160ms ease;
+}
+
+.treatmentsToggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.treatmentsDropdown {
+  position: absolute;
+  top: calc(100% - 0.15rem);
+  left: 0;
+  z-index: 2;
+  display: grid;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 0.65rem;
+  border: 1px solid rgb(var(--color-gold-400-rgb) / 0.18);
+  border-radius: var(--radius-medium);
+  background: var(--color-purple-900);
+  box-shadow: 0 1.4rem 3.5rem rgb(var(--color-purple-950-rgb) / 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.4rem);
+  visibility: hidden;
+  transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
+}
+
+.treatmentsDropdownOpen {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  visibility: visible;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.treatmentsDropdown a {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.45rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1.35;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.treatmentsDropdown a:hover,
+.treatmentsDropdown a:focus-visible,
+.treatmentsDropdown .dropdownActive {
+  background: rgb(var(--color-gold-400-rgb) / 0.1);
+  color: var(--color-gold-400);
+}
+
+.treatmentsDropdown .allTreatmentsLink {
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.45rem 0.45rem 0 0;
+  color: white;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.bookButton {
+  display: inline-flex;
+  min-height: 2.9rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1.1rem;
+  border-radius: var(--radius-small);
+  background: linear-gradient(135deg, var(--color-gold-400), var(--color-gold-500));
+  box-shadow: var(--shadow-button);
+  color: var(--color-purple-950);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  text-transform: uppercase;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.bookButton:hover {
+  box-shadow: 0 0.9rem 2rem rgb(var(--color-gold-600-rgb) / 0.32);
+  transform: translateY(-1px);
+}
+
+.bookButton svg,
+.menuButton svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.menuButton {
+  display: none;
+  width: 2.9rem;
+  height: 2.9rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-small);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 101;
+  border: 0;
+  background: rgba(0, 0, 0, 0.52);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.backdropOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 102;
+  display: flex;
+  width: min(25rem, 90vw);
+  flex-direction: column;
+  padding: 1.15rem 1.15rem max(1.15rem, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: linear-gradient(155deg, var(--color-purple-800), var(--color-purple-950));
+  box-shadow: -1.5rem 0 4rem rgba(0, 0, 0, 0.34);
+  clip-path: inset(0 0 0 100%);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: clip-path 240ms ease, opacity 180ms ease, visibility 0s linear 240ms;
+}
+
+.drawerOpen {
+  clip-path: inset(0);
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: clip-path 240ms ease, opacity 180ms ease;
+}
+
+.drawerTop {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.drawerClose {
+  display: inline-grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: white;
+}
+
+.drawerClose svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.mobileNav {
+  display: grid;
+  padding-block: 1.25rem;
+}
+
+.mobileNav a {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding: 0.9rem 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.83);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+
+.mobileNav .mobileActive {
+  color: var(--color-gold-400);
+}
+
+.mobileTreatments > a {
+  justify-content: space-between;
+}
+
+.mobileTreatments > a span {
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mobileTreatments ul {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0.35rem 0 0.6rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  list-style: none;
+}
+
+.mobileTreatments li a {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 0;
+  border-left: 1px solid rgb(var(--color-gold-400-rgb) / 0.26);
+  color: rgba(255, 255, 255, 0.68);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.mobileTreatments li a:hover,
+.mobileTreatments li a:focus-visible,
+.mobileTreatments li .mobileTreatmentActive {
+  border-left-color: var(--color-gold-400);
+  background: rgb(var(--color-gold-400-rgb) / 0.08);
+  color: var(--color-gold-400);
+}
+
+.drawerContact {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: auto;
+}
+
+.drawerContact a {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-small);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: var(--fs-sm);
+  font-weight: 750;
+}
+
+.drawerContact .drawerBook {
+  border-color: transparent;
+  background: var(--color-gold-500);
+  color: var(--color-purple-950);
+}
+
+.drawerContact svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+@media (max-width: 1120px) {
+  .desktopNav {
+    display: none;
+  }
+
+  .mainBar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .menuButton {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 640px) {
+  .bookButton {
+    display: none;
+  }
+}

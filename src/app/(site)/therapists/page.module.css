@@ -1,0 +1,194 @@
+.container {
+  width: calc(100% - (var(--pad-x) * 2));
+  margin-inline: auto;
+}
+
+.teamSection {
+  padding-block: clamp(4rem, 8vw, 7.5rem);
+  background:
+    radial-gradient(circle at 12% 32%, rgb(var(--color-gold-500-rgb) / 0.1), transparent 22rem),
+    var(--color-ivory);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.teamGrid {
+  display: grid;
+  margin-inline: auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.memberCard {
+  position: relative;
+  display: grid;
+  min-height: 10.5rem;
+  padding: 1.25rem;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-large);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 1rem 3rem rgb(var(--color-purple-950-rgb) / 0.07);
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1.15rem;
+}
+
+.memberCard::after {
+  position: absolute;
+  right: -4rem;
+  bottom: -5rem;
+  width: 10rem;
+  height: 10rem;
+  border: 1px solid rgb(var(--color-gold-500-rgb) / 0.18);
+  border-radius: 50%;
+  content: "";
+}
+
+.monogram {
+  display: grid;
+  width: 6.4rem;
+  height: 7.8rem;
+  border: 1px solid rgb(var(--color-gold-500-rgb) / 0.38);
+  border-radius: 3.2rem 3.2rem var(--radius-medium) var(--radius-medium);
+  background:
+    radial-gradient(circle at 50% 30%, rgb(var(--color-gold-500-rgb) / 0.22), transparent 42%),
+    linear-gradient(160deg, var(--color-purple-800), var(--color-purple-950));
+  color: var(--color-gold-400);
+  place-items: center;
+}
+
+.monogram span {
+  font-family: var(--font-serif);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.memberCopy p {
+  margin-bottom: 0.3rem;
+  color: var(--color-gold-text);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.memberCopy h3 {
+  margin-bottom: 0.3rem;
+  color: var(--color-purple-950);
+  font-size: var(--fs-3xl);
+}
+
+.memberNote {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.memberIcon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 1px solid rgb(var(--color-purple-800-rgb) / 0.13);
+  border-radius: 50%;
+  background: var(--color-purple-50);
+  color: var(--color-purple-700);
+  place-items: center;
+}
+
+.principlesSection {
+  padding-block: clamp(4rem, 8vw, 7.5rem);
+  background: var(--color-cream);
+}
+
+.principlesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.principleCard {
+  padding: clamp(1.45rem, 3vw, 2.2rem);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-medium);
+  background: var(--color-ivory);
+}
+
+.principleTopline {
+  display: flex;
+  margin-bottom: 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.principleIcon {
+  display: grid;
+  width: 3.15rem;
+  height: 3.15rem;
+  border-radius: 50%;
+  background: var(--color-purple-800);
+  color: var(--color-gold-400);
+  place-items: center;
+}
+
+.index {
+  color: rgb(var(--color-purple-800-rgb) / 0.2);
+  font-family: var(--font-serif);
+  font-size: var(--fs-3xl);
+  font-weight: 700;
+}
+
+.principleCard h3 {
+  margin-bottom: 0.65rem;
+  color: var(--color-purple-950);
+  font-size: var(--fs-md);
+}
+
+.principleCard p {
+  margin-bottom: 0;
+  font-size: var(--fs-sm);
+}
+
+.ctaSection {
+  padding-block: clamp(4rem, 8vw, 7rem);
+  background: var(--color-ivory);
+}
+
+@media (max-width: 800px) {
+  .teamGrid,
+  .principlesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .memberCard {
+    width: 100%;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .memberCard {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .monogram {
+    width: 5rem;
+    height: 6.3rem;
+  }
+
+  .memberIcon {
+    display: none;
+  }
+}

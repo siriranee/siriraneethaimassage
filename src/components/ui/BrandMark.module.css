@@ -1,0 +1,29 @@
+.brand {
+  display: inline-flex;
+  width: auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  margin-inline: 0;
+  padding-block: 0.25rem;
+}
+
+.logoImage {
+  width: 4.8rem;
+  height: auto;
+  object-fit: contain;
+}
+
+.compact .logoImage {
+  width: 3.2rem;
+}
+
+@media (max-width: 380px) {
+  .logoImage {
+    width: 4.25rem;
+  }
+
+  .compact .logoImage {
+    width: 2.75rem;
+  }
+}

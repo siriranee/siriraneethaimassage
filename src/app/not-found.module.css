@@ -1,0 +1,69 @@
+.wrap {
+  display: grid;
+  min-height: 62vh;
+  place-items: center;
+  align-content: center;
+  padding: 4rem var(--pad-x);
+  background: radial-gradient(circle at 50% 20%, var(--color-purple-100), transparent 26rem);
+  text-align: center;
+}
+
+.lotus {
+  width: 4.5rem;
+  margin-bottom: 1rem;
+  stroke: var(--color-gold-600);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.wrap p {
+  margin-bottom: 0.75rem;
+  color: var(--color-gold-text);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.wrap h1 {
+  margin-bottom: 1rem;
+  color: var(--color-purple-800);
+  font-size: var(--fs-5xl);
+}
+
+.wrap > span {
+  color: var(--color-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.actions a {
+  display: inline-flex;
+  min-height: 3.1rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.2rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-small);
+  background: white;
+  color: var(--color-purple-800);
+  font-weight: 800;
+}
+
+.actions a:first-child {
+  border-color: transparent;
+  background: var(--color-gold-500);
+  color: var(--color-purple-950);
+}
+
+.actions svg {
+  width: 1rem;
+  height: 1rem;
+}

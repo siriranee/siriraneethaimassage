@@ -1,0 +1,46 @@
+.heading {
+  margin: 0 auto clamp(1.95rem, 3.5vw, 3rem);
+  text-align: center;
+}
+
+.left {
+  margin-inline: 0;
+  text-align: left;
+}
+
+.eyebrow {
+  margin-bottom: 0.65rem;
+  color: var(--color-gold-text);
+  font-size: var(--fs-sm);
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.heading h2 {
+  margin-bottom: 0.8rem;
+  color: var(--color-purple-950);
+  font-size: var(--fs-4xl);
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+}
+
+.heading h2::after {
+  display: block;
+  width: 4rem;
+  height: 1px;
+  margin: 0.9rem auto 0;
+  background: linear-gradient(90deg, transparent, var(--color-gold-500), transparent);
+  content: "";
+}
+
+.left h2::after {
+  margin-left: 0;
+}
+
+.description {
+  margin-bottom: 0;
+  color: var(--color-muted);
+  line-height: 1.75;
+}

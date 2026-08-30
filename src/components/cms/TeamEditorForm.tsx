@@ -1,0 +1,89 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
+
+import type { CmsTeamRecord } from "@/domain/cms/types";
+import { useUnsavedChanges } from "./useUnsavedChanges";
+
+import styles from "./CmsEditorForm.module.css";
+
+export function TeamEditorForm({ member, isNew = false }: Readonly<{ member: CmsTeamRecord; isNew?: boolean }>) {
+  const router = useRouter();
+  const [version, setVersion] = useState(member.version);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const { dirty, markDirty, markSaved } = useUnsavedChanges();
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setFeedback(null);
+    const data = new FormData(event.currentTarget);
+
+    try {
+      const response = await fetch(isNew ? "/api/cms/team" : `/api/cms/team/${member.id}`, {
+        method: isNew ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expectedVersion: version,
+          name: data.get("name"),
+          fullName: data.get("fullName"),
+          publicRole: data.get("publicRole"),
+          publicProfile: data.get("publicProfile") === "on",
+          operationalActive: data.get("operationalActive") === "on",
+          archived: data.get("archived") === "on",
+          sortOrder: Number(data.get("sortOrder")),
+        }),
+      });
+      const result = (await response.json()) as { error?: string; member?: CmsTeamRecord };
+
+      if (!response.ok || !result.member) {
+        setFeedback({ tone: "error", text: result.error ?? "The team profile could not be saved." });
+        return;
+      }
+
+      setVersion(result.member.version);
+      markSaved();
+      setFeedback({ tone: "success", text: isNew ? "Team profile draft created." : "Team profile saved to the draft." });
+      if (isNew) router.push(`/cms/team/${result.member.id}/edit`);
+      router.refresh();
+    } catch {
+      setFeedback({ tone: "error", text: "The CMS could not be reached. Please try again." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className={styles.form} onChange={markDirty} onSubmit={save}>
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}><h2>Public profile</h2><p>This information can appear on the team page but never as a customer booking choice.</p></header>
+        <div className={styles.grid}>
+          <label className={styles.field}>Display name<input defaultValue={member.name} maxLength={80} minLength={2} name="name" required /></label>
+          <label className={styles.field}>Full name<input defaultValue={member.fullName} maxLength={120} minLength={2} name="fullName" required /></label>
+          <label className={styles.fullField}>Public role<input defaultValue={member.publicRole} maxLength={120} minLength={2} name="publicRole" required /></label>
+          <label className={styles.field}>Display order<input defaultValue={member.sortOrder} max={1000} min={0} name="sortOrder" required type="number" /></label>
+          <label className={styles.checkbox}><input defaultChecked={member.publicProfile} name="publicProfile" type="checkbox" /><span>Show public profile<small>Controls whether this person is included in the published team section.</small></span></label>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}><h2>Internal scheduling status</h2><p>Public profile and operational availability are deliberately separate.</p></header>
+        <label className={styles.checkbox}>
+          <input defaultChecked={member.operationalActive} name="operationalActive" type="checkbox" />
+          <span>Available for internal staff assignment<small>Do not enable until working hours and treatment qualifications are confirmed.</small></span>
+        </label>
+        <label className={styles.checkbox}>
+          <input defaultChecked={member.archived} name="archived" type="checkbox" />
+          <span>Archive this profile<small>Archived profiles are removed from both public display and internal assignment after saving.</small></span>
+        </label>
+      </section>
+
+      <div className={styles.saveBar}>
+        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Draft version ${version}${dirty ? " · unsaved changes" : ""}`}</span>
+        <button disabled={saving} type="submit">{saving ? "Saving..." : isNew ? "Create profile draft" : "Save team profile"}</button>
+      </div>
+    </form>
+  );
+}

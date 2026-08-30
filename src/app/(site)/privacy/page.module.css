@@ -1,0 +1,35 @@
+.article {
+  padding-block: clamp(3.5rem, 7vw, 6rem);
+}
+
+.updated {
+  margin-bottom: 2.5rem;
+  color: var(--color-gold-text);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.article section {
+  padding: 1.6rem 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.article h2 {
+  margin-bottom: 0.75rem;
+  color: var(--color-purple-800);
+  font-size: var(--fs-3xl);
+}
+
+.article p {
+  margin-bottom: 0;
+}
+
+.article a {
+  color: var(--color-purple-700);
+  font-weight: 750;
+  text-decoration: underline;
+  text-decoration-color: var(--color-gold-500);
+  text-underline-offset: 0.2rem;
+}

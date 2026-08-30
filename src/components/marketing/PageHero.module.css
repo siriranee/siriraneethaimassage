@@ -1,0 +1,148 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 24rem;
+  background:
+    radial-gradient(circle at 27% 36%, rgb(var(--color-purple-400-rgb) / 0.28), transparent 38%),
+    linear-gradient(125deg, var(--color-purple-900), var(--color-purple-950) 68%);
+  color: var(--color-cream);
+}
+
+.hero::before,
+.hero::after {
+  position: absolute;
+  width: 23rem;
+  height: 23rem;
+  border: 1px solid rgb(var(--color-gold-500-rgb) / 0.12);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.hero::before {
+  bottom: -16rem;
+  left: -6rem;
+}
+
+.hero::after {
+  top: -17rem;
+  left: 32%;
+}
+
+.compact {
+  min-height: 20rem;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: inherit;
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1fr) minmax(24rem, 0.92fr);
+}
+
+.copy {
+  display: flex;
+  padding: clamp(4rem, 8vw, 7rem) var(--pad-x);
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.eyebrow {
+  margin-bottom: 0.75rem;
+  color: var(--color-gold-400);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.copy h1 {
+  margin-bottom: 0.85rem;
+  color: var(--color-cream);
+  font-size: var(--fs-5xl);
+  letter-spacing: -0.035em;
+  line-height: 1.03;
+}
+
+.compact .copy h1 {
+  font-size: var(--fs-5xl);
+}
+
+.divider {
+  width: 4.5rem;
+  height: 1px;
+  margin-bottom: 1.15rem;
+  background: linear-gradient(90deg, transparent, var(--color-gold-400), transparent);
+}
+
+.description {
+  margin: 0;
+  color: rgba(255, 252, 245, 0.83);
+  font-size: var(--fs-md);
+  line-height: 1.75;
+}
+
+.visual {
+  position: relative;
+  min-height: inherit;
+  overflow: hidden;
+  clip-path: ellipse(82% 91% at 82% 48%);
+  filter: drop-shadow(-0.12rem 0 0 rgb(var(--color-gold-500-rgb) / 0.7));
+}
+
+.image {
+  object-fit: cover;
+}
+
+.imageShade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--color-purple-950) 0%, rgb(var(--color-purple-900-rgb) / 0.18) 38%, rgb(var(--color-purple-950-rgb) / 0.06) 100%);
+}
+
+@media (max-width: 900px) {
+  .inner {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.8fr);
+  }
+
+  .copy {
+    padding-block: 3.75rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero,
+  .compact {
+    min-height: auto;
+  }
+
+  .inner {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .copy {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    min-height: 21rem;
+    padding-block: 4.5rem;
+    background: linear-gradient(90deg, rgb(var(--color-purple-950-rgb) / 0.98), rgb(var(--color-purple-900-rgb) / 0.82) 72%, rgb(var(--color-purple-800-rgb) / 0.4));
+  }
+
+  .visual {
+    position: absolute;
+    inset: 0;
+    min-height: 100%;
+    clip-path: none;
+    filter: none;
+  }
+
+  .imageShade {
+    background: linear-gradient(90deg, rgb(var(--color-purple-950-rgb) / 0.96), rgb(var(--color-purple-900-rgb) / 0.8) 68%, rgb(var(--color-purple-800-rgb) / 0.4));
+  }
+}

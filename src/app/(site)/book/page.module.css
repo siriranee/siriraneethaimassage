@@ -1,0 +1,36 @@
+.main {
+  overflow: clip;
+  background: var(--color-ivory);
+}
+
+.plannerSection {
+  position: relative;
+  padding-block: clamp(4rem, 8vw, 7rem);
+  background:
+    radial-gradient(circle at 4% 16%, rgb(var(--color-purple-600-rgb) / 0.09), transparent 24rem),
+    radial-gradient(circle at 96% 84%, rgb(var(--color-gold-500-rgb) / 0.12), transparent 22rem),
+    var(--color-ivory);
+}
+
+.plannerSection::before,
+.plannerSection::after {
+  position: absolute;
+  border: 1px solid rgb(var(--color-purple-700-rgb) / 0.08);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.plannerSection::before {
+  top: 4rem;
+  left: -9rem;
+  width: 19rem;
+  height: 19rem;
+}
+
+.plannerSection::after {
+  right: -7rem;
+  bottom: 3rem;
+  width: 15rem;
+  height: 15rem;
+}

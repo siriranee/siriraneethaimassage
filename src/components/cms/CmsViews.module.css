@@ -1,0 +1,567 @@
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.twoColumn {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(18rem, 0.8fr);
+  gap: 1rem;
+}
+
+.cardGrid,
+.serviceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.cardGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.toolbar {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.toolbar > div {
+  display: grid;
+}
+
+.toolbar strong {
+  font-size: var(--fs-sm);
+}
+
+.toolbar span {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 58rem;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.table th,
+.table td {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th {
+  background: var(--color-purple-50);
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table td strong,
+.table td small {
+  display: block;
+}
+
+.table td small {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.bookingStatusCell {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+
+.expiredHold {
+  color: #8a3d12 !important;
+  font-weight: 800;
+}
+
+.table code {
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.table a {
+  color: var(--color-purple-700);
+  font-weight: 800;
+}
+
+.mobileRecords {
+  display: none;
+}
+
+.recordCard {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.recordCard:last-child {
+  border-bottom: 0;
+}
+
+.recordCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.recordCard dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.8rem;
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.recordCard dt {
+  color: var(--color-muted);
+}
+
+.recordCard dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.recordCard a {
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.checklist,
+.activityList,
+.scheduleList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checklist li,
+.activityList li,
+.scheduleList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.checklist li:last-child,
+.activityList li:last-child,
+.scheduleList li:last-child {
+  border-bottom: 0;
+}
+
+.checklist svg,
+.activityList svg,
+.scheduleList svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.15rem;
+  color: var(--color-purple-600);
+}
+
+.checklist strong,
+.activityList strong,
+.scheduleList strong {
+  display: block;
+  font-size: var(--fs-sm);
+}
+
+.checklist span,
+.activityList span,
+.scheduleList span {
+  display: block;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.card,
+.serviceCard,
+.dayCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 1.15rem;
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  box-shadow: 0 0.7rem 2rem rgb(var(--color-purple-950-rgb) / 0.04);
+}
+
+.card {
+  min-height: 13rem;
+}
+
+.serviceCard {
+  min-height: 20rem;
+}
+
+.cardIcon {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  margin-bottom: 1rem;
+  place-items: center;
+  border-radius: 0.8rem;
+  background: var(--color-purple-100);
+  color: var(--color-purple-700);
+}
+
+.cardIcon svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.card h2,
+.card h3,
+.serviceCard h2 {
+  margin-bottom: 0.4rem;
+  font-size: var(--fs-lg);
+}
+
+.card p,
+.serviceCard p {
+  margin-bottom: 1rem;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.card > a,
+.serviceCard > a {
+  display: inline-flex;
+  min-height: 2.55rem;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  margin-top: auto;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.55rem;
+  background: var(--color-purple-50);
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.card > a svg,
+.serviceCard > a svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.serviceTop {
+  display: flex;
+  min-height: 1.75rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.serviceTop > span:first-child {
+  color: var(--color-purple-600);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.serviceCard dl {
+  display: grid;
+  gap: 0.5rem;
+  margin: auto 0 1rem;
+}
+
+.serviceCard dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-line);
+  font-size: var(--fs-sm);
+}
+
+.serviceCard dt {
+  color: var(--color-muted);
+}
+
+.serviceCard dd {
+  margin: 0;
+  font-weight: 750;
+  text-align: right;
+}
+
+.searchForm {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(10rem, 1fr));
+  gap: 0.65rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.searchForm label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.fullSearch {
+  grid-column: span 2;
+}
+
+.searchForm input,
+.searchForm select {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.6rem;
+  background: white;
+}
+
+.searchForm button {
+  align-self: end;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--color-purple-700);
+  border-radius: 0.6rem;
+  background: var(--color-purple-700);
+  color: white;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.filterActions {
+  display: flex;
+  align-items: end;
+  gap: 0.6rem;
+}
+
+.filterActions a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding: 0.55rem 0.8rem;
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.resultSummary {
+  margin: 0;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(15rem, 1fr));
+  gap: 0.9rem;
+}
+
+.dayCard {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.emptyDay {
+  margin: 0;
+  padding: 0.85rem;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: 0.65rem;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.dayCard header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.dayCard header strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+}
+
+.dayCard header span {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.appointment {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+  gap: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.65rem;
+  background: var(--color-purple-50);
+}
+
+.appointment time {
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+}
+
+.appointment strong,
+.appointment small {
+  display: block;
+}
+
+.appointment strong {
+  font-size: var(--fs-sm);
+}
+
+.appointment small {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.miniLink {
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
+  gap: 1rem;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.details div {
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.details dt {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.details dd {
+  margin: 0.25rem 0 0;
+  font-size: var(--fs-sm);
+  font-weight: 750;
+}
+
+.details div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.setupLabel {
+  display: inline-block;
+  margin-bottom: 0.45rem;
+  color: var(--color-gold-text);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1280px) {
+  .statGrid,
+  .serviceGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calendarGrid {
+    grid-template-columns: repeat(2, minmax(15rem, 1fr));
+  }
+
+  .searchForm {
+    grid-template-columns: repeat(2, minmax(10rem, 1fr));
+  }
+
+  .fullSearch {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .twoColumn,
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .statGrid,
+  .cardGrid,
+  .serviceGrid,
+  .calendarGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .serviceCard {
+    min-height: 0;
+  }
+
+  .searchForm {
+    grid-template-columns: 1fr;
+  }
+
+  .desktopTable {
+    display: none;
+  }
+
+  .mobileRecords {
+    display: block;
+  }
+
+  .toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .details {
+    grid-template-columns: 1fr;
+  }
+
+  .details div:nth-last-child(2) {
+    border-bottom: 1px solid var(--color-line);
+  }
+}

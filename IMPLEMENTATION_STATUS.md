@@ -1,0 +1,117 @@
+# Siriranee Thai Massage implementation status
+
+Updated: 28 August 2026
+
+## Complete and validated
+
+- Responsive English website for mobile, tablet and desktop.
+- Exact brand name: **Siriranee Thai Massage**.
+- Confirmed address: Floor 3, Harbour House, Harbour Road, Howth, Dublin,
+  Ireland.
+- Confirmed menu:
+  - Traditional Thai Massage — 60 minutes €65 / 90 minutes €95
+  - Hot Oil Massage — 60 minutes €65 / 90 minutes €95
+  - Neck, Shoulder & Upper Back Massage — 30 minutes €40
+  - Deep Tissue Massage — 60 minutes €65 / 90 minutes €95
+  - Hot Stone Massage — 90 minutes €95
+- Natural local coverage for Howth, Sutton, Malahide, Portmarnock, Clontarf,
+  Raheny and Dublin.
+- SEO metadata, canonical links, DaySpa and Service structured data, sitemap,
+  robots rules, redirects and social previews.
+- Click-to-load Google Maps, telephone links, and optional owner-configured
+  email, WhatsApp, Instagram, Booksy and Google Review links.
+- Secure CMS authentication, administrator/staff permissions, session
+  revocation, login lockout and audit history.
+- Create/edit/archive workflows for services and team profiles, plus editable
+  site information, hours, booking rules, public page headings and SEO.
+- Promotion and local gallery-metadata management with draft, published and
+  archived states. Provider-backed uploads remain gated.
+- Public pages read the immutable published CMS snapshot; drafts remain private.
+- Review-first publishing with grouped changes, readiness errors/warnings,
+  immutable publication history and restore-to-draft that preserves current
+  operational booking settings.
+- Booking dashboard, global CMS search, URL-based booking filters, booking
+  detail, controlled change reasons, per-booking audit timeline, status updates,
+  rescheduling, bounded recurring closures, day/week/month calendar and
+  internal staff assignment.
+- Metadata-only notification preview queue. It records delivery intent without
+  duplicating contact details or message bodies and sends no external messages.
+- Public treatment/date/time booking backend with same-origin checks, bounded
+  JSON, validation, rate limiting, idempotency and encrypted customer details.
+- Fully booked capacity checks with pending-hold expiry, closures, buffers,
+  notice period, booking horizon and Europe/Dublin daylight-saving handling.
+- Customers never see, submit or select a therapist. Privileged staff, calendar
+  and price fields are rejected by the public booking API.
+- Expired pending requests release capacity and are clearly flagged in the CMS.
+- Automated TypeScript, lint, content, environment, availability, permission,
+  security-contract and production-build checks.
+
+## Safe defaults
+
+- Local development uses a fictional in-memory CMS and a one-click demo login.
+- Hosted builds reject mock CMS mode.
+- Production CMS is disabled without MongoDB configuration.
+- Direct public booking requires independent code, database, owner/privacy,
+  notification, monitoring and verified-recovery readiness gates.
+- Customer details are encrypted with AES-256-GCM before MongoDB storage.
+- CMS and API responses containing private data are no-store.
+- CMS routes are blocked from indexing.
+- Provisional opening hours remain omitted from structured data.
+
+## Mock or provisional until the owner confirms
+
+- Opening hours and operational booking rules.
+- Maximum simultaneous appointments, booking notice, buffers, hold time,
+  booking horizon and cancellation cutoff.
+- Published phone number and public communication channels.
+- Exact Eircode/map pin, entrance, lift, accessibility, parking and transport
+  guidance.
+- Team display details beyond the current supplied names.
+- Illustrative spa imagery and final logo/brand assets.
+- Privacy legal basis, retention schedule, provider list and any international
+  transfer wording.
+- Booking notification and follow-up workflow.
+- External notification delivery provider, retries and alert ownership.
+- Production media upload/storage provider and final image approval workflow.
+- Automated backup frequency, retention and restore-test schedule.
+
+## Implemented but intentionally not live
+
+Direct website booking is production-shaped but remains off until all of the
+following are true:
+
+1. MongoDB production persistence and indexes are configured.
+2. The PII encryption key is stored in both deployment and protected recovery
+   systems.
+3. The owner has confirmed and published opening hours and booking rules.
+4. Public booking is enabled in CMS settings.
+5. The privacy notice and operational retention process are approved.
+6. Staff notification or verified dashboard-monitoring coverage is ready.
+7. Recovery has been tested in an isolated database.
+8. All final environment gates are enabled and the production smoke test passes.
+
+## Remaining launch work
+
+1. Receive the owner-confirmed domain, phone, opening hours, access details,
+   cancellation policy, contact channels and final assets.
+2. Choose and configure hosting, MongoDB, media, notification and monitoring
+   providers.
+3. Approve the final privacy notice and retention schedule.
+4. Establish booking notification, response-time and expired-request procedures.
+5. Configure automated encrypted backups and complete an isolated restore drill.
+6. Provision production administrators without retaining plaintext credentials.
+7. Run the complete validation and rendered HTTP suite against production.
+8. Enable direct booking only after the owner signs off the workflow.
+
+## Sensitive work awaiting explicit authorization
+
+- Persistent account administration beyond the one-time seed flow: creating or
+  disabling administrators, resetting passwords and revoking their sessions.
+- Project-integrated backup and isolated-restore commands that can read or write
+  production database archives.
+
+The CMS user directory therefore remains read-only, and backup/recovery remains
+an operator-run, approval-gated procedure documented in CMS_RECOVERY.md. No
+sensitive booking CSV export has been added.
+
+No production deployment or provider account changes have been made.

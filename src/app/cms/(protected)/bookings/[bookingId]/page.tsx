@@ -1,0 +1,107 @@
+import { History, Mail, Phone, UserRound } from "lucide-react";
+import { notFound } from "next/navigation";
+
+import { BookingEditorForm } from "@/components/cms/BookingEditorForm";
+import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
+import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
+import { isPendingCapacityExpired } from "@/domain/booking/status";
+import { requireCmsPageUser } from "@/server/cms/auth/guards";
+import { getCmsContent } from "@/server/cms/content-service";
+import { getCmsBooking, listCmsBookingTimeline, listCmsNotifications } from "@/server/cms/read-service";
+
+import styles from "@/components/cms/CmsViews.module.css";
+
+type PageProps = {
+  readonly params: Promise<{ readonly bookingId: string }>;
+};
+
+export default async function CmsBookingDetailPage({ params }: PageProps) {
+  await requireCmsPageUser("bookings:write");
+  const { bookingId } = await params;
+  const [booking, content, timeline, notifications] = await Promise.all([
+    getCmsBooking(bookingId),
+    getCmsContent(),
+    listCmsBookingTimeline(bookingId),
+    listCmsNotifications(bookingId, 100),
+  ]);
+  if (!booking) notFound();
+  const expiredPending = isPendingCapacityExpired(booking);
+
+  const staff = content.team
+    .filter((member) => (member.operationalActive && !member.archived) || member.id === booking.assignedStaffId)
+    .map((member) => ({ id: member.id, name: member.name }));
+
+  return (
+    <>
+      <CmsPageHeader
+        actions={<CmsPrimaryLink href="/cms/bookings" secondary>Back to bookings</CmsPrimaryLink>}
+        description="Review the appointment snapshot, update status, reschedule safely or assign staff internally."
+        eyebrow={booking.reference}
+        title={booking.customer.name}
+      />
+
+      {booking.demo ? (
+        <CmsNotice tone="warning" title="Fictional local mock booking">
+          This customer and contact information are placeholders and reset with the local server.
+        </CmsNotice>
+      ) : null}
+
+      {expiredPending ? (
+        <CmsNotice tone="warning" title="Temporary capacity hold has expired">
+          This pending request no longer blocks the appointment time. Confirming or rescheduling it will recheck opening hours, closures and current capacity before saving.
+        </CmsNotice>
+      ) : null}
+
+      <div className={styles.detailGrid}>
+        <CmsPanel title="Booking summary" description="Treatment and price are preserved from the booking date.">
+          <dl className={styles.details}>
+            <div><dt>Status</dt><dd><CmsBookingStatus status={booking.status} /></dd></div>
+            <div><dt>Reference</dt><dd>{booking.reference}</dd></div>
+            <div><dt>Treatment</dt><dd>{booking.serviceName}</dd></div>
+            <div><dt>Duration & price</dt><dd>{booking.durationMinutes} min · €{(booking.priceCents / 100).toFixed(0)}</dd></div>
+            <div><dt>Date</dt><dd>{booking.localDate}</dd></div>
+            <div><dt>Dublin time</dt><dd>{booking.localTime}</dd></div>
+            <div><dt>Source</dt><dd>{booking.source}</dd></div>
+            <div><dt>Assigned staff</dt><dd>{booking.assignedStaffId || "Unassigned"}</dd></div>
+            <div><dt>Last change reason</dt><dd>{booking.lastChangeReason?.replaceAll("-", " ") || "Not recorded"}</dd></div>
+          </dl>
+        </CmsPanel>
+
+        <CmsPanel title="Customer contact" description="Visible only to authorised CMS users.">
+          <ul className={styles.activityList}>
+            <li><UserRound aria-hidden="true" /><div><strong>{booking.customer.name}</strong><span>Customer</span></div></li>
+            <li><Phone aria-hidden="true" /><div><strong>{booking.customer.phone}</strong><span>Phone</span></div></li>
+            <li><Mail aria-hidden="true" /><div><strong>{booking.customer.email || "Not provided"}</strong><span>Email</span></div></li>
+          </ul>
+        </CmsPanel>
+      </div>
+
+      <CmsPanel title={`Booking activity · ${timeline.length}`} description="Status and administrative actions are recorded without customer notes or message content.">
+        {timeline.length ? (
+          <ul className={styles.activityList}>
+            {timeline.map((event) => (
+              <li key={event.id}>
+                <History aria-hidden="true" />
+                <div><strong>{event.summary}</strong><span>{new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Dublin" }).format(new Date(event.createdAt))} · {event.actorName}</span></div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No recorded activity is available for this seeded mock appointment.</p>
+        )}
+      </CmsPanel>
+
+      <CmsPanel title={`Notification previews · ${notifications.length}`} description="Preview records contain no recipient address or message body and are not sent.">
+        {notifications.length ? (
+          <ul className={styles.activityList}>
+            {notifications.map((notification) => (
+              <li key={notification.id}><Mail aria-hidden="true" /><div><strong>{notification.kind.replaceAll("-", " ")} · {notification.channel}</strong><span>{notification.status} · {new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Dublin" }).format(new Date(notification.createdAt))}</span></div></li>
+            ))}
+          </ul>
+        ) : <p>No notification preview has been generated for this booking.</p>}
+      </CmsPanel>
+
+      <BookingEditorForm booking={booking} staff={staff} />
+    </>
+  );
+}

@@ -1,0 +1,55 @@
+.button {
+  display: inline-flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.82rem 1.35rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  line-height: 1.2;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+}
+
+.button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.gold {
+  background: linear-gradient(135deg, var(--color-gold-400), var(--color-gold-500));
+  box-shadow: var(--shadow-button);
+  color: var(--color-purple-950);
+}
+
+.gold:hover {
+  box-shadow: 0 1rem 2.2rem rgb(var(--color-gold-600-rgb) / 0.32);
+}
+
+.outline {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.04);
+  color: white;
+}
+
+.outline:hover {
+  border-color: var(--color-gold-400);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.light {
+  border-color: var(--color-line-strong);
+  background: white;
+  color: var(--color-purple-800);
+}
+
+.light:hover {
+  border-color: var(--color-purple-700);
+  box-shadow: var(--shadow-soft);
+}

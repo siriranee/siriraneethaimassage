@@ -1,0 +1,318 @@
+.form {
+  display: grid;
+  gap: 1rem;
+  padding-bottom: 5rem;
+}
+
+.section {
+  padding: 1.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  box-shadow: 0 0.8rem 2.25rem rgb(var(--color-purple-950-rgb) / 0.04);
+}
+
+.sectionHeader {
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.sectionHeader h2 {
+  margin-bottom: 0.25rem;
+  font-size: var(--fs-lg);
+}
+
+.sectionHeader p {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.grid,
+.threeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.95rem;
+}
+
+.threeGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field,
+.fullField {
+  display: grid;
+  align-content: start;
+  gap: 0.38rem;
+  color: var(--color-ink);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.fullField {
+  grid-column: 1 / -1;
+}
+
+.field small,
+.fullField small {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.field input,
+.field select,
+.field textarea,
+.fullField input,
+.fullField select,
+.fullField textarea {
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.62rem;
+  background: white;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.field textarea,
+.fullField textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.fullField input:focus,
+.fullField select:focus,
+.fullField textarea:focus {
+  border-color: var(--color-purple-600);
+}
+
+.checkbox {
+  display: flex;
+  min-height: 3rem;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.65rem;
+  background: var(--color-purple-50);
+  color: var(--color-ink);
+  font-size: var(--fs-sm);
+  font-weight: 750;
+}
+
+.checkbox input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.12rem;
+  accent-color: var(--color-purple-700);
+}
+
+.checkbox span {
+  display: grid;
+}
+
+.checkbox small {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.priceList {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.priceRow {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.7fr) minmax(8rem, 0.7fr) minmax(9rem, 1fr);
+  gap: 0.75rem;
+  align-items: end;
+  padding: 0.85rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.7rem;
+  background: var(--color-purple-50);
+}
+
+.removeButton,
+.secondaryButton {
+  min-height: 2.55rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.58rem;
+  background: white;
+  color: var(--color-purple-800);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.removeButton {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.removeButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.secondaryButton {
+  justify-self: start;
+}
+
+.priceRow label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.priceRow input[type="number"] {
+  min-height: 2.7rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.55rem;
+  background: white;
+}
+
+.saveBar {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 10;
+  display: flex;
+  min-height: 4.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0.9rem 0.75rem 1rem;
+  border: 1px solid rgb(var(--color-purple-800-rgb) / 0.16);
+  border-radius: 0.85rem;
+  background: rgb(var(--color-surface-rgb) / 0.96);
+  box-shadow: 0 1rem 2.75rem rgb(var(--color-purple-950-rgb) / 0.14);
+  backdrop-filter: blur(0.75rem);
+}
+
+.saveBar span {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.saveBar button {
+  min-height: 2.8rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--color-purple-700);
+  border-radius: 0.62rem;
+  background: linear-gradient(135deg, var(--color-purple-500), var(--color-purple-700));
+  color: white;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.saveBar button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.success,
+.error {
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.58rem;
+  font-size: var(--fs-sm);
+  font-weight: 750;
+}
+
+.success {
+  background: #eaf5e7;
+  color: #2f6d31 !important;
+}
+
+.error {
+  background: #fdebee;
+  color: #9f2c36 !important;
+}
+
+.readOnly {
+  min-height: 2.9rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.62rem;
+  background: var(--color-purple-100);
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.seoPreview {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.22rem;
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 0.6rem 1.5rem rgb(var(--color-purple-950-rgb) / 0.04);
+}
+
+.seoPreview span {
+  color: #27633a;
+  font-size: var(--fs-sm);
+}
+
+.seoPreview strong {
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+}
+
+.seoPreview p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+@media (max-width: 780px) {
+  .grid,
+  .threeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .fullField {
+    grid-column: auto;
+  }
+
+  .priceRow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .priceRow > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .section {
+    padding: 1rem;
+  }
+
+  .priceRow {
+    grid-template-columns: 1fr;
+  }
+
+  .priceRow > :last-child {
+    grid-column: auto;
+  }
+
+  .saveBar {
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

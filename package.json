@@ -1,0 +1,40 @@
+{
+  "name": "siriranee-thai-massage",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "prebuild": "node scripts/validate-production-env.mjs",
+    "build": "next build",
+    "start": "next start",
+    "cms:indexes": "node scripts/cms-indexes.mjs",
+    "cms:seed-admin": "node scripts/seed-cms-admin.mjs",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit --pretty false --incremental false",
+    "test": "npm run test:booking && npm run test:cms-workflows && npm run test:ui && npm run test:env && npm run test:content",
+    "test:booking": "tsx --test tests/availability.test.ts tests/booking-status.test.ts tests/cms-permissions.test.ts tests/booking-contract.test.ts",
+    "test:cms-workflows": "tsx --test tests/cms-workflows.test.ts",
+    "test:ui": "tsx --test tests/home-hero-slider.test.ts tests/contact-fab.test.ts",
+    "test:env": "tsx --test tests/production-env.test.ts",
+    "test:content": "node scripts/validate-site-content.mjs",
+    "test:rendered": "node scripts/validate-rendered-site.mjs",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
+    "lucide-react": "1.20.0",
+    "mongodb": "^7.4.0",
+    "next": "16.3.3",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.3",
+    "@types/react": "19.2.3",
+    "@types/react-dom": "19.2.3",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3",
+    "tsx": "^4.23.12",
+    "typescript": "6.0.3"
+  }
+}
