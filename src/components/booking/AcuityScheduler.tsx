@@ -29,12 +29,9 @@ export function AcuityScheduler({
     >
       <div className={styles.heading}>
         <div>
-          <p className={styles.eyebrow}>Live appointment calendar</p>
-          <h2 id="live-booking-title">Choose your date and time</h2>
-          <p>
-            Acuity shows current availability in Europe/Dublin time. Unavailable
-            and fully booked times are not offered.
-          </p>
+          <p className={styles.eyebrow}>Live calendar</p>
+          <h2 id="live-booking-title">Choose a time</h2>
+          <p>Times are shown in Dublin time.</p>
         </div>
         <div className={styles.headingActions}>
           <span className={styles.liveBadge}>
@@ -84,7 +81,7 @@ export function AcuityScheduler({
       <div className={styles.providerNote}>
         <span>
           <LockKeyhole aria-hidden="true" />
-          Booking details are entered directly into {acuityConfig.providerName}.
+          Book securely with {acuityConfig.providerName}.
         </span>
         <a href={directUrl} target="_blank" rel="noreferrer">
           Open calendar in a new tab

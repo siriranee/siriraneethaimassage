@@ -62,8 +62,67 @@ test("booking page uses the custom month calendar and visual time choices", asyn
   assert.match(calendar, /Day off/);
   assert.match(calendar, /aria-current=\{today \? "date"/);
   assert.match(calendarStyles, /grid-template-columns:\s*repeat\(7/);
+  assert.match(
+    calendarStyles,
+    /\.calendarHeader\s*\{[\s\S]*?display:\s*grid;[\s\S]*?justify-items:\s*center/,
+  );
+  assert.equal((calendarStyles.match(/\.calendarHeader\s*\{/g) ?? []).length, 1);
   assert.match(calendarStyles, /@media \(max-width: 390px\)/);
   assert.match(calendarStyles, /@media \(forced-colors: active\)/);
+});
+
+test("booking page keeps customer instructions concise", async () => {
+  const [planner, bookPage, calendar, plannerStyles] = await Promise.all([
+    source("src/components/booking/BookingPlanner.tsx"),
+    source("src/app/(site)/book/page.tsx"),
+    source("src/components/booking/BookingCalendar.tsx"),
+    source("src/components/booking/BookingPlanner.module.css"),
+  ]);
+  const bookingCopy = `${bookPage}\n${planner}`;
+
+  assert.match(bookPage, /title="Book your massage"/);
+  assert.match(bookPage, /description="Choose a treatment, date and time\."/);
+  assert.match(planner, />Choose your appointment</);
+  assert.match(planner, />Treatment</);
+  assert.match(planner, />Duration</);
+  assert.match(planner, />Date &amp; time</);
+  assert.match(planner, />Available times · Dublin time</);
+  assert.doesNotMatch(planner, /<small>Dublin time<\/small>/);
+  assert.doesNotMatch(planner, /styles\.journey/);
+  assert.doesNotMatch(planner, /stepNumber/);
+  assert.doesNotMatch(planner, /noticeIcon/);
+  assert.doesNotMatch(calendar, /dayStatus|shortStateLabel|todayDot/);
+  assert.match(
+    plannerStyles,
+    /\.fieldset legend\s*\{[\s\S]*?float:\s*left/,
+  );
+  assert.match(
+    plannerStyles,
+    /\.plannerGrid\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/,
+  );
+  assert.equal((plannerStyles.match(/\.plannerGrid\s*\{/g) ?? []).length, 1);
+  assert.match(
+    plannerStyles,
+    /\.appointmentPicker\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/,
+  );
+  assert.equal(
+    (plannerStyles.match(/\.appointmentPicker\s*\{/g) ?? []).length,
+    1,
+  );
+  assert.match(
+    plannerStyles,
+    /@media \(min-width: 641px\)\s*\{[\s\S]*?\.primaryAction\s*\{[\s\S]*?max-width:\s*32rem/,
+  );
+
+  for (const retiredCopy of [
+    "Your visit, your pace",
+    "Review your preferences",
+    "Choose the massage that best suits your visit.",
+    "Prices update with the treatment length.",
+    "Fully booked and blocked times are removed automatically.",
+  ]) {
+    assert.ok(!bookingCopy.includes(retiredCopy), `Retired copy remains: ${retiredCopy}`);
+  }
 });
 
 test("month availability uses one bounded repository read per operational source", async () => {

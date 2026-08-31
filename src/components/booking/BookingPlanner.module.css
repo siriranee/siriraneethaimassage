@@ -6,12 +6,11 @@
 }
 
 .intro {
-  margin: 0 auto clamp(1.95rem, 3.5vw, 3rem);
+  margin: 0 auto 2.5rem;
   text-align: center;
 }
 
-.eyebrow,
-.summaryEyebrow {
+.eyebrow {
   margin-bottom: 0.7rem;
   color: var(--color-gold-text);
   font-size: var(--fs-sm);
@@ -41,86 +40,13 @@
   content: "";
 }
 
-.introText {
-  margin: 0 auto;
-  font-size: var(--fs-base);
-}
-
-.journey {
-  display: grid;
-  margin: 0 auto clamp(1.75rem, 3vw, 2.5rem);
-  padding: 0.55rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-large);
-  background: rgba(255, 255, 255, 0.64);
-  box-shadow: 0 0.5rem 2rem rgb(var(--color-purple-950-rgb) / 0.05);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  list-style: none;
-}
-
-.journey li {
-  display: flex;
-  min-width: 0;
-  padding: 0.85rem 1rem;
-  border-radius: calc(var(--radius-large) - 0.35rem);
-  align-items: center;
-  gap: 0.8rem;
-}
-
-.journey li + li {
-  border-left: 1px solid var(--color-line);
-}
-
-.journeyActive {
-  background: linear-gradient(135deg, var(--color-purple-50), #fff9eb);
-}
-
-.journeyNumber {
-  display: grid;
-  width: 2.15rem;
-  height: 2.15rem;
-  border: 1px solid var(--color-line-strong);
-  border-radius: 50%;
-  color: var(--color-purple-800);
-  flex: 0 0 auto;
-  font-size: var(--fs-sm);
-  font-weight: 800;
-  place-items: center;
-}
-
-.journeyActive .journeyNumber {
-  border-color: var(--color-purple-700);
-  background: var(--color-purple-700);
-  color: var(--color-cream);
-  box-shadow: 0 0.45rem 1rem rgb(var(--color-purple-700-rgb) / 0.22);
-}
-
-.journey strong,
-.journey small {
-  display: block;
-}
-
-.journey strong {
-  color: var(--color-purple-950);
-  font-size: var(--fs-sm);
-  line-height: 1.35;
-}
-
-.journey small {
-  margin-top: 0.15rem;
-  color: var(--color-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.45;
-}
-
 .plannerGrid {
   display: grid;
   align-items: start;
-  gap: clamp(1.25rem, 2.5vw, 2rem);
-  grid-template-columns: minmax(0, 1.55fr) minmax(18.5rem, 0.72fr);
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.selectionCard,
 .summaryCard,
 .emptyState {
   border: 1px solid var(--color-line);
@@ -130,27 +56,30 @@
 }
 
 .selectionCard {
-  overflow: hidden;
+  display: grid;
+  gap: 1.25rem;
 }
 
 .fieldset {
   min-width: 0;
   margin: 0;
-  padding: clamp(1.35rem, 2.7vw, 2.2rem);
-  border: 0;
-}
-
-.fieldset + .fieldset {
-  border-top: 1px solid var(--color-line);
+  padding: 2rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-large);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-card);
 }
 
 .fieldset legend {
-  display: flex;
+  display: block;
+  float: left;
   width: 100%;
   margin: 0 0 1.35rem;
   padding: 0;
-  align-items: center;
-  gap: 0.85rem;
+}
+
+.fieldset > div {
+  clear: both;
 }
 
 .fieldset legend strong,
@@ -172,20 +101,6 @@
   line-height: 1.45;
 }
 
-.stepNumber {
-  display: grid;
-  width: 2.15rem;
-  height: 2.15rem;
-  border-radius: 50%;
-  background: var(--color-purple-100);
-  color: var(--color-purple-800);
-  flex: 0 0 auto;
-  font-family: var(--font-body);
-  font-size: var(--fs-sm);
-  font-weight: 850;
-  place-items: center;
-}
-
 .serviceGrid,
 .durationGrid {
   clear: both;
@@ -194,11 +109,11 @@
 }
 
 .serviceGrid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .durationGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
 }
 
 .optionLabel {
@@ -236,7 +151,7 @@
 
 .serviceOption {
   position: relative;
-  min-height: 8.25rem;
+  min-height: 7.5rem;
   padding: 1rem 1.1rem;
   flex-direction: column;
 }
@@ -346,43 +261,30 @@
   }
 }
 
-.calendarOnly {
-  clear: both;
-  margin: 0;
-  padding: 1rem;
-  border-radius: var(--radius-medium);
-  background: var(--color-purple-50);
-  font-size: var(--fs-sm);
-}
-
-.dateTimeGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.8rem;
-}
-
 .appointmentPicker {
   display: grid;
   min-width: 0;
   align-items: start;
-  grid-template-columns: minmax(0, 1.38fr) minmax(14.5rem, 0.62fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
 }
 
 .timePicker {
   min-width: 0;
-  padding: 1rem;
+  padding: 1.25rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-large);
   background:
     radial-gradient(circle at 100% 0%, rgb(var(--color-purple-600-rgb) / 0.08), transparent 10rem),
     linear-gradient(160deg, white, #fffcf4);
-  box-shadow: 0 1rem 2.6rem rgb(var(--color-purple-950-rgb) / 0.06);
+  box-shadow: 0 0.8rem 2rem rgb(var(--color-purple-950-rgb) / 0.06);
 }
 
 .timePickerHeader {
   display: flex;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-line);
   align-items: center;
   gap: 0.7rem;
 }
@@ -417,14 +319,15 @@
 .timePickerHeader h4 {
   margin: 0;
   color: var(--color-purple-950);
-  font-size: var(--fs-sm);
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
   line-height: 1.3;
 }
 
 .timePlaceholder,
 .timeEmpty {
   display: grid;
-  min-height: 12rem;
+  min-height: 8.5rem;
   padding: 1rem;
   border: 1px dashed var(--color-line-strong);
   border-radius: var(--radius-medium);
@@ -434,18 +337,14 @@
   text-align: center;
 }
 
-.timePlaceholder > span {
-  display: grid;
+.timePlaceholder > svg {
   width: 3rem;
   height: 3rem;
   margin-bottom: 0.7rem;
+  padding: 0.7rem;
   border: 1px solid var(--color-purple-600);
   border-radius: 50%;
   color: var(--color-purple-700);
-  font-family: var(--font-display);
-  font-size: var(--fs-sm);
-  font-weight: 850;
-  place-items: center;
 }
 
 .timePlaceholder p,
@@ -492,8 +391,8 @@
 .timeLoadingGrid,
 .timeSlotGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.65rem;
 }
 
 .timeLoadingGrid span {
@@ -552,21 +451,13 @@
   font-size: var(--fs-sm);
 }
 
-.timeOptionContent small {
-  margin-top: 0.12rem;
-  color: var(--color-muted);
-  font-size: var(--fs-sm);
-  font-weight: 700;
-}
-
 .timeRadio:checked + .timeOptionContent {
   border-color: var(--color-purple-700);
   background: linear-gradient(145deg, var(--color-purple-700), var(--color-purple-800));
   box-shadow: 0 0.55rem 1.15rem rgb(var(--color-purple-700-rgb) / 0.22);
 }
 
-.timeRadio:checked + .timeOptionContent strong,
-.timeRadio:checked + .timeOptionContent small {
+.timeRadio:checked + .timeOptionContent strong {
   color: var(--color-cream);
 }
 
@@ -601,7 +492,7 @@
 }
 
 .bookingField input,
-.bookingField select {
+.bookingField textarea {
   width: 100%;
   min-height: 3.15rem;
   padding: 0.65rem 0.75rem;
@@ -614,25 +505,13 @@
 }
 
 .bookingField input:disabled,
-.bookingField select:disabled {
+.bookingField textarea:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }
 
-.availabilityMessage {
-  margin: 0.85rem 0 0;
-  padding: 0.7rem 0.8rem;
-  border-left: 0.2rem solid var(--color-gold-500);
-  border-radius: 0 var(--radius-small) var(--radius-small) 0;
-  background: var(--color-gold-100);
-  color: var(--color-purple-950);
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-}
-
 .summaryCard {
-  position: sticky;
-  top: calc(var(--sticky-header-height) + 1rem);
+  position: relative;
   overflow: hidden;
 }
 
@@ -653,15 +532,10 @@
 }
 
 .summaryHeading {
-  padding: 1.6rem clamp(1.25rem, 2.5vw, 1.8rem) 1.4rem;
+  padding: 1.5rem;
   background:
     radial-gradient(circle at 88% 0%, rgb(var(--color-gold-400-rgb) / 0.18), transparent 36%),
     linear-gradient(135deg, var(--color-purple-900), var(--color-purple-800));
-}
-
-.summaryEyebrow {
-  margin-bottom: 0.5rem;
-  color: var(--color-gold-400);
 }
 
 .summaryHeading h3 {
@@ -671,20 +545,29 @@
 }
 
 .summaryBody {
-  padding: 0.35rem clamp(1.25rem, 2.5vw, 1.8rem) 0;
+  padding: 1.25rem 1.5rem 0;
 }
 
 .summaryList {
+  display: grid;
   margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-medium);
+  background: var(--color-cream);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .summaryList > div {
-  display: flex;
-  padding: 0.95rem 0;
-  border-bottom: 1px solid var(--color-line);
-  align-items: baseline;
-  gap: 1rem;
-  justify-content: space-between;
+  display: grid;
+  min-width: 0;
+  padding: 1rem;
+  align-content: start;
+  gap: 0.35rem;
+}
+
+.summaryList > div + div {
+  border-left: 1px solid var(--color-line);
 }
 
 .summaryList dt {
@@ -698,7 +581,7 @@
   font-size: var(--fs-sm);
   font-weight: 750;
   line-height: 1.4;
-  text-align: right;
+  text-align: left;
 }
 
 .serviceNote {
@@ -722,7 +605,7 @@
 
 .totalRow {
   display: flex;
-  padding: 1.15rem 0 0.65rem;
+  padding: 1.25rem 0 0.5rem;
   align-items: baseline;
   gap: 1rem;
   justify-content: space-between;
@@ -743,7 +626,7 @@
 .primaryAction {
   display: flex;
   min-height: 3.4rem;
-  margin: 1rem clamp(1.25rem, 2.5vw, 1.8rem) 0;
+  margin: 1rem 1.5rem 0;
   padding: 0.85rem 1.15rem;
   border: 1px solid var(--color-gold-500);
   border-radius: var(--radius-small);
@@ -771,14 +654,11 @@
 }
 
 .calendarNotice {
-  display: flex;
-  margin: 1.15rem clamp(1.25rem, 2.5vw, 1.8rem) 1.5rem;
+  margin: 1.15rem 1.5rem 1.5rem;
   padding: 0.9rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-small);
   background: var(--color-purple-50);
-  align-items: flex-start;
-  gap: 0.65rem;
 }
 
 .calendarNotice p {
@@ -786,32 +666,6 @@
   color: var(--color-muted);
   font-size: var(--fs-sm);
   line-height: 1.55;
-}
-
-.noticeIcon {
-  display: grid;
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 1px solid var(--color-purple-600);
-  border-radius: 50%;
-  color: var(--color-purple-700);
-  flex: 0 0 auto;
-  font-family: var(--font-display);
-  font-size: var(--fs-sm);
-  font-weight: 800;
-  place-items: center;
-}
-
-.visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
-  white-space: nowrap;
 }
 
 .emptyState {
@@ -836,25 +690,6 @@
 }
 
 @media (max-width: 1050px) {
-  .plannerGrid {
-    grid-template-columns: minmax(0, 1fr) minmax(17.5rem, 0.62fr);
-  }
-
-  .serviceGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 820px) {
-  .plannerGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .summaryCard {
-    position: relative;
-    top: auto;
-  }
-
   .serviceGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -865,43 +700,21 @@
     width: calc(100% - 2rem);
   }
 
-  .journey {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .journey li + li {
-    border-top: 1px solid var(--color-line);
-    border-left: 0;
-  }
-
   .serviceGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .durationGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .fieldset {
+    padding: 1.5rem;
   }
 
-  .dateTimeGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 760px) {
-  .appointmentPicker {
+  .summaryList {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .timeSlotGrid,
-  .timeLoadingGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 460px) {
-  .timeSlotGrid,
-  .timeLoadingGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .summaryList > div + div {
+    border-top: 1px solid var(--color-line);
+    border-left: 0;
   }
 }
 
@@ -918,14 +731,6 @@
 
   .fieldset {
     padding: 1.15rem;
-  }
-
-  .fieldset legend {
-    align-items: flex-start;
-  }
-
-  .durationGrid {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .serviceOption {
@@ -949,7 +754,6 @@
 }
 
 .bookingField input:focus-visible,
-.bookingField select:focus-visible,
 .bookingField textarea:focus-visible {
   outline: 0.2rem solid var(--color-gold-500);
   outline-offset: 0.12rem;
@@ -1023,7 +827,7 @@
 }
 
 .formError {
-  margin: 0 1.4rem 1.4rem;
+  margin: 0;
   padding: 1rem;
   overflow-wrap: anywhere;
   border: 1px solid rgba(139, 30, 45, 0.28);
@@ -1053,9 +857,12 @@
   min-height: 100%;
   padding: clamp(1.5rem, 4vw, 2.5rem);
   overflow-wrap: anywhere;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-large);
   background:
     radial-gradient(circle at 100% 0%, rgb(var(--color-gold-400-rgb) / 0.2), transparent 34%),
     linear-gradient(145deg, var(--color-cream), var(--color-purple-50));
+  box-shadow: var(--shadow-card);
 }
 
 .confirmationPanel:focus {
@@ -1139,6 +946,14 @@
   box-shadow: none;
   opacity: 0.58;
   transform: none;
+}
+
+@media (min-width: 641px) {
+  .primaryAction {
+    width: calc(100% - 3rem);
+    max-width: 32rem;
+    margin-inline: auto;
+  }
 }
 
 @media (max-width: 640px) {

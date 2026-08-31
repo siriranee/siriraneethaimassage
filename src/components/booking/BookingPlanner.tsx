@@ -222,9 +222,7 @@ export function BookingPlanner({
   const [availabilityState, setAvailabilityState] = useState<
     "idle" | "loading" | "ready" | "disabled" | "error"
   >(initialDate ? "loading" : "idle");
-  const [availabilityMessage, setAvailabilityMessage] = useState(
-    "Choose a date to check the booking calendar.",
-  );
+  const [availabilityMessage, setAvailabilityMessage] = useState("");
   const [submissionState, setSubmissionState] = useState<
     "idle" | "submitting" | "error" | "success"
   >("idle");
@@ -354,11 +352,8 @@ export function BookingPlanner({
     return (
       <section className={styles.emptyState} aria-labelledby="booking-title">
         <p className={styles.eyebrow}>Book Now</p>
-        <h2 id="booking-title">Contact the Siriranee team</h2>
-        <p>
-          Online booking is unavailable while the service menu is being
-          updated.
-        </p>
+        <h2 id="booking-title">Booking is temporarily unavailable</h2>
+        <p>Please contact Siriranee.</p>
         <Link className={styles.primaryAction} href="/contact">
           Contact the spa <span aria-hidden="true">→</span>
         </Link>
@@ -405,9 +400,7 @@ export function BookingPlanner({
     setAvailableSlots([]);
     setAvailabilityMode(null);
     setAvailabilityMessage(
-      value
-        ? "Checking the booking calendar..."
-        : "Choose a date to check the booking calendar.",
+      value ? "Checking times..." : "",
     );
     setAvailabilityState(value ? "loading" : "idle");
     resetSubmission();
@@ -450,7 +443,7 @@ export function BookingPlanner({
     const data = new FormData(form);
     idempotencyKeyRef.current ||= createIdempotencyKey();
     setSubmissionState("submitting");
-    setSubmissionMessage("Sending your secure booking request...");
+    setSubmissionMessage("Sending your request...");
     setFieldErrors({});
 
     try {
@@ -497,7 +490,7 @@ export function BookingPlanner({
       setConfirmation(result.booking);
       setSubmissionState("success");
       setSubmissionMessage(
-        "Your request was received and is awaiting confirmation from Siriranee.",
+        "Request received. Siriranee will contact you to confirm.",
       );
     } catch {
       setSubmissionState("error");
@@ -521,60 +514,20 @@ export function BookingPlanner({
           : ""
       }`
     : "Not selected yet";
+  const summaryBookingNotice =
+    availabilityMode !== "live" &&
+    selectedService.bookingNotice &&
+    !/^Online booking is (?:being configured|coming soon)\b/i.test(
+      selectedService.bookingNotice.trim(),
+    )
+      ? selectedService.bookingNotice
+      : null;
 
   return (
     <section className={styles.planner} aria-labelledby="booking-planner-title">
       <div className={styles.intro}>
-        <p className={styles.eyebrow}>Your visit, your pace</p>
-        <h2 id="booking-planner-title">Choose your massage</h2>
-        <p className={styles.introText}>
-          Select a treatment, duration and preferred Dublin date and time. The
-          spa handles staff assignment internally, so there is no therapist
-          choice. Personal details are requested only when secure direct booking
-          is fully approved and available.
-        </p>
+        <h2 id="booking-planner-title">Choose your appointment</h2>
       </div>
-
-      <ol className={styles.journey} aria-label="Two-stage appointment process">
-        <li
-          aria-current={!selectedTime ? "step" : undefined}
-          className={styles.journeyActive}
-        >
-          <span className={styles.journeyNumber} aria-hidden="true">
-            1
-          </span>
-          <span>
-            <strong>Book Now</strong>
-            <small>Choose your service, duration and preferred time.</small>
-          </span>
-        </li>
-        <li
-          aria-current={selectedTime ? "step" : undefined}
-          className={
-            selectedTime || calendarRequested ? styles.journeyActive : undefined
-          }
-        >
-          <span className={styles.journeyNumber} aria-hidden="true">
-            2
-          </span>
-          <span>
-            <strong>
-              {directBookingAvailable
-                ? "Send your secure request"
-                : externalCalendarAvailable
-                  ? "Confirm in the live calendar"
-                  : "Request your appointment"}
-            </strong>
-            <small>
-              {directBookingAvailable
-                ? "Enter contact details and await the team’s confirmation."
-                : externalCalendarAvailable
-                  ? "Complete the configured provider booking."
-                  : "Contact the team while direct booking setup is pending."}
-            </small>
-          </span>
-        </li>
-      </ol>
 
       <form
         aria-busy={submissionState === "submitting"}
@@ -593,11 +546,10 @@ export function BookingPlanner({
               <span className={styles.confirmationBadge} aria-hidden="true">
                 ✓
               </span>
-              <p className={styles.eyebrow}>Request received</p>
-              <h3>Thank you — Siriranee will confirm your appointment</h3>
+              <h3>Request received</h3>
               <p>
-                Your reference is <strong>{confirmation.reference}</strong>.
-                This is a pending request, not a confirmed appointment.
+                Reference: <strong>{confirmation.reference}</strong>. We’ll
+                contact you to confirm.
               </p>
               <dl className={styles.confirmationDetails}>
                 <div>
@@ -624,7 +576,7 @@ export function BookingPlanner({
                 onClick={startAnotherBooking}
                 type="button"
               >
-                Book Now
+                Book another massage
               </button>
             </div>
           ) : (
@@ -634,10 +586,8 @@ export function BookingPlanner({
                 disabled={submissionState === "submitting"}
               >
                 <legend>
-                  <span className={styles.stepNumber}>1</span>
                   <span>
-                    <strong>Select a treatment</strong>
-                    <small>Choose the massage that best suits your visit.</small>
+                    <strong>Treatment</strong>
                   </span>
                 </legend>
 
@@ -683,10 +633,8 @@ export function BookingPlanner({
                 disabled={submissionState === "submitting"}
               >
                 <legend>
-                  <span className={styles.stepNumber}>2</span>
                   <span>
-                    <strong>Choose a duration</strong>
-                    <small>Prices update with the treatment length.</small>
+                    <strong>Duration</strong>
                   </span>
                 </legend>
 
@@ -728,12 +676,8 @@ export function BookingPlanner({
                 disabled={submissionState === "submitting"}
               >
                 <legend>
-                  <span className={styles.stepNumber}>3</span>
                   <span>
-                    <strong>Choose a preferred date & time</strong>
-                    <small>
-                      Fully booked and blocked times are removed automatically.
-                    </small>
+                    <strong>Date &amp; time</strong>
                   </span>
                 </legend>
 
@@ -763,22 +707,19 @@ export function BookingPlanner({
                         <Clock3 />
                       </span>
                       <div>
-                        <span>Available times</span>
+                        <span>Available times · Dublin time</span>
                         <h4 id="available-time-title">
                           {preferredDate
                             ? formatLocalDate(preferredDate)
-                            : "Select an available day"}
+                            : "No day selected"}
                         </h4>
                       </div>
                     </header>
 
                     {!preferredDate ? (
                       <div className={styles.timePlaceholder}>
-                        <span aria-hidden="true">01</span>
-                        <p>
-                          Choose a purple <strong>Available</strong> day to see
-                          its Dublin appointment times.
-                        </p>
+                        <Clock3 aria-hidden="true" />
+                        <p>Select a day to see times.</p>
                       </div>
                     ) : availabilityState === "loading" ? (
                       <div
@@ -836,7 +777,6 @@ export function BookingPlanner({
                               />
                               <span className={styles.timeOptionContent}>
                                 <strong>{slot.localTimeLabel}</strong>
-                                <small>Dublin time</small>
                               </span>
                             </label>
                           );
@@ -851,7 +791,7 @@ export function BookingPlanner({
 
                     <p
                       aria-live="polite"
-                      className={styles.availabilityMessage}
+                      className="sr-only"
                       role={
                         availabilityState === "error" ? "alert" : "status"
                       }
@@ -883,12 +823,9 @@ export function BookingPlanner({
                   disabled={submissionState === "submitting"}
                 >
                   <legend>
-                    <span className={styles.stepNumber}>4</span>
                     <span>
                       <strong>Your contact details</strong>
-                      <small>
-                        Siriranee uses these details only to manage your request.
-                      </small>
+                      <small>Used only for your booking.</small>
                     </span>
                   </legend>
 
@@ -1008,8 +945,7 @@ export function BookingPlanner({
           className={styles.summaryCard}
         >
           <div className={styles.summaryHeading}>
-            <p className={styles.summaryEyebrow}>Your booking</p>
-            <h3 id="booking-summary-title">Review your preferences</h3>
+            <h3 id="booking-summary-title">Your booking</h3>
           </div>
 
           <div className={styles.summaryBody}>
@@ -1027,19 +963,19 @@ export function BookingPlanner({
                 </dd>
               </div>
               <div>
-                <dt>Preferred appointment</dt>
+                <dt>Date &amp; time</dt>
                 <dd>{appointmentLabel}</dd>
               </div>
             </dl>
 
-            {availabilityMode !== "live" && selectedService.bookingNotice ? (
+            {summaryBookingNotice ? (
               <div className={styles.serviceNote}>
-                <p>{selectedService.bookingNotice}</p>
+                <p>{summaryBookingNotice}</p>
               </div>
             ) : null}
 
             <div className={styles.totalRow}>
-              <span>Listed treatment price</span>
+              <span>Price</span>
               <strong>
                 {selectedDurationOption
                   ? formatPrice(selectedDurationOption.priceEur)
@@ -1057,7 +993,7 @@ export function BookingPlanner({
               {submissionState === "submitting"
                 ? "Sending request..."
                 : selectedTime
-                  ? "Send secure booking request"
+                  ? "Send booking request"
                   : "Choose a time to continue"}
               <span aria-hidden="true">→</span>
             </button>
@@ -1077,23 +1013,20 @@ export function BookingPlanner({
               className={styles.primaryAction}
               href={contactPreferenceHref}
             >
-              Contact to request this appointment
+              Request appointment
               <span aria-hidden="true">→</span>
             </Link>
           ) : null}
 
           <div className={styles.calendarNotice} id="live-calendar-note">
-            <span className={styles.noticeIcon} aria-hidden="true">
-              i
-            </span>
             <p>
               {confirmation
                 ? submissionMessage
                 : directBookingAvailable
-                  ? "Your details are encrypted before storage. The request remains pending until the Siriranee team confirms it; staff assignment is internal."
+                  ? "Your details are encrypted. Siriranee will confirm your request."
                   : externalCalendarAvailable
-                    ? "Personal details are entered directly with the configured provider. Its staff-selection settings must be verified before launch."
-                    : "This booking page stores no personal information. A preferred time is not confirmed until the Siriranee team replies."}
+                    ? "Complete your booking securely with the booking provider."
+                    : "Your selection is not confirmed until Siriranee replies."}
             </p>
           </div>
         </aside>

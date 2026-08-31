@@ -40,9 +40,9 @@ export default async function ServicesPage() {
   return (
     <div>
       <PageHero
-        eyebrow="Siriranee treatments"
-        title="Massage Services in Dublin"
-        description="Explore our five-treatment menu with clear 30-, 60- and 90-minute options in Howth, Dublin."
+        eyebrow="Treatments & prices"
+        title="Massage in Howth, Dublin"
+        description="Clear options for every schedule and preference."
         image="/images/spa/spa-still-life.webp"
         imageAlt="Massage oils, candles and flowers in a softly lit treatment setting"
       />
@@ -50,10 +50,8 @@ export default async function ServicesPage() {
       <section className={styles.servicesSection} aria-labelledby="services-heading">
         <div className={styles.container}>
           <SectionHeading
-            eyebrow="Find your treatment"
-            title="Choose the experience that feels right"
+            title="All Treatments"
             headingId="services-heading"
-            description="Compare every confirmed duration and price, then open a treatment for more detail or continue to booking."
           />
           <ServiceExplorer services={services} categories={categories} />
         </div>

@@ -33,18 +33,6 @@ export default async function PromotionsPage() {
         imageAlt="Illustrative warm massage oil, folded towels and an orchid"
       />
 
-      <section className={styles.introSection}>
-        <div className={`container ${styles.intro}`}>
-          <span className="eyebrow">Clear and current</span>
-          <h2>Only genuine offers, never placeholder discounts</h2>
-          <p className="lead">
-            Promotional details can change. An offer appears here only after its
-            price, dates and terms are confirmed. Contact the team to ask about
-            current appointment availability.
-          </p>
-        </div>
-      </section>
-
       {promotions.length ? (
         <section className={styles.cardsSection} aria-labelledby="current-offers-heading">
           <div className={`container ${styles.cards}`}>

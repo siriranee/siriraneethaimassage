@@ -201,6 +201,8 @@
 }
 
 .menuButton {
+  position: relative;
+  z-index: 103;
   display: none;
   width: 2.9rem;
   height: 2.9rem;
@@ -212,6 +214,11 @@
   color: white;
 }
 
+.menuButton[aria-expanded="true"] {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: transparent;
+}
+
 .backdrop {
   position: fixed;
   inset: 0;
@@ -219,7 +226,9 @@
   border: 0;
   background: rgba(0, 0, 0, 0.52);
   opacity: 0;
+  overscroll-behavior: none;
   pointer-events: none;
+  touch-action: none;
   transition: opacity 220ms ease;
 }
 
@@ -240,6 +249,8 @@
   padding: 1.15rem 1.15rem max(1.15rem, env(safe-area-inset-bottom));
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   background: linear-gradient(155deg, var(--color-purple-800), var(--color-purple-950));
   box-shadow: -1.5rem 0 4rem rgba(0, 0, 0, 0.34);
   clip-path: inset(0 0 0 100%);
@@ -247,6 +258,10 @@
   pointer-events: none;
   visibility: hidden;
   transition: clip-path 240ms ease, opacity 180ms ease, visibility 0s linear 240ms;
+}
+
+.drawer::-webkit-scrollbar {
+  display: none;
 }
 
 .drawerOpen {
@@ -259,26 +274,12 @@
 
 .drawerTop {
   display: flex;
+  min-height: 3.9rem;
   align-items: center;
   justify-content: flex-end;
+  padding-top: 0.35rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.drawerClose {
-  display: inline-grid;
-  width: 2.75rem;
-  height: 2.75rem;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-small);
-  background: transparent;
-  color: white;
-}
-
-.drawerClose svg {
-  width: 1.2rem;
-  height: 1.2rem;
 }
 
 .mobileNav {

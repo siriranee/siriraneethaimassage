@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BookingCta } from "@/components/marketing/BookingCta";
+import { PageHero } from "@/components/marketing/PageHero";
 import { createMetadata } from "@/lib/metadata";
 import {
   buildBreadcrumbJsonLd,
@@ -77,8 +78,15 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
       <script {...jsonLdScriptProps(serviceJsonLd)} />
       <script {...jsonLdScriptProps(breadcrumbJsonLd)} />
 
-      <section className={styles.hero}>
-        <div className={styles.heroGlow} aria-hidden="true" />
+      <PageHero
+        eyebrow={`${category?.label ?? "Massage treatment"} · Howth, Dublin`}
+        title={service.name}
+        description={service.shortDescription}
+        image={service.image.src}
+        imageAlt={service.image.alt}
+      />
+
+      <section className={styles.optionsSection} aria-labelledby="treatment-options-heading">
         <div className={styles.container}>
           <nav className={styles.breadcrumbs} aria-label="Breadcrumb">
             <Link href="/">Home</Link>
@@ -88,23 +96,17 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
             <span aria-current="page">{service.name}</span>
           </nav>
 
-          <div className={styles.heroGrid}>
-            <div className={styles.visual}>
-              <Image
-                src={service.image.src}
-                alt={service.image.alt}
-                fill
-                preload
-                sizes="(max-width: 800px) 100vw, 52vw"
-              />
-              <span className={styles.imageLabel}>{category?.label ?? "Massage treatment"}</span>
+          <div className={styles.optionsCard}>
+            <div className={styles.optionsIntro}>
+              <p className={styles.eyebrow}>Treatment options</p>
+              <h2 id="treatment-options-heading">Choose your appointment</h2>
+              <p>
+                Review the available durations and prices, then choose a preferred
+                date and time.
+              </p>
             </div>
 
-            <div className={styles.summary}>
-              <p className={styles.eyebrow}>Siriranee · Dublin</p>
-              <h1>{service.name}</h1>
-              <p className={styles.intro}>{service.shortDescription}</p>
-
+            <div className={styles.optionsDetails}>
               {service.durations.length ? (
                 <div className={styles.summaryLine}>
                   <Clock3 aria-hidden="true" size={20} />

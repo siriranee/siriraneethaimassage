@@ -170,9 +170,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
           ) : null}
 
           <SectionHeading
-            eyebrow="Visit or get in touch"
-            title="Everything you need for your appointment"
-            description="Use the verified links below to call, open directions or continue to the booking page."
+            title="Contact Details"
             headingId="contact-heading"
           />
 

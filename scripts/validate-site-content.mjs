@@ -66,6 +66,12 @@ const globalStylesSource = await read("src/app/globals.css");
 const schemaSource = await read("src/lib/structured-data.ts");
 const publicAdapterSource = await read("src/server/cms/public-adapter.ts");
 const publicBookingSource = await read("src/server/booking/public-booking.ts");
+const defaultContentSource = await read("src/server/cms/default-content.ts");
+const servicesPageSource = await read("src/app/(site)/services/page.tsx");
+const therapistsPageSource = await read("src/app/(site)/therapists/page.tsx");
+const contactPageSource = await read("src/app/(site)/contact/page.tsx");
+const galleryPageSource = await read("src/app/(site)/gallery/page.tsx");
+const promotionsPageSource = await read("src/app/(site)/promotions/page.tsx");
 const customerBookingSources = new Map(
   await Promise.all(
     [
@@ -136,6 +142,50 @@ check(
   "Draft opening hours must remain unconfirmed until the owner approves them",
 );
 check(siteSource.includes(expectedAddress), "Formatted address is incorrect");
+
+const conciseHeroSource = [
+  defaultContentSource,
+  servicesPageSource,
+  therapistsPageSource,
+].join("\n");
+
+for (const copy of [
+  "Thai Massage with Thoughtful Care",
+  "Contact Siriranee in Howth",
+  "Find Us in Howth",
+  "Privacy Notice",
+  "Massage Gifts & Offers",
+  "A Look Inside Siriranee",
+  "Massage in Howth, Dublin",
+  "The Siriranee Team",
+]) {
+  check(conciseHeroSource.includes(copy), `Concise PageHero copy is missing: ${copy}`);
+}
+
+for (const retiredCopy of [
+  "Discover a massage and spa setting in Howth shaped around thoughtful care",
+  "continue an appointment request with your chosen massage preferences",
+  "Check the practical details below before your appointment",
+  "Arrange a thoughtful massage gift, explore longer appointments",
+  "shaping Siriranee's visual direction in Howth",
+  "Explore our five-treatment menu with clear 30-, 60- and 90-minute options",
+  "A calm massage experience begins with feeling heard",
+]) {
+  check(!conciseHeroSource.includes(retiredCopy), `Retired PageHero copy remains: ${retiredCopy}`);
+}
+
+check(
+  contactPageSource.includes('title="Contact Details"'),
+  "The contact page should use one concise details heading",
+);
+check(
+  galleryPageSource.includes('title="Treatment Moments"'),
+  "The gallery page should use one concise content heading",
+);
+check(
+  !promotionsPageSource.includes("introSection"),
+  "The repeated promotions introduction must not return",
+);
 
 for (const declaration of [
   "--color-purple-950: #150224;",
@@ -340,9 +390,16 @@ for (const breakpoint of [
 
 for (const file of styleFiles) {
   const source = await readFile(file, "utf8");
+  const relativePath = relative(repoRoot, file).replaceAll("\\", "/");
+  const maxWidthDeclarations = [...source.matchAll(/^\s*max-width\s*:\s*([^;]+);/gm)];
+  const hasAllowedBookingButtonWidth =
+    relativePath === "src/components/booking/BookingPlanner.module.css" &&
+    maxWidthDeclarations.length === 1 &&
+    maxWidthDeclarations[0][1].trim() === "32rem" &&
+    /@media \(min-width: 641px\)\s*\{[\s\S]*?\.primaryAction\s*\{[\s\S]*?max-width:\s*32rem;/.test(source);
   check(
-    !/^\s*max-width\s*:/m.test(source),
-    `Element max-width property found in ${relative(repoRoot, file)}`,
+    maxWidthDeclarations.length === 0 || hasAllowedBookingButtonWidth,
+    `Unexpected element max-width property found in ${relative(repoRoot, file)}`,
   );
   for (const declaration of source.matchAll(/font-size:\s*([^;]+)/g)) {
     check(

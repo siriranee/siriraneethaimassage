@@ -47,8 +47,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     <div className={styles.main}>
       <PageHero
         eyebrow="Massage appointments in Howth"
-        title="Book your massage in Howth"
-        description="Choose your treatment, duration and preferred date and time. The spa checks availability and handles staff assignment internally."
+        title="Book your massage"
+        description="Choose a treatment, date and time."
         image="/images/spa/spa-still-life.webp"
         imageAlt="Illustrative rolled towels, massage oils, orchids and candles in a calm spa setting"
       />

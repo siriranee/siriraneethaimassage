@@ -53,9 +53,9 @@ export default async function TherapistsPage() {
   return (
     <div>
       <PageHero
-        eyebrow="The people behind your visit"
-        title="Meet the Siriranee Team"
-        description="A calm massage experience begins with feeling heard. Meet the confirmed team members who help make each visit welcoming and considered."
+        eyebrow="Your comfort comes first"
+        title="The Siriranee Team"
+        description="Friendly, thoughtful care from the moment you arrive."
         image="/images/spa/hero-massage.webp"
         imageAlt="A massage treatment being provided in a softly lit spa room"
       />
@@ -63,10 +63,9 @@ export default async function TherapistsPage() {
       <section className={styles.teamSection} aria-labelledby="team-heading">
         <div className={styles.container}>
           <SectionHeading
-            eyebrow="Our team"
-            title="The people you may meet at Siriranee"
+            title="Team Profiles"
             headingId="team-heading"
-            description="We publish only confirmed team details. Choose a treatment and duration, then contact the team to request an appointment. The spa handles staff assignment."
+            description="The spa assigns the team member for each appointment."
           />
           <div className={styles.teamGrid}>
             {teamMembers.map((member) => (

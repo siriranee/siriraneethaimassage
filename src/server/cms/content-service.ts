@@ -76,10 +76,21 @@ export async function getCmsContent() {
 
 function normaliseCmsContent(content: CmsContentState): CmsContentState {
   const defaults = createDefaultContentState();
-  const fallbackVouchers = getCmsMode() === "mock" ? defaults.vouchers : [];
+  const mode = getCmsMode();
+  const fallbackVouchers = mode === "mock" ? defaults.vouchers : [];
+  const defaultPages = defaults.pages ?? [];
+  const storedPages = content.pages?.length ? content.pages : defaultPages;
+  const pages = mode === "mock"
+    ? defaultPages.map((defaultPage) => {
+        const storedPage = storedPages.find((page) => page.id === defaultPage.id);
+        return storedPage && storedPage.version >= defaultPage.version
+          ? storedPage
+          : defaultPage;
+      })
+    : storedPages;
   return {
     ...content,
-    pages: content.pages?.length ? content.pages : defaults.pages,
+    pages,
     vouchers: content.vouchers ?? fallbackVouchers,
   };
 }

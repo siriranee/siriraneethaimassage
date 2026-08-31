@@ -19,7 +19,6 @@ export default async function PrivacyPage() {
   return (
     <div>
       <PageHero
-        compact
         eyebrow={pageCopy.eyebrow}
         title={pageCopy.title}
         description={pageCopy.description}

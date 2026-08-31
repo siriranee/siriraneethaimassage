@@ -28,7 +28,6 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [treatmentsOpen, setTreatmentsOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const treatmentsMenuRef = useRef<HTMLDivElement>(null);
   const treatmentsButtonRef = useRef<HTMLButtonElement>(null);
@@ -69,7 +68,19 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
   }, [treatmentsOpen]);
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
+    if (!menuOpen) {
+      return;
+    }
+
+    const body = document.body;
+    const root = document.documentElement;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+    const previousOverscrollBehavior = root.style.overscrollBehavior;
+    const scrollbarWidth = window.innerWidth - root.clientWidth;
+    const bodyPaddingRight = Number.parseFloat(
+      window.getComputedStyle(body).paddingRight,
+    ) || 0;
     const inertTargets = [
       document.getElementById("main-content"),
       document.querySelector("footer"),
@@ -77,13 +88,19 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
     ].filter((target): target is HTMLElement => target instanceof HTMLElement);
     const previousInert = inertTargets.map((target) => target.inert);
 
-    document.body.style.overflow = menuOpen ? "hidden" : previousOverflow;
+    body.style.overflow = "hidden";
+    root.style.overscrollBehavior = "none";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${bodyPaddingRight + scrollbarWidth}px`;
+    }
     inertTargets.forEach((target) => {
-      target.inert = menuOpen;
+      target.inert = true;
     });
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+      root.style.overscrollBehavior = previousOverscrollBehavior;
       inertTargets.forEach((target, index) => {
         target.inert = previousInert[index];
       });
@@ -96,15 +113,20 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
     }
 
     const focusFrame = window.requestAnimationFrame(() => {
-      drawerCloseRef.current?.focus();
+      menuButtonRef.current?.focus({ preventScroll: true });
     });
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Tab") {
-        const focusableElements = drawerRef.current?.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        const drawerElements = Array.from(
+          drawerRef.current?.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ) ?? [],
         );
-        const firstElement = focusableElements?.[0];
-        const lastElement = focusableElements?.[focusableElements.length - 1];
+        const focusableElements = menuButtonRef.current
+          ? [menuButtonRef.current, ...drawerElements]
+          : drawerElements;
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
 
         if (!firstElement || !lastElement) {
           return;
@@ -126,7 +148,7 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
 
       setMenuOpen(false);
       window.requestAnimationFrame(() => {
-        menuButtonRef.current?.focus();
+        menuButtonRef.current?.focus({ preventScroll: true });
       });
     };
 
@@ -142,7 +164,7 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
     setMenuOpen(false);
     setTreatmentsOpen(false);
     window.requestAnimationFrame(() => {
-      menuButtonRef.current?.focus();
+      menuButtonRef.current?.focus({ preventScroll: true });
     });
   }
 
@@ -253,7 +275,7 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
         aria-hidden={!menuOpen}
         className={`${styles.backdrop} ${menuOpen ? styles.backdropOpen : ""}`}
         onClick={closeMenu}
-        tabIndex={menuOpen ? 0 : -1}
+        tabIndex={-1}
         type="button"
       />
       <aside
@@ -266,17 +288,7 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
         ref={drawerRef}
         role="dialog"
       >
-        <div className={styles.drawerTop}>
-          <button
-            aria-label="Close navigation"
-            className={styles.drawerClose}
-            onClick={closeMenu}
-            ref={drawerCloseRef}
-            type="button"
-          >
-            <X aria-hidden="true" />
-          </button>
-        </div>
+        <div aria-hidden="true" className={styles.drawerTop} />
         <nav aria-label="Mobile navigation links" className={styles.mobileNav}>
           {headerNavigation.map((item) =>
             item.href === "/services" ? (

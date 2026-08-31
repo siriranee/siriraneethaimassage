@@ -3,32 +3,15 @@
   margin-inline: auto;
 }
 
-.hero {
-  position: relative;
-  overflow: hidden;
-  padding-block: 1.3rem clamp(3.75rem, 7vw, 6.5rem);
-  background:
-    radial-gradient(circle at 83% 20%, rgb(var(--color-purple-600-rgb) / 0.36), transparent 31rem),
-    linear-gradient(135deg, var(--color-purple-800), var(--color-purple-950) 72%);
-}
-
-.heroGlow {
-  position: absolute;
-  top: -12rem;
-  right: -8rem;
-  width: 32rem;
-  height: 32rem;
-  border: 1px solid rgb(var(--color-gold-500-rgb) / 0.14);
-  border-radius: 50%;
-  pointer-events: none;
+.optionsSection {
+  padding-block: 1.5rem clamp(4rem, 7vw, 6.5rem);
+  background: var(--color-ivory);
 }
 
 .breadcrumbs {
-  position: relative;
-  z-index: 1;
   display: flex;
-  margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
-  color: rgba(255, 252, 245, 0.62);
+  margin-bottom: 1.5rem;
+  color: var(--color-muted);
   align-items: center;
   flex-wrap: wrap;
   font-size: var(--fs-sm);
@@ -36,60 +19,23 @@
 }
 
 .breadcrumbs a:hover {
-  color: var(--color-gold-400);
+  color: var(--color-purple-700);
 }
 
 .breadcrumbs [aria-current="page"] {
-  color: rgba(255, 252, 245, 0.9);
-}
-
-.heroGrid {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  align-items: center;
-  grid-template-columns: minmax(0, 1.08fr) minmax(21rem, 0.92fr);
-  gap: clamp(2rem, 5vw, 5.5rem);
-}
-
-.visual {
-  position: relative;
-  min-height: clamp(25rem, 45vw, 40rem);
-  overflow: hidden;
-  border: 1px solid rgb(var(--color-gold-500-rgb) / 0.42);
-  border-radius: clamp(1.25rem, 3vw, 2.5rem) clamp(1.25rem, 3vw, 2.5rem) clamp(1.25rem, 3vw, 2.5rem) 7rem;
-  background: var(--color-purple-900);
-  box-shadow: 0 2.1rem 5rem rgba(0, 0, 0, 0.25);
-}
-
-.visual::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, rgb(var(--color-purple-950-rgb) / 0.7), transparent 40%);
-  content: "";
-}
-
-.visual img {
-  object-fit: cover;
-}
-
-.imageLabel {
-  position: absolute;
-  z-index: 1;
-  bottom: 1.1rem;
-  left: 1.1rem;
-  padding: 0.55rem 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 999px;
-  background: rgb(var(--color-purple-900-rgb) / 0.76);
-  color: var(--color-cream);
-  font-size: var(--fs-sm);
+  color: var(--color-purple-950);
   font-weight: 700;
-  backdrop-filter: blur(8px);
 }
 
-.summary {
-  color: var(--color-cream);
+.optionsCard {
+  display: grid;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid rgb(var(--color-purple-800-rgb) / 0.14);
+  border-radius: var(--radius-large);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgb(var(--color-gold-500-rgb) / 0.07));
+  box-shadow: var(--shadow-card);
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  gap: clamp(2rem, 6vw, 6rem);
 }
 
 .eyebrow {
@@ -101,27 +47,29 @@
   text-transform: uppercase;
 }
 
-.summary h1 {
+.optionsIntro h2 {
   margin-bottom: 1rem;
-  color: var(--color-cream);
-  font-size: var(--fs-5xl);
-  letter-spacing: -0.04em;
-  line-height: 1.02;
+  color: var(--color-purple-950);
+  font-size: var(--fs-3xl);
+  line-height: 1.12;
 }
 
-.intro {
-  margin-bottom: 1.5rem;
-  color: rgba(255, 252, 245, 0.8);
+.optionsIntro > p:last-child {
+  color: var(--color-muted);
   font-size: var(--fs-sm);
-  line-height: 1.75;
+  line-height: 1.7;
+}
+
+.optionsDetails {
+  min-width: 0;
 }
 
 .summaryLine {
   display: flex;
   margin-bottom: 1.25rem;
   padding-block: 0.9rem;
-  border-block: 1px solid rgba(255, 255, 255, 0.14);
-  color: var(--color-gold-400);
+  border-block: 1px solid var(--color-line);
+  color: var(--color-purple-700);
   align-items: center;
   gap: 0.75rem;
 }
@@ -133,12 +81,12 @@
 }
 
 .summaryLine span {
-  color: rgba(255, 252, 245, 0.56);
+  color: var(--color-muted);
   font-size: var(--fs-sm);
 }
 
 .summaryLine strong {
-  color: var(--color-cream);
+  color: var(--color-purple-950);
   font-size: var(--fs-sm);
 }
 
@@ -153,21 +101,21 @@
   display: flex;
   min-height: 3.5rem;
   padding: 0.7rem 0.85rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-small);
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.72);
   align-items: center;
   gap: 0.75rem;
   justify-content: space-between;
 }
 
 .priceOption span {
-  color: rgba(255, 252, 245, 0.74);
+  color: var(--color-muted);
   font-size: var(--fs-sm);
 }
 
 .priceOption strong {
-  color: var(--color-gold-400);
+  color: var(--color-purple-700);
   font-family: var(--font-serif);
   font-size: var(--fs-base);
 }
@@ -175,16 +123,16 @@
 .enquiryNote {
   margin-bottom: 1.25rem;
   padding: 0.9rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-small);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 252, 245, 0.77);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--color-ink);
   font-size: var(--fs-sm);
 }
 
 .serviceNote {
   margin: -0.4rem 0 1rem;
-  color: rgba(255, 252, 245, 0.64);
+  color: var(--color-muted);
   font-size: var(--fs-sm);
   line-height: 1.55;
 }
@@ -214,8 +162,8 @@
 }
 
 .secondaryAction {
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: var(--color-cream);
+  border: 1px solid rgb(var(--color-purple-800-rgb) / 0.24);
+  color: var(--color-purple-800);
 }
 
 .primaryAction:hover,
@@ -451,26 +399,13 @@
 }
 
 @media (max-width: 900px) {
-  .heroGrid,
+  .optionsCard,
   .contentGrid {
     grid-template-columns: 1fr;
-  }
-
-  .visual {
-    min-height: clamp(22rem, 70vw, 35rem);
   }
 }
 
 @media (max-width: 680px) {
-  .hero {
-    padding-bottom: 4.2rem;
-  }
-
-  .visual {
-    min-height: 21rem;
-    border-radius: var(--radius-large) var(--radius-large) var(--radius-large) 4rem;
-  }
-
   .pricing,
   .highlights ul,
   .relatedGrid {

@@ -61,10 +61,8 @@ export default async function GalleryPage() {
       <section className={styles.gallerySection} aria-labelledby="gallery-heading">
         <div className={styles.container}>
           <SectionHeading
-            eyebrow="Moments of calm"
-            title="Massage, movement and thoughtful detail"
+            title="Treatment Moments"
             headingId="gallery-heading"
-            description="An illustrative introduction to the treatments and spa rituals you can explore at Siriranee."
           />
           <div className={styles.galleryGrid}>
             {galleryImages.map((image, index) => (

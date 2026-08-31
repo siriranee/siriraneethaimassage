@@ -8,7 +8,6 @@ type PageHeroProps = {
   description: string;
   image?: string;
   imageAlt?: string;
-  compact?: boolean;
 };
 
 export function PageHero({
@@ -17,28 +16,28 @@ export function PageHero({
   description,
   image = "/images/spa/spa-still-life.webp",
   imageAlt = "A calm massage treatment room with oils and flowers",
-  compact = false,
 }: PageHeroProps) {
   return (
-    <section className={`${styles.hero} ${compact ? styles.compact : ""}`}>
-      <div className={styles.inner}>
-        <div className={styles.copy}>
-          {eyebrow ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
-          <h1>{title}</h1>
-          <span className={styles.divider} aria-hidden="true" />
-          <p className={styles.description}>{description}</p>
-        </div>
+    <section className={styles.hero}>
+      <div className={styles.media}>
+        <Image
+          alt={imageAlt}
+          className={styles.image}
+          fill
+          preload
+          quality={90}
+          sizes="(max-width: 620px) 400vw, (max-width: 900px) 180vw, 100vw"
+          src={image}
+        />
+      </div>
 
-        <div className={styles.visual} aria-hidden={imageAlt ? undefined : true}>
-          <Image
-            className={styles.image}
-            src={image}
-            alt={imageAlt}
-            fill
-            preload={!compact}
-            sizes="(max-width: 760px) 100vw, 50vw"
-          />
-          <div className={styles.imageShade} />
+      <div aria-hidden="true" className={styles.scrim} />
+
+      <div className={styles.content}>
+        <div className={styles.contentInner}>
+          {eyebrow ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
+          <h1 className={styles.title}>{title}</h1>
+          <p className={styles.description}>{description}</p>
         </div>
       </div>
     </section>

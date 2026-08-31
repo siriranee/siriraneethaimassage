@@ -44,7 +44,7 @@ type BookingCalendarProps = {
   readonly onSelectDate: (localDate: string) => void;
 };
 
-const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const weekdayLabels = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const validDayStates = new Set<CalendarDayState>([
   "available",
   "fully-booked",
@@ -156,24 +156,6 @@ function stateClass(state: CalendarDayState | undefined) {
       return styles.dayUnavailable;
     default:
       return styles.dayOutsideWindow;
-  }
-}
-
-function shortStateLabel(day: CalendarDay | undefined, selected: boolean) {
-  if (selected) return "Selected";
-  if (!day) return "Checking";
-
-  switch (day.state) {
-    case "available":
-      return "Available";
-    case "fully-booked":
-      return "Full";
-    case "day-off":
-      return "Day off";
-    case "unavailable":
-      return "No times";
-    default:
-      return "";
   }
 }
 
@@ -395,7 +377,6 @@ export function BookingCalendar({
           const today = minimumDate === localDate;
           const loading = visibleCalendarState === "loading";
           const selectable = day?.state === "available";
-          const stateLabel = shortStateLabel(day, selected);
           const ariaLabel = `${formatLocalDate(localDate)} — ${
             loading ? "checking availability" : (day?.label ?? "unavailable")
           }${selected ? ", selected" : ""}`;
@@ -415,10 +396,6 @@ export function BookingCalendar({
               type="button"
             >
               <span className={styles.dayNumber}>{Number(localDate.slice(-2))}</span>
-              {stateLabel ? (
-                <span className={styles.dayStatus}>{stateLabel}</span>
-              ) : null}
-              {today ? <span className={styles.todayDot}>Today</span> : null}
             </button>
           );
         })}

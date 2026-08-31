@@ -1,27 +1,5 @@
-.introSection {
-  padding: clamp(3.5rem, 7vw, 6rem) 0 2rem;
-  background: var(--color-ivory);
-}
-
-.intro {
-  text-align: center;
-}
-
-.intro :global(.eyebrow)::before {
-  display: none;
-}
-
-.intro h2 {
-  margin-bottom: 1rem;
-  color: var(--color-purple-800);
-}
-
-.intro p {
-  margin-inline: auto;
-}
-
 .cardsSection {
-  padding: 2rem 0 var(--section-y);
+  padding: var(--section-y) 0;
   background:
     radial-gradient(circle at 96% 12%, var(--color-purple-100), transparent 25rem),
     var(--color-ivory);

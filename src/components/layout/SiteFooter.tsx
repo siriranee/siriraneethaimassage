@@ -65,7 +65,7 @@ export function SiteFooter({ site }: Readonly<{ site: PublicSiteData }>) {
           <h2 className={styles.heading}>Opening hours</h2>
           <div className={styles.hoursIntro}>
             <Clock3 aria-hidden="true" />
-            <span>{site.openingHoursConfirmed ? "Current published schedule" : "Draft schedule — please confirm before travelling"}</span>
+            <span>{site.openingHoursConfirmed ? "Current published schedule" : "Draft schedule. Please confirm before travelling"}</span>
           </div>
           <dl className={styles.hours}>
             {site.openingHoursGroups.map((entry) => (
@@ -82,7 +82,6 @@ export function SiteFooter({ site }: Readonly<{ site: PublicSiteData }>) {
         <div className={`container ${styles.bottomInner}`}>
           <span>© {new Date().getFullYear()} {site.name}</span>
           <div className={styles.bottomMeta}>
-            <span>Appointments are confirmed directly with the Siriranee team.</span>
             <Link href="/privacy">Privacy policy</Link>
           </div>
         </div>

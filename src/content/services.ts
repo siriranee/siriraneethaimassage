@@ -64,7 +64,7 @@ export type Service = {
 };
 
 const bookingSetupNotice =
-  "Online booking is being configured for Siriranee. Use the booking page to review your preferences, then contact the spa to request an appointment.";
+  "Online booking is coming soon.";
 
 export const services: readonly Service[] = [
   {
