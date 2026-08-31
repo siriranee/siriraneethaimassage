@@ -82,7 +82,6 @@ const customerBookingSources = new Map(
 const bookNowSources = [
   "src/components/layout/SiteHeader.tsx",
   "src/components/layout/SiteFooter.tsx",
-  "src/components/layout/MobileBookingBar.tsx",
   "src/components/marketing/BookingCta.tsx",
   "src/components/marketing/HomeHeroSlider.tsx",
   "src/components/services/ServiceExplorer.tsx",
@@ -93,6 +92,17 @@ const bookNowSources = [
   "src/app/(site)/promotions/page.tsx",
   "src/app/(site)/services/[slug]/page.tsx",
 ];
+
+const publicShellSource = await read("src/components/layout/PublicShell.tsx");
+
+check(
+  publicShellSource.includes("<ContactFab site={site} />"),
+  "The public shell must render the contact FAB",
+);
+check(
+  !publicShellSource.includes("MobileBookingBar"),
+  "The retired mobile booking bar must not return to the public shell",
+);
 
 const retiredBookingLabels = [
   "Plan a massage",

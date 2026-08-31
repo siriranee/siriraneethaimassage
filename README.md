@@ -81,7 +81,10 @@ environment settings. Do not commit real secrets.
 
 The normal production sequence is:
 
-1. Confirm the canonical HTTPS domain and set NEXT_PUBLIC_SITE_URL.
+1. For the initial Vercel deployment, keep system environment variables enabled
+   so VERCEL_PROJECT_PRODUCTION_URL can provide the canonical HTTPS origin.
+   When a custom domain is confirmed and connected, set NEXT_PUBLIC_SITE_URL to
+   that exact origin.
 2. Create a production MongoDB deployment that supports transactions.
 3. Set CMS_MODE=mongodb, MONGODB_URI, MONGODB_DB and CMS_ORIGIN.
 4. Store a secret 32-byte CMS_PII_ENCRYPTION_KEY in the deployment secret

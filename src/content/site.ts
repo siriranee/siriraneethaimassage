@@ -86,9 +86,14 @@ function optionalEmail(value: string | undefined) {
     : null;
 }
 
+const vercelProductionHost =
+  process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+const automaticVercelUrl = vercelProductionHost
+  ? `https://${vercelProductionHost}`
+  : undefined;
 const canonicalUrl = publicUrl(
-  process.env.NEXT_PUBLIC_SITE_URL,
-  "https://www.thaimassageindublin.com",
+  process.env.NEXT_PUBLIC_SITE_URL || automaticVercelUrl,
+  "http://localhost:3000",
 ).replace(/\/+$/, "");
 
 const bookingUrl = optionalPublicUrl(process.env.NEXT_PUBLIC_BOOKING_URL);

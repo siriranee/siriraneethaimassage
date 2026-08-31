@@ -10,11 +10,18 @@ if (!hostedBuild) {
   process.exit(0);
 }
 
-const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+const explicitOrigin = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+const vercelProductionHost =
+  process.env.VERCEL === "1"
+    ? process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim()
+    : undefined;
+const configuredOrigin =
+  explicitOrigin ||
+  (vercelProductionHost ? `https://${vercelProductionHost}` : undefined);
 
 if (!configuredOrigin) {
   console.error(
-    "Hosted build blocked: NEXT_PUBLIC_SITE_URL must be set to the owner-confirmed production origin.",
+    "Hosted build blocked: set NEXT_PUBLIC_SITE_URL to the owner-confirmed production origin. Vercel builds may use VERCEL_PROJECT_PRODUCTION_URL for the initial deployment.",
   );
   process.exit(1);
 }

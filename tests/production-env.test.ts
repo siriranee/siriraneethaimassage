@@ -8,6 +8,7 @@ const relevantKeys = [
   "VERCEL",
   "NETLIFY",
   "CI",
+  "VERCEL_PROJECT_PRODUCTION_URL",
   "NEXT_PUBLIC_SITE_URL",
   "CMS_MODE",
   "MONGODB_URI",
@@ -34,7 +35,7 @@ function run(overrides: Record<string, string> = {}) {
   });
 }
 
-const validOrigin = "https://www.thaimassageindublin.com";
+const validOrigin = "https://siriranee.example";
 const database = {
   CMS_MODE: "mongodb",
   MONGODB_URI: "mongodb://127.0.0.1:27017",
@@ -54,6 +55,14 @@ test("hosted builds require a clean HTTPS production origin", () => {
   );
   assert.equal(
     run({ CMS_MODE: "disabled", NEXT_PUBLIC_SITE_URL: validOrigin }).status,
+    0,
+  );
+  assert.equal(
+    run({
+      VERCEL: "1",
+      VERCEL_PROJECT_PRODUCTION_URL: "siriraneethaimassage.vercel.app",
+      CMS_MODE: "disabled",
+    }).status,
     0,
   );
 });
