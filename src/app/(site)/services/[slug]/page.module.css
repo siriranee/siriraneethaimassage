@@ -143,8 +143,7 @@
   gap: 0.75rem;
 }
 
-.primaryAction,
-.secondaryAction {
+.primaryAction {
   display: inline-flex;
   min-height: 3.1rem;
   padding: 0.75rem 1.15rem;
@@ -161,13 +160,7 @@
   color: #24100d;
 }
 
-.secondaryAction {
-  border: 1px solid rgb(var(--color-purple-800-rgb) / 0.24);
-  color: var(--color-purple-800);
-}
-
-.primaryAction:hover,
-.secondaryAction:hover {
+.primaryAction:hover {
   transform: translateY(-2px);
 }
 
@@ -425,8 +418,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .relatedImage img,
-  .primaryAction,
-  .secondaryAction {
+  .primaryAction {
     transition: none;
   }
 }

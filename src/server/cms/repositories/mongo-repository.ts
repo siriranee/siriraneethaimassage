@@ -12,6 +12,7 @@ import type {
   CmsClosure,
   CmsContentState,
   CmsLoginAttempt,
+  CmsMediaAsset,
   CmsPublication,
   CmsSession,
   CmsUser,
@@ -26,10 +27,12 @@ import {
   CmsConflictError,
   type CmsRepository,
 } from "@/server/cms/repositories/repository";
+import { cmsContentReferencesMediaAsset } from "@/server/media/references";
 
 const collections = {
   content: "cmsContent",
   publications: "cmsPublications",
+  mediaAssets: "cmsMediaAssets",
   meta: "cmsMeta",
   users: "cmsUsers",
   sessions: "cmsSessions",
@@ -220,6 +223,87 @@ export class MongoCmsRepository implements CmsRepository {
     );
   }
 
+  async getMediaAsset(publicId: string) {
+    const db = await this.db();
+    return decode<CmsMediaAsset>(
+      await db
+        .collection<CmsMongoDocument>(collections.mediaAssets)
+        .findOne({ _id: publicId }, this.options()),
+    );
+  }
+
+  async listExpiredMediaAssets(nowIso: string, limit = 10) {
+    const db = await this.db();
+    const rows = await db
+      .collection<CmsMongoDocument>(collections.mediaAssets)
+      .find(
+        {
+          status: { $in: ["authorized", "staged", "deleting"] },
+          expiresAt: { $lte: nowIso },
+        },
+        this.options(),
+      )
+      .sort({ expiresAt: 1 })
+      .limit(Math.max(1, Math.min(limit, 25)))
+      .toArray();
+    return rows.map((row) => decode<CmsMediaAsset>(row)!);
+  }
+
+  async saveMediaAsset(asset: CmsMediaAsset, expectedVersion?: number) {
+    const db = await this.db();
+    const collection = db.collection<CmsMongoDocument>(collections.mediaAssets);
+
+    if (expectedVersion === undefined) {
+      try {
+        await collection.insertOne(encode(asset), this.options());
+      } catch (error) {
+        if (
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          error.code === 11_000
+        ) {
+          throw new CmsConflictError("This image already exists.");
+        }
+        throw error;
+      }
+      return asset;
+    }
+
+    const result = await collection.replaceOne(
+      { _id: asset.id, version: expectedVersion },
+      encode(asset),
+      this.options(),
+    );
+    if (result.matchedCount !== 1) throw new CmsConflictError();
+    return asset;
+  }
+
+  async isMediaAssetReferenced(publicId: string, secureUrl: string) {
+    const db = await this.db();
+    const asset = { publicId, secureUrl };
+    const current = decode<CmsContentState>(
+      await db
+        .collection<CmsMongoDocument>(collections.content)
+        .findOne({ _id: "siriranee-content" }, this.options()),
+    );
+    if (current && cmsContentReferencesMediaAsset(current, asset)) return true;
+
+    const cursor = db
+      .collection<CmsMongoDocument>(collections.publications)
+      .find({}, this.options())
+      .project({ snapshot: 1 });
+
+    for await (const row of cursor) {
+      const snapshot = row.snapshot as CmsContentState | undefined;
+      if (snapshot && cmsContentReferencesMediaAsset(snapshot, asset)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   async findUserByEmail(email: string) {
     const db = await this.db();
     return decode<CmsUser>(
@@ -407,7 +491,6 @@ export class MongoCmsRepository implements CmsRepository {
     if (query.status) filter.status = query.status;
     if (query.source) filter.source = query.source;
     if (query.serviceId) filter.serviceId = query.serviceId;
-    if (query.attention === "unassigned") filter.assignedStaffId = "";
     const rows = await db
       .collection<CmsMongoDocument>(collections.bookings)
       .find(filter, this.options())

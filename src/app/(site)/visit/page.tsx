@@ -13,6 +13,7 @@ import Link from "next/link";
 
 import { MapEmbed } from "@/components/contact/MapEmbed";
 import { PageHero } from "@/components/marketing/PageHero";
+import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
 import {
   buildBreadcrumbJsonLd,
@@ -34,17 +35,17 @@ const breadcrumbJsonLd = buildBreadcrumbJsonLd([
 
 export default async function VisitPage() {
   const [site, pageCopy] = await Promise.all([getPublicSiteData(), getPublicPageCopy("visit")]);
+  const phone = site.contact.phone;
 
   return (
     <div>
       <script {...jsonLdScriptProps(breadcrumbJsonLd)} />
 
       <PageHero
+        {...pageHeroImages.contact}
         eyebrow={pageCopy.eyebrow}
         title={pageCopy.title}
         description={pageCopy.description}
-        image="/images/spa/spa-still-life.webp"
-        imageAlt="Illustrative spa towels, oils and flowers arranged in warm light"
       />
 
       <section className={styles.locationSection} aria-labelledby="location-heading">
@@ -71,10 +72,12 @@ export default async function VisitPage() {
                 <ArrowUpRight aria-hidden="true" className={styles.actionArrow} />
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>
-              <a className={styles.action} href={site.contact.phone.href}>
-                <Phone aria-hidden="true" />
-                <span>Call the team</span>
-              </a>
+              {phone ? (
+                <a className={styles.action} href={phone.href}>
+                  <Phone aria-hidden="true" />
+                  <span>Call the team</span>
+                </a>
+              ) : null}
               <Link className={styles.action} href="/book">
                 <CalendarDays aria-hidden="true" />
                 <span>Book Now</span>
@@ -101,22 +104,24 @@ export default async function VisitPage() {
                 <Clock3 aria-hidden="true" />
               </span>
               <div>
-                <p className={styles.eyebrow}>{site.openingHoursConfirmed ? "Opening hours" : "Provisional opening hours"}</p>
-                <h2>Choose a suitable day</h2>
+                <p className={styles.eyebrow}>{site.openingHoursConfirmed ? "Opening hours" : "Schedule update"}</p>
+                <h2>{site.openingHoursConfirmed ? "Choose a suitable day" : "Opening hours are being confirmed"}</h2>
               </div>
             </div>
-            <dl className={styles.hoursList}>
-              {site.openingHoursGroups.map((entry) => (
-                <div key={entry.label}>
-                  <dt>{entry.label}</dt>
-                  <dd>{entry.hours}</dd>
-                </div>
-              ))}
-            </dl>
+            {site.openingHoursConfirmed ? (
+              <dl className={styles.hoursList}>
+                {site.openingHoursGroups.map((entry) => (
+                  <div key={entry.label}>
+                    <dt>{entry.label}</dt>
+                    <dd>{entry.hours}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
             <p className={styles.smallNote}>
               {site.openingHoursConfirmed
                 ? "Appointments are subject to current availability."
-                : "These draft hours still need owner confirmation. Appointment times are confirmed directly by the Siriranee team."}
+                : "Exact times will appear here after the owner has reviewed and published them."}
             </p>
           </article>
 
@@ -124,8 +129,9 @@ export default async function VisitPage() {
             <p className={styles.eyebrow}>Before you travel</p>
             <h2 id="arrival-heading">A simple arrival guide</h2>
             <p className={styles.intro}>
-              Keep the address and phone number close to hand, especially for your
-              first appointment at Harbour House.
+              {phone
+                ? "Keep the address and phone number close to hand, especially for your first appointment at Harbour House."
+                : "Keep the confirmed address close to hand for your first appointment at Harbour House."}
             </p>
 
             <ol className={styles.arrivalList}>
@@ -156,8 +162,9 @@ export default async function VisitPage() {
               <Info aria-hidden="true" />
               <p>
                 Entrance, lift, accessibility, parking and public transport details
-                are intentionally not listed until they are confirmed. Please call
-                ahead if any of these details affect your visit.
+                are intentionally not listed until they are confirmed. Check the
+                current contact options before travelling if any of these details
+                affect your visit.
               </p>
             </aside>
           </div>
@@ -191,8 +198,8 @@ export default async function VisitPage() {
             <p className={styles.ctaEyebrow}>Ready when you are</p>
             <h2>Ready to visit Siriranee?</h2>
             <p>
-              Choose a treatment and duration, then contact the team to request a
-              suitable appointment time.
+              Choose a treatment and duration, then continue through the booking
+              page using the options currently available.
             </p>
           </div>
           <div className={styles.ctaActions}>
@@ -200,10 +207,12 @@ export default async function VisitPage() {
               Book Now
               <CalendarDays aria-hidden="true" />
             </Link>
-            <a className={styles.ctaSecondary} href={site.contact.phone.href}>
-              Call {site.contact.phone.display}
-              <Phone aria-hidden="true" />
-            </a>
+            {phone ? (
+              <a className={styles.ctaSecondary} href={phone.href}>
+                Call {phone.display}
+                <Phone aria-hidden="true" />
+              </a>
+            ) : null}
           </div>
         </div>
       </section>

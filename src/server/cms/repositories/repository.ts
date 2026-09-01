@@ -10,6 +10,7 @@ import type {
   CmsClosure,
   CmsContentState,
   CmsLoginAttempt,
+  CmsMediaAsset,
   CmsPublication,
   CmsSession,
   CmsUser,
@@ -37,6 +38,20 @@ export interface CmsRepository {
   getPublication(id: string): Promise<CmsPublication | null>;
   listPublications(limit?: number): Promise<readonly CmsPublication[]>;
   savePublication(publication: CmsPublication): Promise<void>;
+
+  getMediaAsset(publicId: string): Promise<CmsMediaAsset | null>;
+  listExpiredMediaAssets(
+    nowIso: string,
+    limit?: number,
+  ): Promise<readonly CmsMediaAsset[]>;
+  saveMediaAsset(
+    asset: CmsMediaAsset,
+    expectedVersion?: number,
+  ): Promise<CmsMediaAsset>;
+  isMediaAssetReferenced(
+    publicId: string,
+    secureUrl: string,
+  ): Promise<boolean>;
 
   findUserByEmail(email: string): Promise<CmsUser | null>;
   findUserById(id: string): Promise<CmsUser | null>;

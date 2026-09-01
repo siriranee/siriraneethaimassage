@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const response = NextResponse.json(
       {
         status: "disabled",
-        message: "Availability is temporarily unavailable. Contact the spa directly.",
+        message: "Availability is temporarily unavailable. Please try again later.",
         slots: [],
       },
       { status: 503 },

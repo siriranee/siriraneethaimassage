@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Sparkles,
-  UserRoundSearch,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -61,7 +60,6 @@ export default async function CmsDashboardPage() {
         <CmsStatCard detail="Appointments on the Dublin calendar" icon={CalendarDays} label="Today" tone="purple" value={summary.todayCount} />
         <CmsStatCard detail="Awaiting internal confirmation" icon={ClipboardList} label="Pending" tone="gold" value={summary.pendingCount} />
         <CmsStatCard detail="Future active appointments" icon={CalendarClock} label="Upcoming" tone="green" value={summary.upcomingCount} />
-        <CmsStatCard detail="Staff assignment is internal only" icon={UserRoundSearch} label="Unassigned" tone="purple" value={summary.unassignedCount} />
       </div>
 
       <div className={styles.twoColumn}>
@@ -77,7 +75,6 @@ export default async function CmsDashboardPage() {
                       <th scope="col">Date and time</th>
                       <th scope="col">Treatment</th>
                       <th scope="col">Status</th>
-                      <th scope="col">Assigned staff</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -87,7 +84,6 @@ export default async function CmsDashboardPage() {
                         <td><strong>{formatDate(booking.localDate)}</strong><small>{booking.localTime}</small></td>
                         <td><strong>{booking.serviceName}</strong><small>{booking.durationMinutes} min · €{(booking.priceCents / 100).toFixed(0)}</small></td>
                         <td><CmsBookingStatus status={booking.status} /></td>
-                        <td>{booking.assignedStaffId || "Unassigned"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -104,7 +100,6 @@ export default async function CmsDashboardPage() {
                       <dt>Guest</dt><dd>{booking.customer.name}</dd>
                       <dt>When</dt><dd>{formatDate(booking.localDate)} · {booking.localTime}</dd>
                       <dt>Treatment</dt><dd>{booking.serviceName}</dd>
-                      <dt>Staff</dt><dd>{booking.assignedStaffId || "Unassigned"}</dd>
                     </dl>
                     <Link href={`/cms/bookings/${booking.id}`}>View booking</Link>
                   </article>
@@ -132,7 +127,7 @@ export default async function CmsDashboardPage() {
             </li>
             <li>
               <Sparkles aria-hidden="true" />
-              <div><strong>Customer experience</strong><span>Customers choose a treatment and time, never a therapist.</span></div>
+              <div><strong>Customer experience</strong><span>Customers choose a treatment, date and time.</span></div>
             </li>
           </ul>
         </CmsPanel>

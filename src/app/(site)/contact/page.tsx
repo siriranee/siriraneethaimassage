@@ -14,6 +14,7 @@ import Link from "next/link";
 import { MapEmbed } from "@/components/contact/MapEmbed";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { pageHeroImages } from "@/content/page-heroes";
 import {
   buildAppointmentWhatsAppUrl,
   buildPlannerPreferenceHref,
@@ -52,24 +53,26 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
   const changePreferencesHref = appointmentPreference
     ? buildPlannerPreferenceHref(appointmentPreference)
     : "/book";
+  const phone = site.contact.phone;
   const email = site.contact.email;
   const instagram = site.social.instagram;
   const whatsappUrl = site.contact.whatsapp.url;
+  const contactCardCount =
+    1 + (phone ? 1 : 0) + (email ? 1 : 0) + (whatsappUrl ? 1 : 0);
   const gridClass =
-    email && whatsappUrl
+    contactCardCount >= 4
       ? styles.contactGridFour
-      : !email && !whatsappUrl
+      : contactCardCount <= 2
         ? styles.contactGridTwo
         : "";
 
   return (
     <div>
       <PageHero
+        {...pageHeroImages.contact}
         eyebrow={pageCopy.eyebrow}
         title={pageCopy.title}
         description={pageCopy.description}
-        image="/images/spa/spa-still-life.webp"
-        imageAlt="Illustrative spa towels, oils and flowers arranged in warm light"
       />
 
       <section className={styles.contactSection} aria-labelledby="contact-heading">
@@ -90,8 +93,8 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
                 </h2>
                 <p>
                   Your treatment choices are ready to share with Siriranee Thai
-                  Massage. Choose a contact option and ask the team for a suitable
-                  date and time.
+                  Massage. Use any currently available contact option below to ask
+                  about a suitable date and time.
                 </p>
               </div>
 
@@ -147,17 +150,19 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
                       <span className="sr-only"> (opens in a new tab)</span>
                     </a>
                   ) : null}
-                  <a
-                    className={
-                      appointmentWhatsappUrl
-                        ? styles.requestSecondary
-                        : styles.requestPrimary
-                    }
-                    href={site.contact.phone.href}
-                  >
-                    <Phone aria-hidden="true" size={18} />
-                    Call the team
-                  </a>
+                  {phone ? (
+                    <a
+                      className={
+                        appointmentWhatsappUrl
+                          ? styles.requestSecondary
+                          : styles.requestPrimary
+                      }
+                      href={phone.href}
+                    >
+                      <Phone aria-hidden="true" size={18} />
+                      Call the team
+                    </a>
+                  ) : null}
                   <Link
                     className={styles.requestTertiary}
                     href={changePreferencesHref}
@@ -189,22 +194,22 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
               </a>
             </article>
 
-            <article className={styles.contactCard}>
-              <span className={styles.iconWrap}>
-                <Phone aria-hidden="true" size={23} strokeWidth={1.65} />
-              </span>
-              <p className={styles.cardLabel}>Call us</p>
-              <h3>
-                <a href={site.contact.phone.href}>
-                  {site.contact.phone.display}
+            {phone ? (
+              <article className={styles.contactCard}>
+                <span className={styles.iconWrap}>
+                  <Phone aria-hidden="true" size={23} strokeWidth={1.65} />
+                </span>
+                <p className={styles.cardLabel}>Call us</p>
+                <h3>
+                  <a href={phone.href}>{phone.display}</a>
+                </h3>
+                <p>Call directly if you have a question about your visit.</p>
+                <a href={phone.href}>
+                  Call Siriranee
+                  <ArrowUpRight aria-hidden="true" size={16} />
                 </a>
-              </h3>
-              <p>Call directly if you have a question about your visit.</p>
-              <a href={site.contact.phone.href}>
-                Call Siriranee
-                <ArrowUpRight aria-hidden="true" size={16} />
-              </a>
-            </article>
+              </article>
+            ) : null}
 
             {email ? (
               <article className={styles.contactCard}>
@@ -250,22 +255,24 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
                 <Clock3 aria-hidden="true" size={23} strokeWidth={1.65} />
               </span>
               <div>
-                <p className={styles.cardLabel}>{site.openingHoursConfirmed ? "Opening hours" : "Provisional opening hours"}</p>
-                <h2>Visiting information</h2>
+                <p className={styles.cardLabel}>{site.openingHoursConfirmed ? "Opening hours" : "Schedule update"}</p>
+                <h2>{site.openingHoursConfirmed ? "Visiting information" : "Opening hours are being confirmed"}</h2>
               </div>
             </div>
-            <dl className={styles.hoursList}>
-              {site.openingHoursGroups.map((entry) => (
-                <div key={entry.label}>
-                  <dt>{entry.label}</dt>
-                  <dd>{entry.hours}</dd>
-                </div>
-              ))}
-            </dl>
+            {site.openingHoursConfirmed ? (
+              <dl className={styles.hoursList}>
+                {site.openingHoursGroups.map((entry) => (
+                  <div key={entry.label}>
+                    <dt>{entry.label}</dt>
+                    <dd>{entry.hours}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
             <p className={styles.hoursNote}>
               {site.openingHoursConfirmed
                 ? "Appointments are subject to current availability."
-                : "These draft hours still need owner confirmation. Appointment times are confirmed directly by the team."}
+                : "Exact times will appear here after the owner has reviewed and published them."}
             </p>
           </div>
 
@@ -275,7 +282,6 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
               businessName={site.name}
               directionsUrl={site.address.directionsUrl}
               embedUrl={site.address.mapsEmbedUrl}
-              loadImmediately
             />
           </div>
         </div>
@@ -287,8 +293,8 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
             <p className={styles.cardLabel}>Ready when you are</p>
             <h2>Request your massage appointment</h2>
             <p>
-              Choose your treatment preferences here, then contact the Siriranee
-              team to request a suitable date and time.
+              Choose your treatment preferences, then use the booking page and
+              any currently published contact option to continue.
             </p>
           </div>
           <div className={styles.actions}>

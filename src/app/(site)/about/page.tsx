@@ -6,6 +6,7 @@ import Link from "next/link";
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
 import { getPublicPageCopy, getPublicSiteData } from "@/server/cms/public-adapter";
 
@@ -40,11 +41,10 @@ export default async function AboutPage() {
   return (
     <div>
       <PageHero
+        {...pageHeroImages.about}
         eyebrow={pageCopy.eyebrow}
         title={pageCopy.title}
         description={pageCopy.description}
-        image="/images/spa/hero-massage.webp"
-        imageAlt="A relaxing massage treatment in a warmly lit spa room"
       />
 
       <section className={styles.storySection}>
@@ -69,7 +69,10 @@ export default async function AboutPage() {
               Siriranee Thai Massage offers a place to step away from busy routines and choose a treatment that suits the time and style of massage you prefer.
             </p>
             <p>
-              Our service menu draws on Thai massage traditions alongside warm oil, hot stone, focused and specialist treatments. Each appointment leaves room for a clear conversation about comfort, pressure and pace before the treatment begins.
+              Our service menu draws on Thai massage traditions alongside warm oil,
+              hot stone and focused upper-body treatments. Each appointment leaves
+              room for a clear conversation about comfort, pressure and pace before
+              the treatment begins.
             </p>
             <Link className={styles.textLink} href="/services">
               Explore our massage treatments

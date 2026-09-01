@@ -1,20 +1,27 @@
 import { HeartHandshake, Leaf, Sparkles } from "lucide-react";
+import type { Metadata } from "next";
 
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
 import { ServiceExplorer } from "@/components/services/ServiceExplorer";
+import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
-import { getPublicServicesSnapshot } from "@/server/cms/public-adapter";
+import {
+  getPublicPageCopy,
+  getPublicServicesSnapshot,
+} from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
-export const metadata = createMetadata({
-  title: "Massage Treatments in Howth, Dublin",
-  description:
-    "Explore traditional Thai, hot oil, deep tissue, hot stone and focused upper-body massage at Siriranee Thai Massage in Howth, Dublin.",
-  path: "/services",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const page = await getPublicPageCopy("services");
+  return createMetadata({
+    title: page.seoTitle,
+    description: page.seoDescription,
+    path: "/services",
+  });
+}
 
 const experienceNotes = [
   {
@@ -35,16 +42,18 @@ const experienceNotes = [
 ];
 
 export default async function ServicesPage() {
-  const { categories, services } = await getPublicServicesSnapshot();
+  const [{ categories, services }, pageCopy] = await Promise.all([
+    getPublicServicesSnapshot(),
+    getPublicPageCopy("services"),
+  ]);
 
   return (
     <div>
       <PageHero
-        eyebrow="Treatments & prices"
-        title="Massage in Howth, Dublin"
-        description="Clear options for every schedule and preference."
-        image="/images/spa/spa-still-life.webp"
-        imageAlt="Massage oils, candles and flowers in a softly lit treatment setting"
+        {...pageHeroImages.services}
+        eyebrow={pageCopy.eyebrow}
+        title={pageCopy.title}
+        description={pageCopy.description}
       />
 
       <section className={styles.servicesSection} aria-labelledby="services-heading">

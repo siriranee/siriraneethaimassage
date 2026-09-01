@@ -16,9 +16,25 @@ import type {
   CmsUser,
   CmsVoucherRecord,
 } from "@/domain/cms/types";
+import { migrateLegacyHomeHeroSlides } from "@/content/home-hero";
+import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
+import {
+  CmsPageHeroValidationError,
+  normaliseStoredPageHeroSlides,
+  parseCmsPageHeroSlides,
+} from "@/domain/cms/page-hero";
+import {
+  CMS_CONTENT_SCHEMA_VERSION,
+  CmsServiceGalleryValidationError,
+  normaliseStoredServiceGalleryImages,
+  parseCmsServiceGalleryImages,
+} from "@/domain/cms/service-gallery";
 import { appendCmsAudit } from "@/server/cms/audit";
 import { getCmsMode } from "@/server/cms/config";
-import { createDefaultContentState } from "@/server/cms/default-content";
+import {
+  createDefaultContentState,
+  createSafePublicContentState,
+} from "@/server/cms/default-content";
 import {
   CmsValidationError,
   parseBookingSettingsUpdate,
@@ -36,10 +52,16 @@ import {
   parseVoucherUpdate,
 } from "@/server/cms/content-validation";
 import { CmsConflictError, getCmsRepository } from "@/server/cms/repositories";
+import type { CmsMediaSubmission } from "@/server/media/submission";
+import {
+  assertCmsContentMediaReferencesApproved,
+  commitCmsMediaForContentMutation,
+} from "@/server/media/submission";
 
 type MutationContext = {
   readonly actor: CmsUser;
   readonly requestId?: string;
+  readonly mediaSubmission?: CmsMediaSubmission | null;
 };
 
 async function mutateContent(
@@ -53,10 +75,18 @@ async function mutateContent(
   const repository = getCmsRepository();
 
   return repository.transaction(async (transaction) => {
-    const current = await transaction.getContent();
+    const storedCurrent = await transaction.getContent();
+    const current = normaliseCmsContent(storedCurrent);
     const next = update(current);
 
-    await transaction.saveContent(next, current.revision);
+    await commitCmsMediaForContentMutation(transaction, {
+      current,
+      next,
+      submission: context.mediaSubmission,
+      actor: context.actor,
+      requestId: context.requestId,
+    });
+    await transaction.saveContent(next, storedCurrent.revision);
     await appendCmsAudit(transaction, {
       actor: context.actor,
       action,
@@ -76,33 +106,102 @@ export async function getCmsContent() {
 
 function normaliseCmsContent(content: CmsContentState): CmsContentState {
   const defaults = createDefaultContentState();
+  const storedSchemaVersion = Number.isInteger(content.schemaVersion)
+    ? content.schemaVersion
+    : 0;
+  const migrateConfirmedPhone =
+    storedSchemaVersion < 4 &&
+    !content.site.phoneDisplay.trim() &&
+    !content.site.phoneE164.trim();
+  const migrateConfirmedWhatsapp =
+    storedSchemaVersion < 4 && !content.site.whatsappNumber.trim();
+  const defaultServicesBySlug = new Map(
+    defaults.services.map((service) => [service.slug, service] as const),
+  );
   const mode = getCmsMode();
   const fallbackVouchers = mode === "mock" ? defaults.vouchers : [];
   const defaultPages = defaults.pages ?? [];
-  const storedPages = content.pages?.length ? content.pages : defaultPages;
-  const pages = mode === "mock"
-    ? defaultPages.map((defaultPage) => {
-        const storedPage = storedPages.find((page) => page.id === defaultPage.id);
-        return storedPage && storedPage.version >= defaultPage.version
-          ? storedPage
-          : defaultPage;
-      })
-    : storedPages;
+  const storedPages = content.pages ?? [];
+  const pages = defaultPages.map((defaultPage) => {
+    const storedPage = storedPages.find((page) => page.id === defaultPage.id);
+    const page =
+      storedPage && storedPage.version >= defaultPage.version
+        ? storedPage
+        : defaultPage;
+
+    if (page.id !== "home") return page;
+
+    return {
+      ...page,
+      heroSlides: migrateLegacyHomeHeroSlides(
+        normaliseStoredPageHeroSlides(
+          storedPage?.heroSlides,
+          defaultPage.heroSlides ?? [],
+        ),
+      ),
+    };
+  });
+  const services = content.services.map((service) => {
+    const storedGallery = (
+      service as CmsServiceRecord & { readonly galleryImages?: unknown }
+    ).galleryImages;
+    const fallbackGallery =
+      defaultServicesBySlug.get(service.slug)?.galleryImages ?? [];
+
+    return {
+      ...service,
+      galleryImages: normaliseStoredServiceGalleryImages(
+        storedGallery,
+        fallbackGallery,
+      ),
+    };
+  });
+
   return {
     ...content,
+    schemaVersion: CMS_CONTENT_SCHEMA_VERSION,
+    services,
+    site: {
+      ...content.site,
+      phoneDisplay: migrateConfirmedPhone
+        ? defaults.site.phoneDisplay
+        : content.site.phoneDisplay,
+      phoneE164: migrateConfirmedPhone
+        ? defaults.site.phoneE164
+        : content.site.phoneE164,
+      phoneConfirmed: migrateConfirmedPhone
+        ? defaults.site.phoneConfirmed
+        : content.site.phoneConfirmed === true,
+      whatsappNumber: migrateConfirmedWhatsapp
+        ? defaults.site.whatsappNumber
+        : content.site.whatsappNumber,
+    },
     pages,
     vouchers: content.vouchers ?? fallbackVouchers,
   };
 }
 
+export class CmsPublicContentUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super("Published website content is temporarily unavailable.", { cause });
+    this.name = "CmsPublicContentUnavailableError";
+  }
+}
+
 export async function getPublishedCmsContent() {
-  if (getCmsMode() === "disabled") return createDefaultContentState();
+  const mode = getCmsMode();
+  if (mode === "disabled") return createSafePublicContentState();
 
   try {
     const publication = await getCmsRepository().getPublishedContent();
-    return normaliseCmsContent(publication?.snapshot ?? createDefaultContentState());
-  } catch {
-    return createDefaultContentState();
+    if (publication) return normaliseCmsContent(publication.snapshot);
+
+    return mode === "mock"
+      ? createDefaultContentState()
+      : createSafePublicContentState();
+  } catch (error) {
+    if (mode === "mock") return createDefaultContentState();
+    throw new CmsPublicContentUnavailableError(error);
   }
 }
 
@@ -124,15 +223,71 @@ export function inspectCmsPublishReadiness(content: CmsContentState) {
   if (publishedServices.some((service) => !service.imageAlt.trim())) {
     errors.push("Every published treatment needs descriptive image alternative text.");
   }
+  for (const service of publishedServices) {
+    try {
+      parseCmsServiceGalleryImages(service.galleryImages);
+    } catch (error) {
+      errors.push(
+        error instanceof CmsServiceGalleryValidationError
+          ? `${service.name}: ${error.message}`
+          : `${service.name}: the treatment gallery is invalid.`,
+      );
+    }
+  }
+  const homePage = content.pages?.find((page) => page.id === "home");
+  try {
+    parseCmsPageHeroSlides(homePage?.heroSlides);
+  } catch (error) {
+    errors.push(
+      error instanceof CmsPageHeroValidationError
+        ? error.message
+        : "The home hero slides are invalid.",
+    );
+  }
+  if (
+    homePage?.heroSlides?.some(
+      (slide) =>
+        slide.imageUrl.startsWith("https://") &&
+        !isApprovedPublicImageUrl(slide.imageUrl),
+    )
+  ) {
+    warnings.push(
+      "Remote home hero images remain hidden until a media provider is approved.",
+    );
+  }
+  if (
+    publishedServices.some((service) =>
+      [service.imageUrl, ...service.galleryImages.map((image) => image.imageUrl)]
+        .some(
+          (imageUrl) =>
+            imageUrl.startsWith("https://") &&
+            !isApprovedPublicImageUrl(imageUrl),
+        ),
+    )
+  ) {
+    warnings.push(
+      "Unapproved remote treatment images remain hidden.",
+    );
+  }
   if (!content.site.openingHoursConfirmed) {
     warnings.push("Opening hours are still marked as provisional.");
+  }
+  if (!content.site.phoneConfirmed) {
+    warnings.push("The public phone number is hidden until the owner confirms it.");
   }
   if (!content.bookingSettings.rulesConfirmed) {
     warnings.push("Booking capacity, notice and buffer rules still need owner confirmation.");
   }
   if (!content.site.email) warnings.push("No public email address is configured.");
   if (!content.site.whatsappNumber) warnings.push("WhatsApp is not configured.");
-  if (content.gallery.some((item) => item.published && !item.imageUrl.startsWith("/"))) {
+  if (
+    content.gallery.some(
+      (item) =>
+        item.published &&
+        item.imageUrl.startsWith("https://") &&
+        !isApprovedPublicImageUrl(item.imageUrl),
+    )
+  ) {
     warnings.push("Remote gallery images remain hidden until a media provider is approved.");
   }
   if (!content.team.some((member) => member.publicProfile)) {
@@ -144,11 +299,17 @@ export function inspectCmsPublishReadiness(content: CmsContentState) {
 
 export async function getCmsPublicationPreview() {
   const repository = getCmsRepository();
-  const [draft, published, history] = await Promise.all([
+  const [draft, publishedRecord, history] = await Promise.all([
     repository.getContent().then(normaliseCmsContent),
     repository.getPublishedContent(),
     repository.listPublications(20),
   ]);
+  const published = publishedRecord
+    ? {
+        ...publishedRecord,
+        snapshot: normaliseCmsContent(publishedRecord.snapshot),
+      }
+    : null;
   const snapshot = published?.snapshot;
   const changes = [
     { key: "services", label: "Treatments and prices", changed: contentChanged(draft.services, snapshot?.services) },
@@ -177,10 +338,11 @@ export async function restoreCmsPublicationToDraft(
 ) {
   const repository = getCmsRepository();
   return repository.transaction(async (transaction) => {
-    const [current, publication] = await Promise.all([
+    const [storedCurrent, publication] = await Promise.all([
       transaction.getContent(),
       transaction.getPublication(publicationId),
     ]);
+    const current = normaliseCmsContent(storedCurrent);
     if (!publication) throw new Error("Publication not found.");
     if (current.revision !== expectedRevision) throw new CmsConflictError();
 
@@ -188,10 +350,13 @@ export async function restoreCmsPublicationToDraft(
     const restored: CmsContentState = {
       ...structuredClone(publishedSnapshot),
       id: current.id,
-      schemaVersion: current.schemaVersion,
+      schemaVersion: CMS_CONTENT_SCHEMA_VERSION,
       revision: current.revision + 1,
       site: {
         ...structuredClone(publishedSnapshot.site),
+        phoneDisplay: current.site.phoneDisplay,
+        phoneE164: current.site.phoneE164,
+        phoneConfirmed: current.site.phoneConfirmed,
         weeklyHours: current.site.weeklyHours,
         openingHoursConfirmed: current.site.openingHoursConfirmed,
       },
@@ -200,7 +365,8 @@ export async function restoreCmsPublicationToDraft(
       updatedBy: context.actor.id,
     };
 
-    await transaction.saveContent(restored, current.revision);
+    assertCmsContentMediaReferencesApproved(restored);
+    await transaction.saveContent(restored, storedCurrent.revision);
     await appendCmsAudit(transaction, {
       actor: context.actor,
       action: "content.restored-to-draft",
@@ -402,7 +568,7 @@ export async function updateCmsTeamMember(
     "team.updated",
     "team-member",
     memberId,
-    "Updated a team profile or internal operational status.",
+    "Updated a public team profile.",
     (current) => {
       const existing = current.team.find((member) => member.id === memberId);
 
@@ -639,6 +805,8 @@ export async function publishCmsContent(context: MutationContext) {
 
   return repository.transaction(async (transaction) => {
     const current = normaliseCmsContent(await transaction.getContent());
+
+    assertCmsContentMediaReferencesApproved(current);
 
     const readiness = inspectCmsPublishReadiness(current);
     if (readiness.errors.length) throw new CmsValidationError(readiness.errors[0]);

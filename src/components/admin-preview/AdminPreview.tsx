@@ -44,7 +44,6 @@ const demoBookings = [
     reference: "DEMO-001",
     guest: "Demo guest A",
     service: services[0].name,
-    assignedStaff: "Unassigned",
     time: "Example · 10:00",
     status: "Confirmed",
   },
@@ -52,7 +51,6 @@ const demoBookings = [
     reference: "DEMO-002",
     guest: "Demo guest B",
     service: services[2].name,
-    assignedStaff: teamMembers[1]?.name ?? "Unassigned",
     time: "Example · 12:00",
     status: "Pending",
   },
@@ -60,7 +58,6 @@ const demoBookings = [
     reference: "DEMO-003",
     guest: "Demo guest C",
     service: services[4].name,
-    assignedStaff: teamMembers[2]?.name ?? "Unassigned",
     time: "Example · 15:00",
     status: "Confirmed",
   },
@@ -246,7 +243,6 @@ export function AdminPreview() {
                       <th scope="col">Reference</th>
                       <th scope="col">Guest</th>
                       <th scope="col">Treatment</th>
-                      <th scope="col">Assigned staff</th>
                       <th scope="col">Time</th>
                       <th scope="col">Status</th>
                       <th scope="col"><span className="sr-only">Preview action</span></th>
@@ -261,7 +257,6 @@ export function AdminPreview() {
                           <small>Fictional sample</small>
                         </td>
                         <td>{booking.service}</td>
-                        <td>{booking.assignedStaff}</td>
                         <td>{booking.time}</td>
                         <td>
                           <span
@@ -291,7 +286,7 @@ export function AdminPreview() {
             <div className={styles.sectionHeader}>
               <div>
                 <span className={styles.kicker}>Availability mockup</span>
-                <h2>Staff availability calendar</h2>
+                <h2>Appointment calendar</h2>
                 <p>A sample schedule only. It is not connected to provider availability.</p>
               </div>
               <span className={styles.sourceBadge}>
@@ -424,7 +419,7 @@ export function AdminPreview() {
                   <span>Contact</span>
                   <h3>Public details</h3>
                   <p>
-                    {siteConfig.contact.phone.internationalDisplay}
+                    Phone pending owner confirmation
                     <br />
                     {siteConfig.contact.email?.address ?? "Email pending owner confirmation"}
                   </p>
@@ -435,15 +430,8 @@ export function AdminPreview() {
                 <div className={styles.contentIcon}><Clock3 aria-hidden="true" /></div>
                 <div>
                   <span>Opening hours</span>
-                  <h3>Seven-day schedule</h3>
-                  <dl className={styles.hoursList}>
-                    {siteConfig.openingHoursGroups.map((entry) => (
-                      <div key={entry.label}>
-                        <dt>{entry.label}</dt>
-                        <dd>{entry.hours}</dd>
-                      </div>
-                    ))}
-                  </dl>
+                  <h3>Schedule pending confirmation</h3>
+                  <p>Exact public hours remain hidden until the owner reviews and publishes them.</p>
                 </div>
               </article>
               <article className={styles.contentCard}>

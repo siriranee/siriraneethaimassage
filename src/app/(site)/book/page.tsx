@@ -2,19 +2,21 @@ import type { Metadata } from "next";
 
 import { BookingPlanner } from "@/components/booking/BookingPlanner";
 import { PageHero } from "@/components/marketing/PageHero";
+import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
 import { getPublicBookingPlannerServices } from "@/server/booking/public-config";
+import { getPublicPageCopy } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
-const metadataDescription =
-  "Book a massage at Siriranee Thai Massage in Howth, Dublin. Choose a treatment, duration and preferred date and time, then contact the team to confirm.";
-
-export const metadata: Metadata = createMetadata({
-  title: "Book a Massage in Howth, Dublin",
-  description: metadataDescription,
-  path: "/book",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const page = await getPublicPageCopy("book");
+  return createMetadata({
+    title: page.seoTitle,
+    description: page.seoDescription,
+    path: "/book",
+  });
+}
 
 type BookPageProps = {
   readonly searchParams: Promise<{
@@ -30,9 +32,10 @@ function firstValue(value: string | string[] | undefined) {
 }
 
 export default async function BookPage({ searchParams }: BookPageProps) {
-  const [query, plannerServices] = await Promise.all([
+  const [query, plannerServices, pageCopy] = await Promise.all([
     searchParams,
     getPublicBookingPlannerServices(),
+    getPublicPageCopy("book"),
   ]);
   const initialServiceSlug = firstValue(query.service);
   const durationValue = firstValue(query.duration);
@@ -46,11 +49,10 @@ export default async function BookPage({ searchParams }: BookPageProps) {
   return (
     <div className={styles.main}>
       <PageHero
-        eyebrow="Massage appointments in Howth"
-        title="Book your massage"
-        description="Choose a treatment, date and time."
-        image="/images/spa/spa-still-life.webp"
-        imageAlt="Illustrative rolled towels, massage oils, orchids and candles in a calm spa setting"
+        {...pageHeroImages.book}
+        eyebrow={pageCopy.eyebrow}
+        title={pageCopy.title}
+        description={pageCopy.description}
       />
 
       <div className={styles.plannerSection}>

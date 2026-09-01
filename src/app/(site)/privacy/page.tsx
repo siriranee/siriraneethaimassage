@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { PageHero } from "@/components/marketing/PageHero";
+import { pageHeroImages } from "@/content/page-heroes";
 import { bookingPrivacyNotice } from "@/domain/privacy";
 import { createMetadata } from "@/lib/metadata";
 import { getPublicPageCopy, getPublicSiteData } from "@/server/cms/public-adapter";
@@ -14,11 +15,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function PrivacyPage() {
   const [site, pageCopy] = await Promise.all([getPublicSiteData(), getPublicPageCopy("privacy")]);
+  const phone = site.contact.phone;
   const email = site.contact.email;
 
   return (
     <div>
       <PageHero
+        {...pageHeroImages.about}
         eyebrow={pageCopy.eyebrow}
         title={pageCopy.title}
         description={pageCopy.description}
@@ -40,7 +43,7 @@ export default async function PrivacyPage() {
             Direct website booking remains disabled until the owner has approved
             the final retention period, lawful basis, service-provider list and
             operational process. While it is disabled, the booking page stores no
-            personal information and directs you to contact the spa.
+            personal information and shows only the options currently available.
           </p>
         </section>
 
@@ -56,8 +59,7 @@ export default async function PrivacyPage() {
           <p>
             This information is used to review, confirm, change and administer your
             appointment, contact you about the request, protect booking
-            availability and maintain an operational record. Staff assignment is
-            handled internally and is not chosen by customers.
+            availability and maintain an operational record.
           </p>
         </section>
 
@@ -115,18 +117,28 @@ export default async function PrivacyPage() {
         <section>
           <h2>Questions or requests</h2>
           <p>
-            {email ? (
+            {email && phone ? (
               <>
                 For a privacy question or request, email{" "}
                 <a href={email.href}>{email.address}</a> or call{" "}
+                <a href={phone.href}>{phone.internationalDisplay}</a>.
+              </>
+            ) : email ? (
+              <>
+                For a privacy question or request, email{" "}
+                <a href={email.href}>{email.address}</a>.
+              </>
+            ) : phone ? (
+              <>
+                For a privacy question or request, call{" "}
+                <a href={phone.href}>{phone.internationalDisplay}</a>.
               </>
             ) : (
-              <>For a privacy question or request, call </>
+              <>
+                Privacy contact details are being confirmed. Please check this
+                page again before making a request.
+              </>
             )}
-            <a href={site.contact.phone.href}>
-              {site.contact.phone.internationalDisplay}
-            </a>
-            .
           </p>
           <p>
             This implementation-ready draft still requires owner and, where

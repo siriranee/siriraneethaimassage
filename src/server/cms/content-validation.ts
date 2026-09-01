@@ -1,5 +1,15 @@
 import "server-only";
 
+import {
+  CmsPageHeroValidationError,
+  parseCmsPageHeroSlides,
+  type CmsPageHeroSlide,
+} from "@/domain/cms/page-hero";
+import {
+  CmsServiceGalleryValidationError,
+  parseCmsServiceGalleryImages,
+  type CmsServiceGalleryImage,
+} from "@/domain/cms/service-gallery";
 import type {
   CmsBookingSettings,
   CmsGalleryRecord,
@@ -176,6 +186,40 @@ function prices(value: unknown, serviceId: string): readonly CmsServicePrice[] {
   );
 }
 
+function serviceGalleryImages(
+  value: unknown,
+  current: readonly CmsServiceGalleryImage[] | undefined,
+) {
+  if (value === undefined) return current ?? [];
+
+  try {
+    return parseCmsServiceGalleryImages(value);
+  } catch (error) {
+    if (error instanceof CmsServiceGalleryValidationError) {
+      throw new CmsValidationError(error.message, error.fields);
+    }
+
+    throw error;
+  }
+}
+
+function pageHeroSlides(
+  value: unknown,
+  current: readonly CmsPageHeroSlide[] | undefined,
+) {
+  if (value === undefined) return current;
+
+  try {
+    return parseCmsPageHeroSlides(value);
+  } catch (error) {
+    if (error instanceof CmsPageHeroValidationError) {
+      throw new CmsValidationError(error.message, error.fields);
+    }
+
+    throw error;
+  }
+}
+
 export function parseServiceUpdate(
   value: unknown,
   current: CmsServiceRecord,
@@ -208,6 +252,10 @@ export function parseServiceUpdate(
         ? source.imageUrl.trim()
         : validUrl(source.imageUrl, "imageUrl", false),
     imageAlt: text(source.imageAlt, "imageAlt", 8, 180),
+    galleryImages: serviceGalleryImages(
+      source.galleryImages,
+      current.galleryImages,
+    ),
     prices: prices(source.prices, current.id),
     idealFor: stringList(source.idealFor, 8, 160),
     highlights: stringList(source.highlights, 8, 160),
@@ -241,6 +289,7 @@ export function parseServiceCreate(
     longDescription: "",
     imageUrl: "",
     imageAlt: "",
+    galleryImages: [],
     prices: [],
     idealFor: [],
     highlights: [],
@@ -293,6 +342,31 @@ export function parseSiteSettingsUpdate(
     throw new CmsValidationError("All seven opening-hours rows are required.");
   }
 
+  const phoneDisplay = optionalText(source.phoneDisplay, 40);
+  const phoneE164Input = optionalText(source.phoneE164, 25);
+  const phoneE164 = phoneE164Input.replace(/[\s().-]/g, "");
+  const phoneConfirmed =
+    source.phoneConfirmed === undefined
+      ? current.phoneConfirmed === true
+      : source.phoneConfirmed === true;
+
+  if (
+    phoneConfirmed &&
+    (phoneDisplay.length < 5 || !/^\+[1-9]\d{7,14}$/.test(phoneE164))
+  ) {
+    throw new CmsValidationError(
+      "Enter and verify the public phone number before confirming it.",
+      {
+        ...(phoneDisplay.length < 5
+          ? { phoneDisplay: "Enter the phone number visitors should see." }
+          : {}),
+        ...(!/^\+[1-9]\d{7,14}$/.test(phoneE164)
+          ? { phoneE164: "Use E.164 format, for example +353123456789." }
+          : {}),
+      },
+    );
+  }
+
   return {
     ...current,
     name: text(source.name, "name", 2, 100),
@@ -302,8 +376,9 @@ export function parseSiteSettingsUpdate(
     region: text(source.region, "region", 2, 80),
     postalCode: optionalText(source.postalCode, 20),
     country: text(source.country, "country", 2, 80),
-    phoneDisplay: text(source.phoneDisplay, "phoneDisplay", 5, 40),
-    phoneE164: text(source.phoneE164, "phoneE164", 8, 25),
+    phoneDisplay,
+    phoneE164,
+    phoneConfirmed,
     email: optionalText(source.email, 254),
     whatsappNumber: optionalText(source.whatsappNumber, 25).replace(/\D/g, ""),
     instagramUrl: validUrl(source.instagramUrl, "instagramUrl"),
@@ -587,6 +662,10 @@ export function parsePageUpdate(
     description: text(source.description, "description", 20, 400),
     seoTitle: text(source.seoTitle, "seoTitle", 10, 70),
     seoDescription: text(source.seoDescription, "seoDescription", 40, 170),
+    heroSlides:
+      current.id === "home"
+        ? pageHeroSlides(source.heroSlides, current.heroSlides)
+        : undefined,
     version: current.version + 1,
     updatedAt: new Date().toISOString(),
   };

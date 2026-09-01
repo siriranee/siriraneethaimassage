@@ -1,6 +1,6 @@
 # Siriranee Thai Massage implementation status
 
-Updated: 28 August 2026
+Updated: 1 September 2026
 
 ## Complete and validated
 
@@ -24,24 +24,31 @@ Updated: 28 August 2026
   revocation, login lockout and audit history.
 - Create/edit/archive workflows for services and team profiles, plus editable
   site information, hours, booking rules, public page headings and SEO.
+- CMS-managed home-hero slides and per-service image galleries with ordering,
+  crop focus, alternative text and publication safety.
+- Client-side raster validation and compression with local previews, size and
+  dimension feedback, retry/remove controls and no upload on file selection.
+- Signed direct Cloudinary image uploads with server-side provider verification,
+  owned-folder enforcement, durable asset states, transactional content commit,
+  conservative rollback and bounded expired-stage cleanup.
 - Promotion and local gallery-metadata management with draft, published and
-  archived states. Provider-backed uploads remain gated.
+  archived states.
 - Public pages read the immutable published CMS snapshot; drafts remain private.
 - Review-first publishing with grouped changes, readiness errors/warnings,
   immutable publication history and restore-to-draft that preserves current
   operational booking settings.
 - Booking dashboard, global CMS search, URL-based booking filters, booking
   detail, controlled change reasons, per-booking audit timeline, status updates,
-  rescheduling, bounded recurring closures, day/week/month calendar and
-  internal staff assignment.
+  rescheduling, bounded recurring closures and day/week/month calendar.
 - Metadata-only notification preview queue. It records delivery intent without
   duplicating contact details or message bodies and sends no external messages.
 - Public treatment/date/time booking backend with same-origin checks, bounded
   JSON, validation, rate limiting, idempotency and encrypted customer details.
 - Fully booked capacity checks with pending-hold expiry, closures, buffers,
   notice period, booking horizon and Europe/Dublin daylight-saving handling.
-- Customers never see, submit or select a therapist. Privileged staff, calendar
-  and price fields are rejected by the public booking API.
+- Customers never see, submit or select a therapist, and booking management has
+  no staff-assignment workflow. Privileged staff, calendar and price fields are
+  rejected by the public booking API.
 - Expired pending requests release capacity and are clearly flagged in the CMS.
 - Automated TypeScript, lint, content, environment, availability, permission,
   security-contract and production-build checks.
@@ -51,6 +58,8 @@ Updated: 28 August 2026
 - Local development uses a fictional in-memory CMS and a one-click demo login.
 - Hosted builds reject mock CMS mode.
 - Production CMS is disabled without MongoDB configuration.
+- Cloudinary uploads require MongoDB, complete server-only credentials and an
+  independent CMS_MEDIA_UPLOAD_READY gate.
 - Direct public booking requires independent code, database, owner/privacy,
   notification, monitoring and verified-recovery readiness gates.
 - Customer details are encrypted with AES-256-GCM before MongoDB storage.
@@ -63,16 +72,17 @@ Updated: 28 August 2026
 - Opening hours and operational booking rules.
 - Maximum simultaneous appointments, booking notice, buffers, hold time,
   booking horizon and cancellation cutoff.
-- Published phone number and public communication channels.
+- Remaining public communication channels beyond the confirmed phone and WhatsApp number.
 - Exact Eircode/map pin, entrance, lift, accessibility, parking and transport
   guidance.
 - Team display details beyond the current supplied names.
-- Illustrative spa imagery and final logo/brand assets.
+- Illustrative spa imagery and final approval of generated treatment galleries.
 - Privacy legal basis, retention schedule, provider list and any international
   transfer wording.
 - Booking notification and follow-up workflow.
 - External notification delivery provider, retries and alert ownership.
-- Production media upload/storage provider and final image approval workflow.
+- Production Cloudinary credentials, signed upload preset, provider retention
+  policy and final image approval workflow.
 - Automated backup frequency, retention and restore-test schedule.
 
 ## Implemented but intentionally not live
@@ -94,7 +104,7 @@ following are true:
 
 1. Receive the owner-confirmed domain, phone, opening hours, access details,
    cancellation policy, contact channels and final assets.
-2. Choose and configure hosting, MongoDB, media, notification and monitoring
+2. Configure hosting, MongoDB, Cloudinary, notification and monitoring
    providers.
 3. Approve the final privacy notice and retention schedule.
 4. Establish booking notification, response-time and expired-request procedures.

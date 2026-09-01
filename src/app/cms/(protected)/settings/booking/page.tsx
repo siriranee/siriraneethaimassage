@@ -11,14 +11,14 @@ export default async function CmsBookingSettingsPage() {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/settings" secondary>Back to settings</CmsPrimaryLink>}
-        description="Configure one Dublin-time availability policy without exposing therapist selection to customers."
+        description="Configure one space-wide availability policy in Dublin time."
         eyebrow="Settings"
         title="Booking rules"
       />
-      <CmsNotice tone="warning" title="Public booking remains locked">
-        The current customer journey still hands off to phone, WhatsApp or the
-        contact form. The launch switch stays unavailable until the complete booking
-        engine and privacy workflow pass validation.
+      <CmsNotice tone="warning" title="Deployment gates remain authoritative">
+        The CMS switch records the owner&apos;s decision after hours and rules are
+        confirmed. Public booking still stays safely off until privacy,
+        notification, monitoring, recovery and encryption checks pass on the server.
       </CmsNotice>
       <BookingSettingsForm openingHoursConfirmed={content.site.openingHoursConfirmed} settings={content.bookingSettings} />
     </>

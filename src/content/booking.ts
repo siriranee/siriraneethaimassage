@@ -22,7 +22,7 @@ export const acuityConfig = {
 
 /**
  * Add only owner-confirmed Siriranee appointment identifiers.
- * Staff assignment stays with the spa or booking provider rather than the customer.
+ * Siriranee bookings do not include a therapist-selection step.
  * Empty mappings intentionally keep the public site in safe contact-only mode.
  */
 export const acuityAppointmentTypes: Readonly<

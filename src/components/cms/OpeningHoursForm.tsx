@@ -18,6 +18,7 @@ function basePayload(site: CmsSiteSettings) {
     country: site.country,
     phoneDisplay: site.phoneDisplay,
     phoneE164: site.phoneE164,
+    phoneConfirmed: site.phoneConfirmed,
     email: site.email,
     whatsappNumber: site.whatsappNumber,
     instagramUrl: site.instagramUrl,

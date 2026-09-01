@@ -11,12 +11,16 @@ A usable recovery requires all of these parts:
 - the MongoDB database named by MONGODB_DB;
 - the exact CMS_PII_ENCRYPTION_KEY used for encrypted booking contact data;
 - deployment environment configuration and canonical domain settings;
+- the Cloudinary account, owned folder, committed image assets and the
+  cmsMediaAssets registry that connects provider assets to CMS content;
+- the Cloudinary credentials and separate CMS_MEDIA_TOKEN_SECRET held in the
+  protected secret store;
 - provider configuration for hosting, monitoring and future notifications;
 - a record of the deployed source revision and database backup timestamp.
 
-There is currently no payment data or production media-provider data in this
-application. If a media, notification or payment provider is added later, its
-backup and reconciliation procedure must be added here.
+There is no payment-provider data in this application. Cloudinary image bytes
+are not stored in MongoDB backups: database recovery restores their registry
+and URLs, while the provider account remains a separate recovery boundary.
 
 The PII key is not embedded in MongoDB backups. Losing or changing it makes
 existing customer details unreadable. The current v1 encryption envelope does
@@ -49,10 +53,21 @@ The current application uses:
 - cmsClosures
 - cmsBookingHolds
 - cmsBookingDayLocks
+- cmsMediaAssets
 
 TTL indexes may remove expired sessions, login attempts and booking holds. A
 logical backup is therefore a point-in-time operational snapshot, not a
 permanent history of expired records.
+
+The cmsMediaAssets collection deliberately has no TTL index. Expired staged
+records retain the ownership evidence needed for safe, idempotent provider
+cleanup. Committed records also protect assets referenced by current drafts and
+immutable publication history.
+
+Cleanup is intentionally two-phase while a signed Cloudinary upload request can
+still be replayed. The first pass removes the current provider asset and retains
+a `deleting` tombstone; a later pass after the provider-signature safety window
+performs the final sweep and marks the registry record deleted.
 
 ## Create a logical backup
 
@@ -79,8 +94,12 @@ Store with the archive:
 - application version;
 - operator;
 - confirmation that the protected PII key is independently recoverable.
+- Cloudinary account and owned-folder identifiers, an inventory timestamp, and
+  confirmation that provider credentials and CMS_MEDIA_TOKEN_SECRET are
+  independently recoverable.
 
 Do not copy the PII key into the same archive.
+Do not copy Cloudinary or media-token secrets into the database archive.
 
 ## Restore to an isolated database
 
@@ -108,6 +127,7 @@ $env:CMS_PRIVACY_NOTICE_APPROVED = "false"
 $env:CMS_BOOKING_NOTIFICATION_READY = "false"
 $env:CMS_MONITORING_READY = "false"
 $env:CMS_RECOVERY_DRILL_VERIFIED = "false"
+$env:CMS_MEDIA_UPLOAD_READY = "false"
 ~~~
 
 Set the original PII key through the trusted secret channel, then install and
@@ -140,10 +160,16 @@ record or retain the plaintext password.
 8. Verify a missing or incorrect key fails closed rather than exposing data.
 9. Confirm published services, prices, page copy, promotions, gallery metadata,
    business information and site navigation match the restored publication.
-10. Run npm.cmd run check.
-11. Start the isolated application and run npm.cmd run test:rendered.
-12. Confirm public booking remains disabled and no notifications are sent.
-13. Record the result, duration and any remediation work.
+10. Compare committed cmsMediaAssets records with every current and historical
+    content reference, then verify a sample from each image scope resolves from
+    the original Cloudinary account.
+11. Confirm expired staged records can be cleaned without deleting committed or
+    publication-referenced assets.
+12. Run npm.cmd run check.
+13. Start the isolated application and run npm.cmd run test:rendered.
+14. Confirm public booking and CMS media uploads remain disabled and no
+    notifications are sent.
+15. Record the result, duration and any remediation work.
 
 The notification collection contains operational preview metadata only; it must
 not contain recipient addresses, phone numbers or message bodies. Confirm that
@@ -156,7 +182,9 @@ Promoting a restore is a separate, approval-gated operation:
 1. Identify the incident and freeze writes if required.
 2. Select the newest verified backup that meets the agreed recovery point.
 3. Restore and validate it in an isolated database.
-4. Reconcile any provider-side actions that occurred after the backup.
+4. Reconcile Cloudinary uploads/deletions and any other provider-side actions
+   that occurred after the database backup. Never bulk-delete provider assets
+   merely because they are absent from an older restored snapshot.
 5. Obtain owner/technical approval.
 6. Prefer switching the deployment to the verified restored database rather
    than overwriting the damaged database.

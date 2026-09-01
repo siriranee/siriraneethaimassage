@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { CmsValidationError } from "@/server/cms/content-validation";
 import { CmsConflictError } from "@/server/cms/repositories";
+import { CmsMediaValidationError } from "@/server/media/policy";
 
 export async function readCmsJsonObject(
   request: Request,
@@ -37,9 +38,15 @@ export function cmsNoStoreJson(
 }
 
 export function cmsErrorResponse(error: unknown) {
-  if (error instanceof CmsValidationError) {
+  if (
+    error instanceof CmsValidationError ||
+    error instanceof CmsMediaValidationError
+  ) {
     return cmsNoStoreJson(
-      { error: error.message, fields: error.fields },
+      {
+        error: error.message,
+        ...(error instanceof CmsValidationError ? { fields: error.fields } : {}),
+      },
       { status: 422 },
     );
   }

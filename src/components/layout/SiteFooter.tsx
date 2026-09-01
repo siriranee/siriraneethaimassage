@@ -8,6 +8,7 @@ import type { PublicSiteData } from "@/domain/public-site";
 import styles from "./SiteFooter.module.css";
 
 export function SiteFooter({ site }: Readonly<{ site: PublicSiteData }>) {
+  const phone = site.contact.phone;
   const email = site.contact.email;
   const instagram = site.social.instagram;
   const whatsappUrl = site.contact.whatsapp.url;
@@ -34,10 +35,12 @@ export function SiteFooter({ site }: Readonly<{ site: PublicSiteData }>) {
               <span>{site.address.formatted}</span>
               <span className="sr-only"> (opens in a new tab)</span>
             </a>
-            <a href={site.contact.phone.href}>
-              <Phone aria-hidden="true" />
-              <span>{site.contact.phone.internationalDisplay}</span>
-            </a>
+            {phone ? (
+              <a href={phone.href}>
+                <Phone aria-hidden="true" />
+                <span>{phone.internationalDisplay}</span>
+              </a>
+            ) : null}
             {email ? (
               <a href={email.href}>
                 <Mail aria-hidden="true" />
@@ -65,16 +68,18 @@ export function SiteFooter({ site }: Readonly<{ site: PublicSiteData }>) {
           <h2 className={styles.heading}>Opening hours</h2>
           <div className={styles.hoursIntro}>
             <Clock3 aria-hidden="true" />
-            <span>{site.openingHoursConfirmed ? "Current published schedule" : "Draft schedule. Please confirm before travelling"}</span>
+            <span>{site.openingHoursConfirmed ? "Current published schedule" : "Opening hours are being confirmed"}</span>
           </div>
-          <dl className={styles.hours}>
-            {site.openingHoursGroups.map((entry) => (
-              <div key={entry.label}>
-                <dt>{entry.label}</dt>
-                <dd>{entry.hours}</dd>
-              </div>
-            ))}
-          </dl>
+          {site.openingHoursConfirmed ? (
+            <dl className={styles.hours}>
+              {site.openingHoursGroups.map((entry) => (
+                <div key={entry.label}>
+                  <dt>{entry.label}</dt>
+                  <dd>{entry.hours}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
         </div>
       </div>
 

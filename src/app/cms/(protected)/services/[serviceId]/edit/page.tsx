@@ -4,6 +4,7 @@ import { ServiceEditorForm } from "@/components/cms/ServiceEditorForm";
 import { CmsPageHeader, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
+import { getCloudinaryMediaOwnershipConfig } from "@/server/media/config";
 
 type PageProps = {
   readonly params: Promise<{ readonly serviceId: string }>;
@@ -13,6 +14,7 @@ export default async function CmsServiceEditPage({ params }: PageProps) {
   await requireCmsPageUser("content:write");
   const { serviceId } = await params;
   const content = await getCmsContent();
+  const cloudinaryOwnership = getCloudinaryMediaOwnershipConfig();
   const service = content.services.find((item) => item.id === serviceId);
   if (!service) notFound();
 
@@ -24,7 +26,10 @@ export default async function CmsServiceEditPage({ params }: PageProps) {
         eyebrow="Treatment editor"
         title={service.name}
       />
-      <ServiceEditorForm service={service} />
+      <ServiceEditorForm
+        cloudinaryOwnership={cloudinaryOwnership}
+        service={service}
+      />
     </>
   );
 }

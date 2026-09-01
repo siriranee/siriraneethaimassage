@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { siteConfig } from "@/content/site";
+import { isConfiguredCloudinaryImageUrl } from "@/lib/media/cloudinary-delivery";
 
 export type CreateMetadataInput = {
   readonly title: string;
@@ -23,6 +24,18 @@ export function absoluteUrl(path = "/"): string {
   return url.toString();
 }
 
+export function absoluteMediaUrl(value: string): string {
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    return absoluteUrl(value);
+  }
+
+  if (isConfiguredCloudinaryImageUrl(value)) {
+    return new URL(value).toString();
+  }
+
+  throw new Error(`Media URLs must be local or use the configured Cloudinary account: ${value}`);
+}
+
 export function formatMetadataTitle(title: string): string {
   return title.toLocaleLowerCase("en-IE").includes("siriranee")
     ? title
@@ -38,7 +51,7 @@ export function createMetadata({
 }: CreateMetadataInput): Metadata {
   const formattedTitle = formatMetadataTitle(title);
   const canonical = absoluteUrl(path);
-  const socialImage = absoluteUrl(image?.src ?? "/opengraph-image");
+  const socialImage = absoluteMediaUrl(image?.src ?? "/opengraph-image");
   const socialImageAlt =
     image?.alt ?? `${siteConfig.name} in Howth, Dublin`;
 

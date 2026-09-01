@@ -61,7 +61,7 @@ export type PublicSiteData = {
       readonly internationalDisplay: string;
       readonly e164: string;
       readonly href: string;
-    };
+    } | null;
     readonly email: {
       readonly address: string;
       readonly href: string;

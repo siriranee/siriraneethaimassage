@@ -89,6 +89,7 @@ export async function createPublicBooking(
     ? (value as Record<string, unknown>)
     : {};
   const forbidden = [
+    "assignedStaffId",
     "therapist",
     "therapistId",
     "staffId",
@@ -98,7 +99,7 @@ export async function createPublicBooking(
   ];
   if (forbidden.some((field) => field in source)) {
     throw new CmsValidationError(
-      "Staff assignment and pricing are controlled by the spa.",
+      "Booking fields and pricing are controlled by the spa.",
     );
   }
   if (String(source.website ?? "").trim()) {

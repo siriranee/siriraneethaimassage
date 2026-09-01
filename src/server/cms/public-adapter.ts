@@ -8,6 +8,7 @@ import {
   type Service,
   type ServiceCategoryId,
 } from "@/content/services";
+import { defaultHomeHeroSlides } from "@/content/home-hero";
 import {
   googleMapsDirectionsUrl,
   googleMapsEmbedUrl,
@@ -21,6 +22,7 @@ import type {
   PublicTeamMember,
   PublicVoucher,
 } from "@/domain/public-site";
+import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
 import { isLivePublicBookingReady } from "@/server/booking/readiness";
 import { getPublishedCmsContent } from "@/server/cms/content-service";
 
@@ -42,6 +44,14 @@ function safePublicUrl(value: string) {
   } catch {
     return null;
   }
+}
+
+function safeFocalPosition(value: number) {
+  return Number.isInteger(value) && value >= 0 && value <= 100 ? value : 50;
+}
+
+function isPublicProjectImage(value: string) {
+  return isApprovedPublicImageUrl(value);
 }
 
 function formatAddress(parts: readonly string[]) {
@@ -97,10 +107,9 @@ function mapPublishedService(
   const category = isServiceCategory(record.category)
     ? record.category
     : fallback.category;
-  const imageSource =
-    record.imageUrl.startsWith("/") && !record.imageUrl.startsWith("//")
-      ? record.imageUrl
-      : fallback.image.src;
+  const imageSource = isPublicProjectImage(record.imageUrl)
+    ? record.imageUrl
+    : fallback.image.src;
 
   return {
     slug: record.slug,
@@ -112,6 +121,15 @@ function mapPublishedService(
       src: imageSource,
       alt: record.imageAlt || fallback.image.alt,
     },
+    gallery: record.galleryImages
+      .filter((image) => isPublicProjectImage(image.imageUrl))
+      .map((image) => ({
+        src: image.imageUrl,
+        alt: image.altText,
+        caption: image.caption,
+        focalX: safeFocalPosition(image.focalX),
+        focalY: safeFocalPosition(image.focalY),
+      })),
     durations: pricing.map((price) => `${price.durationMinutes} minutes`),
     pricing,
     bookingNotice: record.bookingNotice || undefined,
@@ -171,10 +189,7 @@ export const getPublicGallery = cache(async () => {
   const content = await getPublicContent();
   return [...content.gallery]
     .filter(
-      (item) =>
-        item.published &&
-        item.imageUrl.startsWith("/") &&
-        !item.imageUrl.startsWith("//"),
+      (item) => item.published && isPublicProjectImage(item.imageUrl),
     )
     .sort((first, second) => first.sortOrder - second.sortOrder)
     .map((item) => ({
@@ -224,7 +239,20 @@ export const getPublicPageCopy = cache(async (pageId: CmsPageId) => {
   const content = await getPublicContent();
   const page = content.pages?.find((item) => item.id === pageId);
   if (!page) throw new Error(`Public page copy is missing for ${pageId}.`);
-  return page;
+
+  if (page.id !== "home") return page;
+
+  const publishedSlides = (page.heroSlides ?? []).filter((slide) =>
+    isPublicProjectImage(slide.imageUrl),
+  );
+
+  return {
+    ...page,
+    heroSlides: (publishedSlides.length
+      ? publishedSlides
+      : defaultHomeHeroSlides
+    ).map((slide) => ({ ...slide })),
+  };
 });
 
 export const getPublicSiteData = cache(async (): Promise<PublicSiteData> => {
@@ -242,9 +270,17 @@ export const getPublicSiteData = cache(async (): Promise<PublicSiteData> => {
   ]);
   const localityLabel = formatAddress([source.locality, source.region]);
   const phoneDigits = source.phoneE164.replace(/[^\d+]/g, "");
-  const safePhone = /^\+?[1-9]\d{7,14}$/.test(phoneDigits)
-    ? phoneDigits
-    : siteConfig.contact.phone.e164;
+  const phone =
+    source.phoneConfirmed === true &&
+    source.phoneDisplay.trim().length >= 5 &&
+    /^\+[1-9]\d{7,14}$/.test(phoneDigits)
+      ? {
+          display: source.phoneDisplay.trim(),
+          internationalDisplay: phoneDigits,
+          e164: phoneDigits,
+          href: `tel:${phoneDigits}`,
+        }
+      : null;
   const emailAddress =
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(source.email.trim())
       ? source.email.trim()
@@ -260,14 +296,15 @@ export const getPublicSiteData = cache(async (): Promise<PublicSiteData> => {
   const instagramHandle = instagramUrl
     ? `@${new URL(instagramUrl).pathname.split("/").filter(Boolean)[0] ?? "Instagram"}`
     : null;
-  const openingHours: readonly PublicOpeningHours[] = source.weeklyHours.map(
-    (entry) => ({
-      day: entry.day,
-      open: entry.open,
-      opens: entry.opens,
-      closes: entry.closes,
-    }),
-  );
+  const openingHoursConfirmed = source.openingHoursConfirmed === true;
+  const openingHours: readonly PublicOpeningHours[] = openingHoursConfirmed
+    ? source.weeklyHours.map((entry) => ({
+        day: entry.day,
+        open: entry.open,
+        opens: entry.opens,
+        closes: entry.closes,
+      }))
+    : [];
   const liveBooking = isLivePublicBookingReady(content);
 
   return {
@@ -296,12 +333,7 @@ export const getPublicSiteData = cache(async (): Promise<PublicSiteData> => {
       assistance: source.arrivalAssistance,
     },
     contact: {
-      phone: {
-        display: source.phoneDisplay,
-        internationalDisplay: safePhone,
-        e164: safePhone,
-        href: `tel:${safePhone}`,
-      },
+      phone,
       email: emailAddress
         ? { address: emailAddress, href: `mailto:${emailAddress}` }
         : null,
@@ -312,7 +344,7 @@ export const getPublicSiteData = cache(async (): Promise<PublicSiteData> => {
     },
     openingHours,
     openingHoursGroups: makeHoursGroups(openingHours),
-    openingHoursConfirmed: source.openingHoursConfirmed,
+    openingHoursConfirmed,
     booking: {
       enabled: liveBooking || siteConfig.booking.enabled,
       live: liveBooking,

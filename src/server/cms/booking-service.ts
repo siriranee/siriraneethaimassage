@@ -7,6 +7,10 @@ import {
   getAvailabilitySlots,
 } from "@/domain/booking/availability";
 import {
+  canTransitionBookingStatus,
+  isTerminalBookingStatus,
+} from "@/domain/booking/status";
+import {
   bookingSources,
   bookingChangeReasons,
   bookingStatuses,
@@ -43,9 +47,23 @@ type BookingInput = {
   readonly localTime: string;
   readonly status: BookingStatus;
   readonly source: BookingSource;
-  readonly assignedStaffId: string;
   readonly internalNotes: string;
 };
+
+const staffAssignmentFields = [
+  "assignedStaffId",
+  "staffId",
+  "therapist",
+  "therapistId",
+] as const;
+
+function assertNoStaffAssignment(source: Record<string, unknown>) {
+  if (staffAssignmentFields.some((field) => field in source)) {
+    throw new CmsValidationError(
+      "Staff assignment is not part of Siriranee booking management.",
+    );
+  }
+}
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -72,6 +90,7 @@ function parseBookingInput(value: unknown): BookingInput {
   const source = value && typeof value === "object"
     ? (value as Record<string, unknown>)
     : {};
+  assertNoStaffAssignment(source);
   const status = String(source.status);
   const bookingSource = String(source.source);
   const durationMinutes = Number(source.durationMinutes);
@@ -81,6 +100,11 @@ function parseBookingInput(value: unknown): BookingInput {
 
   if (!bookingStatuses.some((item) => item === status)) {
     throw new CmsValidationError("Choose a valid booking status.");
+  }
+  if (status !== "pending" && status !== "confirmed") {
+    throw new CmsValidationError(
+      "New bookings must start as pending or confirmed.",
+    );
   }
   if (!bookingSources.some((item) => item === bookingSource) || bookingSource === "website" || bookingSource === "provider") {
     throw new CmsValidationError("Choose phone, WhatsApp, walk-in or administrator as the source.");
@@ -111,7 +135,6 @@ function parseBookingInput(value: unknown): BookingInput {
     localTime,
     status: status as BookingStatus,
     source: bookingSource as BookingSource,
-    assignedStaffId: optionalText(source.assignedStaffId, 120),
     internalNotes: optionalText(source.internalNotes, 1000),
   };
 }
@@ -119,19 +142,6 @@ function parseBookingInput(value: unknown): BookingInput {
 function assertPersistenceReady(repository: CmsRepository) {
   if (repository.mode === "mongodb") {
     getCmsPiiEncryptionKey();
-  }
-}
-
-function assertStaffAssignment(
-  assignedStaffId: string,
-  team: readonly { id: string; operationalActive: boolean }[],
-) {
-  if (!assignedStaffId) return;
-  const staff = team.find((member) => member.id === assignedStaffId);
-  if (!staff?.operationalActive) {
-    throw new CmsValidationError(
-      "Assigned staff must be operationally active. Customers never choose this field.",
-    );
   }
 }
 
@@ -246,8 +256,7 @@ export async function createAdminBooking(
 
   return repository.transaction(async (transaction) => {
     await transaction.lockBookingDate(input.localDate);
-    const { content, price, service, slot } = await findSlot(transaction, input);
-    assertStaffAssignment(input.assignedStaffId, content.team);
+    const { price, service, slot } = await findSlot(transaction, input);
     const now = new Date().toISOString();
     const booking: CmsBooking = {
       id: randomUUID(),
@@ -272,7 +281,7 @@ export async function createAdminBooking(
       status: input.status,
       source: input.source,
       capacityExpiresAt: "",
-      assignedStaffId: input.assignedStaffId,
+      assignedStaffId: "",
       internalNotes: input.internalNotes,
       privacyAcceptedAt: "",
       privacyNoticeVersion: "admin-captured",
@@ -315,6 +324,8 @@ export async function updateAdminBooking(
   const repository = getCmsRepository();
   assertPersistenceReady(repository);
 
+  assertNoStaffAssignment(source);
+
   return repository.transaction(async (transaction) => {
     const current = await transaction.getBooking(bookingId);
     if (!current) throw new Error("Booking not found.");
@@ -325,19 +336,33 @@ export async function updateAdminBooking(
     const nextDate = typeof source.localDate === "string" ? source.localDate : current.localDate;
     const nextTime = typeof source.localTime === "string" ? source.localTime : current.localTime;
     const statusValue = typeof source.status === "string" ? source.status : current.status;
-    const status = bookingStatuses.some((item) => item === statusValue)
-      ? (statusValue as BookingStatus)
-      : current.status;
-    const assignedStaffId = optionalText(source.assignedStaffId, 120);
+    if (!bookingStatuses.some((item) => item === statusValue)) {
+      throw new CmsValidationError("Choose a valid booking status.");
+    }
+    const status = statusValue as BookingStatus;
+    if (!canTransitionBookingStatus(current.status, status)) {
+      throw new CmsValidationError(
+        `A ${current.status.replaceAll("-", " ")} booking cannot change to ${status.replaceAll("-", " ")}.`,
+      );
+    }
     const internalNotes = optionalText(source.internalNotes, 1000);
     const reasonValue = typeof source.changeReason === "string" ? source.changeReason : "";
     const changeReason = bookingChangeReasons.some((reason) => reason === reasonValue)
       ? (reasonValue as BookingChangeReason)
       : undefined;
+    const timeChanged =
+      nextDate !== current.localDate || nextTime !== current.localTime;
+    if (
+      timeChanged &&
+      (isTerminalBookingStatus(current.status) || isTerminalBookingStatus(status))
+    ) {
+      throw new CmsValidationError(
+        "Complete the reschedule before moving a booking to a final status.",
+      );
+    }
     const appointmentChanged =
       status !== current.status ||
-      nextDate !== current.localDate ||
-      nextTime !== current.localTime;
+      timeChanged;
     if (appointmentChanged && !changeReason) {
       throw new CmsValidationError(
         "Choose an operational reason when changing appointment status, date or time.",
@@ -345,9 +370,6 @@ export async function updateAdminBooking(
     }
     const lockDates = [...new Set([current.localDate, nextDate])].sort();
     for (const date of lockDates) await transaction.lockBookingDate(date);
-
-    const content = await transaction.getContent();
-    assertStaffAssignment(assignedStaffId, content.team);
 
     let startsAt = current.startsAt;
     let endsAt = current.endsAt;
@@ -381,7 +403,6 @@ export async function updateAdminBooking(
       status,
       capacityExpiresAt:
         status === "pending" ? current.capacityExpiresAt || "" : "",
-      assignedStaffId,
       internalNotes,
       lastChangeReason: appointmentChanged ? changeReason : current.lastChangeReason,
       version: current.version + 1,

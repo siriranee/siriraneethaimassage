@@ -32,6 +32,7 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
   const treatmentsMenuRef = useRef<HTMLDivElement>(null);
   const treatmentsButtonRef = useRef<HTMLButtonElement>(null);
   const whatsappUrl = site.contact.whatsapp.url;
+  const phone = site.contact.phone;
   const treatmentNavigation = site.treatments;
 
   useEffect(() => {
@@ -336,9 +337,11 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
           <Link className={styles.drawerBook} href="/book" onClick={closeMenu}>
             <CalendarDays aria-hidden="true" /> Book Now
           </Link>
-          <a href={site.contact.phone.href}>
-            <Phone aria-hidden="true" /> {site.contact.phone.display}
-          </a>
+          {phone ? (
+            <a href={phone.href}>
+              <Phone aria-hidden="true" /> {phone.display}
+            </a>
+          ) : null}
           {whatsappUrl ? (
             <a href={whatsappUrl} target="_blank" rel="noreferrer">
               <MessageCircle aria-hidden="true" /> WhatsApp<span className="sr-only"> (opens in a new tab)</span>

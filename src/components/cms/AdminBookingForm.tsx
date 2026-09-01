@@ -14,20 +14,13 @@ type Variant = {
   readonly priceCents: number;
 };
 
-type StaffOption = {
-  readonly id: string;
-  readonly name: string;
-};
-
 export function AdminBookingForm({
   defaultDate,
   isMock,
-  staff,
   variants,
 }: Readonly<{
   defaultDate: string;
   isMock: boolean;
-  staff: readonly StaffOption[];
   variants: readonly Variant[];
 }>) {
   const router = useRouter();
@@ -119,7 +112,6 @@ export function AdminBookingForm({
           localTime,
           status: data.get("status"),
           source: data.get("source"),
-          assignedStaffId: data.get("assignedStaffId"),
           internalNotes: data.get("internalNotes"),
         }),
       });
@@ -175,11 +167,10 @@ export function AdminBookingForm({
       </section>
 
       <section className={styles.section}>
-        <header className={styles.sectionHeader}><h2>Internal handling</h2><p>Assigned staff is optional and never shown as a customer choice.</p></header>
+        <header className={styles.sectionHeader}><h2>Booking details</h2><p>Record how the appointment arrived and whether it is already confirmed.</p></header>
         <div className={styles.grid}>
           <label className={styles.field}>Status<select defaultValue="confirmed" name="status"><option value="pending">Pending</option><option value="confirmed">Confirmed</option></select></label>
           <label className={styles.field}>Source<select defaultValue="phone" name="source"><option value="phone">Phone</option><option value="whatsapp">WhatsApp</option><option value="walk-in">Walk-in</option><option value="administrator">Administrator</option></select></label>
-          <label className={styles.fullField}>Assigned staff, internal only<select defaultValue="" name="assignedStaffId"><option value="">Unassigned</option>{staff.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select><small>Only operationally confirmed staff appear here.</small></label>
           <label className={styles.fullField}>Internal notes<textarea maxLength={1000} name="internalNotes" /></label>
         </div>
       </section>

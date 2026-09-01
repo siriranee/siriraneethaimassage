@@ -14,8 +14,12 @@ export function BrandMark({ compact = false }: BrandMarkProps) {
         aria-hidden="true"
         className={styles.logoImage}
         height={1394}
-        src="/brand/siriranee-logo-gold-exact.svg"
-        unoptimized
+        sizes={
+          compact
+            ? "(max-width: 380px) 2.75rem, 3.2rem"
+            : "(max-width: 380px) 4.25rem, 4.8rem"
+        }
+        src="/brand/siriranee-logo-gold-exact.webp"
         width={1411}
       />
       <span className="sr-only">Siriranee Thai Massage</span>

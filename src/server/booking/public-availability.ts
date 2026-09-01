@@ -122,7 +122,7 @@ export async function getPublicAvailabilityCalendar(input: {
   if (mode === "disabled") {
     return {
       status: "disabled" as const,
-      message: "Online availability is not configured yet. Contact the spa to choose a date.",
+      message: "Online availability is not configured yet. Please check again later.",
       month: input.month,
       minimumDate: fallbackMinimumDate,
       maximumDate: fallbackMinimumDate,

@@ -6,7 +6,6 @@ import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { isPendingCapacityExpired } from "@/domain/booking/status";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
-import { getCmsContent } from "@/server/cms/content-service";
 import { getCmsBooking, listCmsBookingTimeline, listCmsNotifications } from "@/server/cms/read-service";
 
 import styles from "@/components/cms/CmsViews.module.css";
@@ -18,24 +17,19 @@ type PageProps = {
 export default async function CmsBookingDetailPage({ params }: PageProps) {
   await requireCmsPageUser("bookings:write");
   const { bookingId } = await params;
-  const [booking, content, timeline, notifications] = await Promise.all([
+  const [booking, timeline, notifications] = await Promise.all([
     getCmsBooking(bookingId),
-    getCmsContent(),
     listCmsBookingTimeline(bookingId),
     listCmsNotifications(bookingId, 100),
   ]);
   if (!booking) notFound();
   const expiredPending = isPendingCapacityExpired(booking);
 
-  const staff = content.team
-    .filter((member) => (member.operationalActive && !member.archived) || member.id === booking.assignedStaffId)
-    .map((member) => ({ id: member.id, name: member.name }));
-
   return (
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/bookings" secondary>Back to bookings</CmsPrimaryLink>}
-        description="Review the appointment snapshot, update status, reschedule safely or assign staff internally."
+        description="Review the appointment snapshot, update its status or reschedule safely."
         eyebrow={booking.reference}
         title={booking.customer.name}
       />
@@ -62,7 +56,6 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
             <div><dt>Date</dt><dd>{booking.localDate}</dd></div>
             <div><dt>Dublin time</dt><dd>{booking.localTime}</dd></div>
             <div><dt>Source</dt><dd>{booking.source}</dd></div>
-            <div><dt>Assigned staff</dt><dd>{booking.assignedStaffId || "Unassigned"}</dd></div>
             <div><dt>Last change reason</dt><dd>{booking.lastChangeReason?.replaceAll("-", " ") || "Not recorded"}</dd></div>
           </dl>
         </CmsPanel>
@@ -101,7 +94,7 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
         ) : <p>No notification preview has been generated for this booking.</p>}
       </CmsPanel>
 
-      <BookingEditorForm booking={booking} staff={staff} />
+      <BookingEditorForm booking={booking} />
     </>
   );
 }

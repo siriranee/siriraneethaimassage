@@ -16,14 +16,14 @@ export default async function CmsTeamPage() {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/team/new"><Plus aria-hidden="true" /> Add profile</CmsPrimaryLink>}
-        description="Keep public biographies separate from scheduling. Operational status is internal and never becomes a customer therapist picker."
+        description="Manage the informational profiles shown on the public team page."
         eyebrow="People"
         title="Team"
       />
 
       <CmsNotice title="No therapist selection in customer booking">
-        Team profiles can introduce the people at Siriranee. Appointment staff
-        assignment stays optional and internal to the CMS.
+        Team profiles introduce the people at Siriranee. They are not used as
+        booking choices or appointment-management fields.
       </CmsNotice>
 
       <div className={styles.serviceGrid}>
@@ -35,14 +35,10 @@ export default async function CmsTeamPage() {
             </div>
             <span className={styles.cardIcon}><UserRoundCog aria-hidden="true" /></span>
             <h2>{member.fullName}</h2>
-            <p>
-              {member.operationalActive
-                ? "Available for internal scheduling where confirmed."
-                : "Operational availability is not yet confirmed."}
-            </p>
+            <p>Informational website profile managed separately from bookings.</p>
             <dl>
               <div><dt>Website name</dt><dd>{member.name}</dd></div>
-              <div><dt>Scheduling</dt><dd>{member.operationalActive ? "Active" : "Not confirmed"}</dd></div>
+              <div><dt>Display order</dt><dd>{member.sortOrder}</dd></div>
             </dl>
             <Link href={`/cms/team/${member.id}/edit`}><Pencil aria-hidden="true" /> Edit profile</Link>
           </article>

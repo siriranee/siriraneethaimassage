@@ -20,7 +20,7 @@ export default async function CmsTeamEditPage({ params }: PageProps) {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/team" secondary>Back to team</CmsPrimaryLink>}
-        description="Edit public identity and internal scheduling status as separate responsibilities."
+        description="Edit this informational profile and control its public visibility."
         eyebrow="Team editor"
         title={member.fullName}
       />

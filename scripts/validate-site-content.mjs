@@ -64,6 +64,12 @@ const siteSource = await read("src/content/site.ts");
 const servicesSource = await read("src/content/services.ts");
 const globalStylesSource = await read("src/app/globals.css");
 const schemaSource = await read("src/lib/structured-data.ts");
+const homePageSource = await read("src/app/(site)/page.tsx");
+const aboutPageSource = await read("src/app/(site)/about/page.tsx");
+const openGraphImageSource = await read("src/app/opengraph-image.tsx");
+const mapEmbedSource = await read("src/components/contact/MapEmbed.tsx");
+const sitemapSource = await read("src/app/sitemap.ts");
+const robotsSource = await read("src/app/robots.ts");
 const publicAdapterSource = await read("src/server/cms/public-adapter.ts");
 const publicBookingSource = await read("src/server/booking/public-booking.ts");
 const defaultContentSource = await read("src/server/cms/default-content.ts");
@@ -293,6 +299,16 @@ check(
   "DaySpa schema must declare the configured EUR currency",
 );
 check(
+  schemaSource.includes("buildServicePriceRange") &&
+    schemaSource.includes("...(priceRange ? { priceRange } : {})") &&
+    !schemaSource.includes('priceRange: "€40–€95"'),
+  "DaySpa priceRange must be derived from the published services",
+);
+check(
+  homePageSource.includes("buildDaySpaJsonLd(site, services)"),
+  "The homepage must pass its published service list to the DaySpa schema",
+);
+check(
   schemaSource.includes("...(sameAs.length > 0 ? { sameAs } : {})"),
   "DaySpa schema must omit sameAs when no verified profiles exist",
 );
@@ -305,6 +321,40 @@ check(
   schemaSource.includes("...(site.openingHoursConfirmed"),
   "Opening-hours schema must be conditional on owner confirmation",
 );
+check(
+  !contactPageSource.includes("loadImmediately") &&
+    !mapEmbedSource.includes("loadImmediately") &&
+    mapEmbedSource.includes("useState(false)"),
+  "Google Maps must remain click-to-load until the visitor opts in",
+);
+check(
+  !sitemapSource.includes('{ path: "/therapists"') &&
+    sitemapSource.includes("getPublicPromotions") &&
+    sitemapSource.includes("promotions.length > 0"),
+  "Sitemap must exclude the team page and include promotions only when published",
+);
+check(
+  robotsSource.includes('process.env.VERCEL_ENV === "preview"') &&
+    robotsSource.includes('disallow: "/"'),
+  "Vercel preview deployments must block search indexing",
+);
+const publicMarketingCopy = [
+  homePageSource,
+  aboutPageSource,
+  therapistsPageSource,
+  openGraphImageSource,
+  defaultContentSource,
+].join("\n");
+for (const unsupportedClaim of [
+  /\bauthentic Thai\b/i,
+  /\bspecialist treatments?\b/i,
+  /\bconfirmed team\b/i,
+]) {
+  check(
+    !unsupportedClaim.test(publicMarketingCopy),
+    `Public marketing copy contains an unconfirmed claim: ${unsupportedClaim}`,
+  );
+}
 check(
   publicAdapterSource.includes("getPublishedCmsContent") &&
     publicAdapterSource.includes('record.status !== "published"'),

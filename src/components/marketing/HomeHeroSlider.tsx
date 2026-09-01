@@ -5,44 +5,34 @@ import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
 import { ButtonLink } from "@/components/ui/ButtonLink";
+import { defaultHomeHeroSlides } from "@/content/home-hero";
+import type { CmsPageHeroSlide } from "@/domain/cms/page-hero";
 
 import styles from "./HomeHeroSlider.module.css";
 
 const AUTOPLAY_DELAY_MS = 3_000;
 
-export const homeHeroSlides = [
-  {
-    src: "/images/hero/slide-traditional-thai.webp",
-    alt: "Traditional Thai massage in an elegant plum and gold treatment room",
-    title: "Traditional Thai massage",
-  },
-  {
-    src: "/images/hero/slide-hot-oil.webp",
-    alt: "Warm massage oil, orchids and folded towels in a peaceful spa setting",
-    title: "Warm oil ritual",
-  },
-  {
-    src: "/images/hero/slide-hot-stone.webp",
-    alt: "Hot stones, orchids and candlelight arranged for a calming treatment",
-    title: "Hot stone relaxation",
-  },
-] as const;
+export const homeHeroSlides = defaultHomeHeroSlides;
 
 type HomeHeroSliderProps = {
   eyebrow: string;
   title: string;
   description: string;
+  slides?: readonly CmsPageHeroSlide[];
 };
 
-function normaliseSlide(index: number) {
-  return (index + homeHeroSlides.length) % homeHeroSlides.length;
+function normaliseSlide(index: number, slideCount: number) {
+  return (index + slideCount) % slideCount;
 }
 
 export function HomeHeroSlider({
   eyebrow,
   title,
   description,
+  slides,
 }: HomeHeroSliderProps) {
+  const resolvedSlides = slides?.length ? slides : homeHeroSlides;
+  const hasMultipleSlides = resolvedSlides.length > 1;
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPointerPaused, setIsPointerPaused] = useState(false);
   const [isFocusPaused, setIsFocusPaused] = useState(false);
@@ -72,23 +62,24 @@ export function HomeHeroSlider({
   }, []);
 
   const announceSlide = useCallback((index: number) => {
-    const nextIndex = normaliseSlide(index);
+    const nextIndex = normaliseSlide(index, resolvedSlides.length);
     setAnnouncement(
-      `${homeHeroSlides[nextIndex].title}, slide ${nextIndex + 1} of ${homeHeroSlides.length}.`,
+      `${resolvedSlides[nextIndex].title}, slide ${nextIndex + 1} of ${resolvedSlides.length}.`,
     );
-  }, []);
+  }, [resolvedSlides]);
 
   const selectSlide = useCallback(
     (index: number) => {
-      const nextIndex = normaliseSlide(index);
+      const nextIndex = normaliseSlide(index, resolvedSlides.length);
       setActiveIndex(nextIndex);
       announceSlide(nextIndex);
     },
-    [announceSlide],
+    [announceSlide, resolvedSlides.length],
   );
 
   useEffect(() => {
     if (
+      !hasMultipleSlides ||
       isPointerPaused ||
       isFocusPaused ||
       !isDocumentVisible ||
@@ -98,21 +89,25 @@ export function HomeHeroSlider({
     }
 
     const timer = window.setInterval(() => {
-      setActiveIndex((current) => normaliseSlide(current + 1));
+      setActiveIndex((current) =>
+        normaliseSlide(current + 1, resolvedSlides.length),
+      );
     }, AUTOPLAY_DELAY_MS);
 
     return () => window.clearInterval(timer);
   }, [
     isDocumentVisible,
     isFocusPaused,
+    hasMultipleSlides,
     isPointerPaused,
     prefersReducedMotion,
+    resolvedSlides.length,
   ]);
 
   return (
     <section
       aria-label="Siriranee massage highlights"
-      aria-roledescription="carousel"
+      aria-roledescription={hasMultipleSlides ? "carousel" : undefined}
       className={styles.hero}
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -121,6 +116,8 @@ export function HomeHeroSlider({
       }}
       onFocusCapture={() => setIsFocusPaused(true)}
       onKeyDown={(event) => {
+        if (!hasMultipleSlides) return;
+
         if (event.key === "ArrowLeft") {
           event.preventDefault();
           selectSlide(activeIndex - 1);
@@ -135,7 +132,7 @@ export function HomeHeroSlider({
       role="region"
     >
       <div className={styles.slides}>
-        {homeHeroSlides.map((slide, index) => {
+        {resolvedSlides.map((slide, index) => {
           const isActive = index === activeIndex;
           return (
             <div
@@ -144,15 +141,16 @@ export function HomeHeroSlider({
               data-hero-slide
               data-hero-slide-active={isActive ? "true" : "false"}
               id={`home-hero-slide-${index + 1}`}
-              key={slide.src}
+              key={slide.id}
             >
               <Image
-                alt={slide.alt}
+                alt={slide.altText}
                 fill
                 preload={index === 0}
                 quality={90}
-                sizes="100vw"
-                src={slide.src}
+                sizes="(max-width: 620px) 400vw, (max-width: 900px) 180vw, 100vw"
+                src={slide.imageUrl}
+                style={{ objectPosition: `${slide.focalX}% ${slide.focalY}%` }}
               />
             </div>
           );
@@ -190,8 +188,8 @@ export function HomeHeroSlider({
         aria-hidden="true"
         className={styles.heroLogo}
         height={1394}
-        src="/brand/siriranee-logo-gold-exact.svg"
-        unoptimized
+        sizes="(max-width: 380px) 6.2rem, (max-width: 620px) 7.2rem, (max-width: 900px) 6.5rem, (max-width: 1100px) 5.8rem, 7.5rem"
+        src="/brand/siriranee-logo-gold-exact.webp"
         width={1411}
       />
 

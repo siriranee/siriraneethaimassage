@@ -144,11 +144,6 @@
   transform: rotate(5deg);
 }
 
-.item:focus-visible,
-.mainButton:focus-visible {
-  outline-color: var(--color-purple-400);
-}
-
 @media (hover: hover) and (pointer: fine) {
   .item:hover {
     transform: translateY(-0.1rem) scale(1.015);

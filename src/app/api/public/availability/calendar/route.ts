@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const response = NextResponse.json(
       {
         status: "disabled",
-        message: "The booking calendar is temporarily unavailable. Contact the spa directly.",
+        message: "The booking calendar is temporarily unavailable. Please try again later.",
         month: "",
         minimumDate: "",
         maximumDate: "",

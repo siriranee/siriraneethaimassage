@@ -67,7 +67,7 @@ export default function OpenGraphImage() {
             Thai Massage
           </div>
           <div style={{ color: "rgba(255,255,255,.75)", fontSize: 27, marginTop: 32 }}>
-            Authentic Thai massage and thoughtful spa treatments
+            Thai massage and thoughtful spa treatments
           </div>
         </div>
       </div>

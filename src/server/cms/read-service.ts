@@ -47,7 +47,6 @@ export async function getCmsDashboardData() {
       ).length,
       expiredPendingCount: expiredPending.length,
       upcomingCount: upcoming.length,
-      unassignedCount: upcoming.filter((booking) => !booking.assignedStaffId).length,
       activeServiceCount: content.services.filter(
         (service) => service.status === "published",
       ).length,

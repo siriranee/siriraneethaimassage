@@ -24,6 +24,7 @@ test("public booking rejects privileged fields and stores no staff assignment", 
   const booking = await source("src/server/booking/public-booking.ts");
 
   for (const field of [
+    "assignedStaffId",
     "therapist",
     "therapistId",
     "staffId",
@@ -36,6 +37,72 @@ test("public booking rejects privileged fields and stores no staff assignment", 
   assert.match(booking, /assignedStaffId:\s*""/);
   assert.match(booking, /requestFingerprintHash/);
   assert.match(booking, /privacyNoticeVersion:\s*bookingPrivacyNotice\.version/);
+});
+
+test("booking management surfaces do not offer staff assignment", async () => {
+  const files = await Promise.all([
+    source("src/components/cms/AdminBookingForm.tsx"),
+    source("src/components/cms/BookingEditorForm.tsx"),
+    source("src/app/cms/(protected)/bookings/page.tsx"),
+    source("src/app/cms/(protected)/bookings/[bookingId]/page.tsx"),
+    source("src/app/cms/(protected)/calendar/page.tsx"),
+    source("src/app/cms/(protected)/page.tsx"),
+  ]);
+  const managementSource = files.join("\n");
+
+  assert.doesNotMatch(managementSource, /assignedStaffId/);
+  assert.doesNotMatch(managementSource, /assigned staff/i);
+  assert.doesNotMatch(managementSource, /unassigned/i);
+});
+
+test("team profiles remain informational and have no assignment control", async () => {
+  const [editor, listing] = await Promise.all([
+    source("src/components/cms/TeamEditorForm.tsx"),
+    source("src/app/cms/(protected)/team/page.tsx"),
+  ]);
+
+  assert.doesNotMatch(editor, /name="operationalActive"/);
+  assert.doesNotMatch(listing, /member\.operationalActive/);
+  assert.match(editor, /operationalActive:\s*member\.operationalActive/);
+});
+
+test("booking settings use the API response contract and gate public enablement", async () => {
+  const [form, validation, readiness] = await Promise.all([
+    source("src/components/cms/BookingSettingsForm.tsx"),
+    source("src/server/cms/content-validation.ts"),
+    source("src/server/booking/readiness.ts"),
+  ]);
+
+  assert.match(form, /bookingSettings\?: CmsBookingSettings/);
+  assert.doesNotMatch(form, /settings\?: CmsBookingSettings/);
+  assert.match(form, /disabled=\{!canEnablePublicBooking\}/);
+  assert.match(form, /holdMinutes:\s*settings\.holdMinutes/);
+  assert.match(form, /cancellationCutoffMinutes:\s*settings\.cancellationCutoffMinutes/);
+  assert.doesNotMatch(form, /name="holdMinutes"/);
+  assert.doesNotMatch(form, /name="cancellationCutoffMinutes"/);
+  assert.match(validation, /publicBookingEnabled[\s\S]*?!rulesConfirmed \|\| !openingHoursConfirmed/);
+  for (const gate of [
+    "CMS_PUBLIC_BOOKING_READY",
+    "CMS_PRIVACY_NOTICE_APPROVED",
+    "CMS_BOOKING_NOTIFICATION_READY",
+    "CMS_MONITORING_READY",
+    "CMS_RECOVERY_DRILL_VERIFIED",
+  ]) {
+    assert.match(readiness, new RegExp(gate));
+  }
+});
+
+test("booking mutations reject assignment fields and unsafe initial statuses", async () => {
+  const service = await source("src/server/cms/booking-service.ts");
+
+  assert.match(service, /status !== "pending" && status !== "confirmed"/);
+  assert.match(service, /canTransitionBookingStatus\(current\.status, status\)/);
+  for (const field of ["assignedStaffId", "staffId", "therapist", "therapistId"]) {
+    assert.match(service, new RegExp(`"${field}"`));
+  }
+  assert.match(service, /parseBookingInput[\s\S]*?assertNoStaffAssignment\(source\)/);
+  assert.match(service, /assignedStaffId:\s*""/);
+  assert.doesNotMatch(service, /assignedStaffId:\s*input\./);
 });
 
 test("contact handoff resolves service and price from the published snapshot", async () => {
@@ -80,8 +147,9 @@ test("booking page keeps customer instructions concise", async () => {
   ]);
   const bookingCopy = `${bookPage}\n${planner}`;
 
-  assert.match(bookPage, /title="Book your massage"/);
-  assert.match(bookPage, /description="Choose a treatment, date and time\."/);
+  assert.match(bookPage, /getPublicPageCopy\("book"\)/);
+  assert.match(bookPage, /title=\{pageCopy\.title\}/);
+  assert.match(bookPage, /description=\{pageCopy\.description\}/);
   assert.match(planner, />Choose your appointment</);
   assert.match(planner, />Treatment</);
   assert.match(planner, />Duration</);

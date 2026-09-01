@@ -10,7 +10,6 @@ type MapEmbedProps = {
   readonly businessName: string;
   readonly directionsUrl: string;
   readonly embedUrl: string;
-  readonly loadImmediately?: boolean;
 };
 
 export function MapEmbed({
@@ -18,9 +17,8 @@ export function MapEmbed({
   businessName,
   directionsUrl,
   embedUrl,
-  loadImmediately = false,
 }: MapEmbedProps) {
-  const [mapLoaded, setMapLoaded] = useState(loadImmediately);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   if (mapLoaded) {
     return (

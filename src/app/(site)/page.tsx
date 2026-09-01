@@ -60,7 +60,7 @@ const reassuranceItems = [
   {
     icon: Leaf,
     title: "Thai tradition",
-    text: "A treatment menu rooted in authentic Thai massage styles.",
+    text: "A treatment menu inspired by traditional Thai massage styles.",
   },
   {
     icon: Sparkles,
@@ -125,7 +125,7 @@ export default async function HomePage() {
     <>
       <script
         {...jsonLdScriptProps([
-          buildDaySpaJsonLd(site),
+          buildDaySpaJsonLd(site, services),
           buildWebSiteJsonLd(site),
         ])}
       />
@@ -133,6 +133,7 @@ export default async function HomePage() {
       <HomeHeroSlider
         description={pageCopy.description}
         eyebrow={pageCopy.eyebrow}
+        slides={pageCopy.heroSlides}
         title={pageCopy.title}
       />
 

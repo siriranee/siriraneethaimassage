@@ -6,6 +6,9 @@ import { notFound } from "next/navigation";
 
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
+import { ServiceImageSlider } from "@/components/services/ServiceImageSlider";
+import { getServicePageHero } from "@/content/page-heroes";
+import { getServiceGalleryImages } from "@/content/service-galleries";
 import { createMetadata } from "@/lib/metadata";
 import {
   buildBreadcrumbJsonLd,
@@ -67,6 +70,8 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
     .filter((item) => item.slug !== service.slug && item.category === service.category)
     .slice(0, 3);
   const serviceJsonLd = buildServiceJsonLd(service, site);
+  const serviceGallery = getServiceGalleryImages(service);
+  const serviceHero = getServicePageHero(service.slug);
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },
     { name: "Services", path: "/services" },
@@ -79,11 +84,10 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
       <script {...jsonLdScriptProps(breadcrumbJsonLd)} />
 
       <PageHero
+        {...serviceHero}
         eyebrow={`${category?.label ?? "Massage treatment"} · Howth, Dublin`}
         title={service.name}
         description={service.shortDescription}
-        image={service.image.src}
-        imageAlt={service.image.alt}
       />
 
       <section className={styles.optionsSection} aria-labelledby="treatment-options-heading">
@@ -128,7 +132,7 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                 </div>
               ) : (
                 <p className={styles.enquiryNote}>
-                  Please contact us for availability and appointment options for this treatment.
+                  Appointment availability will appear when the current options are confirmed.
                 </p>
               )}
 
@@ -142,15 +146,17 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
                   <CalendarDays aria-hidden="true" size={18} />
                   Book Now
                 </Link>
-                <Link className={styles.secondaryAction} href="/contact">
-                  Ask a question
-                  <ArrowRight aria-hidden="true" size={17} />
-                </Link>
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      <ServiceImageSlider
+        key={service.slug}
+        serviceName={service.name}
+        slides={serviceGallery}
+      />
 
       <section className={styles.contentSection}>
         <div className={`${styles.container} ${styles.contentGrid}`}>

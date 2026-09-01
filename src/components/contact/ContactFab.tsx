@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
@@ -24,24 +24,29 @@ export function ContactFab({ site }: Readonly<{ site: PublicSiteData }>) {
   const actionsId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const phone = site.contact.phone;
   const whatsappUrl = site.contact.whatsapp.url;
   const email = site.contact.email;
   const instagram = site.social.instagram;
 
   const actions: readonly ContactAction[] = [
-    {
-      detail: site.contact.phone.internationalDisplay,
-      href: site.contact.phone.href,
-      iconSrc: "/icons/Phone-2.png",
-      label: "Call Siriranee",
-    },
+    ...(phone
+      ? ([
+          {
+            detail: phone.internationalDisplay,
+            href: phone.href,
+            iconSrc: "/icons/Phone-2.png",
+            label: "Call Siriranee",
+          },
+        ] satisfies readonly ContactAction[])
+      : []),
     ...(whatsappUrl
       ? ([
           {
             detail: "Message the team",
             external: true,
             href: whatsappUrl,
-            icon: MessageCircle,
+            iconSrc: "/icons/Whatsapp.svg",
             label: "WhatsApp",
           },
         ] satisfies readonly ContactAction[])

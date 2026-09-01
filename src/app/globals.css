@@ -183,8 +183,9 @@ b {
 }
 
 :focus-visible {
-  outline: 0.2rem solid var(--color-gold-500);
-  outline-offset: 0.2rem;
+  outline: 0.18rem solid var(--color-surface);
+  outline-offset: 0.12rem;
+  box-shadow: 0 0 0 0.48rem var(--color-purple-700);
 }
 
 .container {

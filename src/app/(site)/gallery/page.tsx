@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
 import { getPublicGallery, getPublicPageCopy } from "@/server/cms/public-adapter";
 
@@ -51,11 +52,10 @@ export default async function GalleryPage() {
   return (
     <div>
       <PageHero
+        {...pageHeroImages.gallery}
         eyebrow={pageCopy.eyebrow}
         title={pageCopy.title}
         description={pageCopy.description}
-        image="/images/spa/spa-still-life.webp"
-        imageAlt="Spa oils, towels and flowers arranged in warm light"
       />
 
       <section className={styles.gallerySection} aria-labelledby="gallery-heading">

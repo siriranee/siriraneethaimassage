@@ -1,0 +1,362 @@
+.section {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(4rem, 7vw, 6.5rem);
+  background:
+    radial-gradient(circle at 12% 15%, rgb(var(--color-gold-400-rgb) / 0.12), transparent 25rem),
+    var(--color-cream);
+}
+
+.inner {
+  position: relative;
+  width: calc(100% - (var(--pad-x) * 2));
+  margin-inline: auto;
+}
+
+.header {
+  width: 100%;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.eyebrow {
+  margin-bottom: 0.65rem;
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.header h2 {
+  margin-bottom: 0.8rem;
+  color: var(--color-purple-950);
+  font-size: var(--fs-4xl);
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.header > p:last-child {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+}
+
+.slider {
+  position: relative;
+}
+
+.viewport {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid rgb(var(--color-purple-800-rgb) / 0.16);
+  border-radius: var(--radius-large);
+  background: var(--color-purple-950);
+  box-shadow: 0 1.75rem 4.5rem rgb(var(--color-purple-950-rgb) / 0.18);
+  outline: none;
+  touch-action: pan-y;
+}
+
+.viewport:focus-visible {
+  outline: 0.18rem solid var(--color-surface);
+  outline-offset: 0.12rem;
+  box-shadow:
+    0 0 0 0.48rem var(--color-purple-700),
+    0 1.75rem 4.5rem rgb(var(--color-purple-950-rgb) / 0.18);
+}
+
+.slides,
+.slide {
+  position: absolute;
+  inset: 0;
+}
+
+.slide {
+  z-index: 0;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.015);
+  visibility: hidden;
+  transition: opacity 360ms ease, transform 700ms ease, visibility 0s linear 360ms;
+}
+
+.slide::after {
+  position: absolute;
+  inset: 38% 0 0;
+  z-index: 1;
+  background: linear-gradient(0deg, rgb(var(--color-purple-950-rgb) / 0.72), transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.slideActive {
+  z-index: 1;
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+  visibility: visible;
+  transition: opacity 360ms ease, transform 700ms ease;
+}
+
+.image,
+.thumbnailImage {
+  object-fit: cover;
+  object-position: center;
+  user-select: none;
+}
+
+.caption {
+  position: absolute;
+  right: clamp(1.2rem, 4vw, 3rem);
+  bottom: clamp(1.2rem, 4vw, 3rem);
+  left: clamp(1.2rem, 4vw, 3rem);
+  z-index: 2;
+  color: white;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+  text-shadow: 0 2px 1rem rgba(0, 0, 0, 0.72);
+  text-wrap: balance;
+}
+
+.control {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  background: rgb(var(--color-purple-950-rgb) / 0.52);
+  box-shadow: 0 0.65rem 1.6rem rgba(0, 0, 0, 0.24);
+  color: white;
+  place-items: center;
+  transform: translateY(-50%);
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+  backdrop-filter: blur(0.45rem);
+}
+
+.control:hover,
+.control:focus-visible {
+  border-color: var(--color-gold-400);
+  background: var(--color-purple-800);
+}
+
+.control:focus-visible,
+.thumbnailScrollControl:focus-visible,
+.thumbnail:focus-visible {
+  outline: 0.18rem solid var(--color-surface);
+  outline-offset: 0.12rem;
+  box-shadow: 0 0 0 0.48rem var(--color-purple-700);
+}
+
+.control:hover {
+  transform: translateY(-50%) scale(1.04);
+}
+
+.control svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.previous {
+  left: 1rem;
+}
+
+.next {
+  right: 1rem;
+}
+
+.thumbnailNavigation {
+  position: relative;
+  margin-top: 1.2rem;
+}
+
+.thumbnailNavigation::before,
+.thumbnailNavigation::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 4rem;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.thumbnailNavigation::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--color-cream), transparent);
+}
+
+.thumbnailNavigation::after {
+  right: 0;
+  background: linear-gradient(270deg, var(--color-cream), transparent);
+}
+
+.thumbnailCanScrollBackward::before,
+.thumbnailCanScrollForward::after {
+  opacity: 1;
+}
+
+.thumbnails {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0.3rem;
+  gap: 0.75rem;
+  justify-content: flex-start;
+  overscroll-behavior-inline: contain;
+  scroll-behavior: smooth;
+  scroll-padding-inline: 0.3rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.thumbnails::-webkit-scrollbar {
+  display: none;
+}
+
+.thumbnailScrollControl {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid rgb(var(--color-purple-800-rgb) / 0.2);
+  border-radius: 50%;
+  background: rgb(var(--color-purple-950-rgb) / 0.92);
+  box-shadow: 0 0.45rem 1.2rem rgb(var(--color-purple-950-rgb) / 0.16);
+  color: white;
+  place-items: center;
+  transform: translateY(-50%);
+  transition: background 180ms ease, border-color 180ms ease, opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.thumbnailScrollControl[hidden] {
+  display: none;
+}
+
+.thumbnailScrollControl:hover:not(:disabled),
+.thumbnailScrollControl:focus-visible {
+  border-color: var(--color-gold-500);
+  background: var(--color-purple-800);
+}
+
+.thumbnailScrollControl:hover:not(:disabled) {
+  transform: translateY(-50%) scale(1.04);
+}
+
+.thumbnailScrollControl:disabled {
+  cursor: default;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.thumbnailScrollControl svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.thumbnailScrollPrevious {
+  left: 0.35rem;
+}
+
+.thumbnailScrollNext {
+  right: 0.35rem;
+}
+
+.thumbnail {
+  position: relative;
+  width: 7rem;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: var(--radius-small);
+  background: var(--color-purple-950);
+  box-shadow: 0 0.45rem 1.2rem rgb(var(--color-purple-950-rgb) / 0.12);
+  flex: 0 0 auto;
+  opacity: 0.62;
+  scroll-snap-align: center;
+  transition: border-color 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.thumbnail:first-child {
+  margin-inline-start: auto;
+}
+
+.thumbnail:last-child {
+  margin-inline-end: auto;
+}
+
+.thumbnail:hover,
+.thumbnail:focus-visible,
+.thumbnailActive {
+  border-color: var(--color-gold-500);
+  opacity: 1;
+}
+
+.thumbnail:hover {
+  transform: translateY(-0.15rem);
+}
+
+@media (max-width: 620px) {
+  .header h2 {
+    font-size: var(--fs-3xl);
+  }
+
+  .caption {
+    right: 3.8rem;
+    bottom: 1.15rem;
+    left: 3.8rem;
+    font-size: var(--fs-sm);
+  }
+
+  .control {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .previous {
+    left: 0.65rem;
+  }
+
+  .next {
+    right: 0.65rem;
+  }
+
+  .thumbnail {
+    width: 5rem;
+  }
+
+  .thumbnailScrollControl {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+
+  .thumbnailNavigation::before,
+  .thumbnailNavigation::after {
+    width: 3.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide,
+  .slideActive,
+  .control,
+  .thumbnailScrollControl,
+  .thumbnail {
+    transition: none;
+  }
+
+  .thumbnails {
+    scroll-behavior: auto;
+  }
+}

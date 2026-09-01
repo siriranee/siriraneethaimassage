@@ -16,8 +16,18 @@ export function BookingSettingsForm({
 }>) {
   const router = useRouter();
   const [version, setVersion] = useState(settings.version);
+  const [rulesConfirmed, setRulesConfirmed] = useState(settings.rulesConfirmed);
+  const [publicBookingEnabled, setPublicBookingEnabled] = useState(
+    settings.publicBookingEnabled,
+  );
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const canEnablePublicBooking = openingHoursConfirmed && rulesConfirmed;
+
+  function changeRulesConfirmed(confirmed: boolean) {
+    setRulesConfirmed(confirmed);
+    if (!confirmed) setPublicBookingEnabled(false);
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,16 +36,17 @@ export function BookingSettingsForm({
     const data = new FormData(event.currentTarget);
     const payload = {
       expectedVersion: version,
-      publicBookingEnabled: false,
-      rulesConfirmed: data.get("rulesConfirmed") === "on",
+      publicBookingEnabled:
+        canEnablePublicBooking && publicBookingEnabled,
+      rulesConfirmed,
       slotIntervalMinutes: Number(data.get("slotIntervalMinutes")),
       maxConcurrentBookings: Number(data.get("maxConcurrentBookings")),
       minimumNoticeMinutes: Number(data.get("minimumNoticeMinutes")),
       bookingHorizonDays: Number(data.get("bookingHorizonDays")),
       bufferBeforeMinutes: Number(data.get("bufferBeforeMinutes")),
       bufferAfterMinutes: Number(data.get("bufferAfterMinutes")),
-      holdMinutes: Number(data.get("holdMinutes")),
-      cancellationCutoffMinutes: Number(data.get("cancellationCutoffMinutes")),
+      holdMinutes: settings.holdMinutes,
+      cancellationCutoffMinutes: settings.cancellationCutoffMinutes,
       provisionalNotice: data.get("provisionalNotice"),
     };
 
@@ -45,14 +56,16 @@ export function BookingSettingsForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const result = (await response.json()) as { error?: string; settings?: CmsBookingSettings };
+      const result = (await response.json()) as { error?: string; bookingSettings?: CmsBookingSettings };
 
-      if (!response.ok || !result.settings) {
+      if (!response.ok || !result.bookingSettings) {
         setFeedback({ tone: "error", text: result.error ?? "Booking rules could not be saved." });
         return;
       }
 
-      setVersion(result.settings.version);
+      setVersion(result.bookingSettings.version);
+      setRulesConfirmed(result.bookingSettings.rulesConfirmed);
+      setPublicBookingEnabled(result.bookingSettings.publicBookingEnabled);
       setFeedback({ tone: "success", text: "Booking rules saved to the draft." });
       router.refresh();
     } catch {
@@ -79,10 +92,8 @@ export function BookingSettingsForm({
         <div className={styles.threeGrid}>
           <label className={styles.field}>Minimum notice, minutes<input defaultValue={settings.minimumNoticeMinutes} max={10080} min={0} name="minimumNoticeMinutes" required type="number" /></label>
           <label className={styles.field}>Booking horizon, days<input defaultValue={settings.bookingHorizonDays} max={365} min={1} name="bookingHorizonDays" required type="number" /></label>
-          <label className={styles.field}>Temporary hold, minutes<input defaultValue={settings.holdMinutes} max={30} min={2} name="holdMinutes" required type="number" /></label>
           <label className={styles.field}>Buffer before, minutes<input defaultValue={settings.bufferBeforeMinutes} max={120} min={0} name="bufferBeforeMinutes" required type="number" /></label>
           <label className={styles.field}>Buffer after, minutes<input defaultValue={settings.bufferAfterMinutes} max={120} min={0} name="bufferAfterMinutes" required type="number" /></label>
-          <label className={styles.field}>Cancellation cutoff, minutes<input defaultValue={settings.cancellationCutoffMinutes} max={10080} min={0} name="cancellationCutoffMinutes" required type="number" /></label>
           <label className={styles.fullField}>Internal provisional note<textarea defaultValue={settings.provisionalNotice} maxLength={500} name="provisionalNotice" /></label>
         </div>
       </section>
@@ -91,12 +102,30 @@ export function BookingSettingsForm({
         <header className={styles.sectionHeader}><h2>Confirmation & launch gate</h2><p>Confirmation records the owner decision; it does not activate unfinished public booking.</p></header>
         <div className={styles.grid}>
           <label className={styles.checkbox}>
-            <input defaultChecked={settings.rulesConfirmed} name="rulesConfirmed" type="checkbox" />
-            <span>I confirm capacity, notice, horizon, buffers and cancellation cutoff<small>Opening hours are currently {openingHoursConfirmed ? "confirmed" : "not confirmed"}.</small></span>
+            <input
+              checked={rulesConfirmed}
+              name="rulesConfirmed"
+              onChange={(event) => changeRulesConfirmed(event.target.checked)}
+              type="checkbox"
+            />
+            <span>I confirm capacity, notice, horizon and buffers<small>Opening hours are currently {openingHoursConfirmed ? "confirmed" : "not confirmed"}.</small></span>
           </label>
           <label className={styles.checkbox}>
-            <input checked={false} disabled readOnly type="checkbox" />
-            <span>Enable public date and time booking<small>Locked until collision, privacy, notification and recovery checks are complete.</small></span>
+            <input
+              checked={publicBookingEnabled}
+              disabled={!canEnablePublicBooking}
+              name="publicBookingEnabled"
+              onChange={(event) => setPublicBookingEnabled(event.target.checked)}
+              type="checkbox"
+            />
+            <span>
+              Enable public date and time booking
+              <small>
+                {canEnablePublicBooking
+                  ? "This saves the owner decision to the draft. Server-side privacy, notification, monitoring and recovery gates must also pass before booking becomes live."
+                  : "Confirm both the opening hours and booking rules before enabling this draft setting."}
+              </small>
+            </span>
           </label>
         </div>
       </section>

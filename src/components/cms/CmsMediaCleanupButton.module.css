@@ -1,0 +1,54 @@
+.cleanup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cleanup button {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+}
+
+.cleanup button:hover:not(:disabled) {
+  border-color: var(--color-gold-600);
+  background: var(--color-gold-100);
+}
+
+.cleanup button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.cleanup button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.cleanup p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.cleanup .error {
+  color: var(--color-danger);
+  font-weight: 750;
+}
+
+@media (max-width: 640px) {
+  .cleanup,
+  .cleanup button {
+    width: 100%;
+  }
+}

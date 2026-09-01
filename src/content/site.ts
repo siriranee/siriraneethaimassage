@@ -106,12 +106,19 @@ const googleReviewUrl = optionalPublicUrl(
 );
 const formattedAddress =
   "Floor 3, Harbour House, Harbour Road, Howth, Dublin, Ireland";
+export const confirmedContactPhone = {
+  display: "089 948 4585",
+  internationalDisplay: "+353 89 948 4585",
+  e164: "+353899484585",
+  href: "tel:+353899484585",
+} as const;
 export const googleMapsDirectionsUrl =
   "https://maps.app.goo.gl/ZVpLkfVQSHx6xkpS6";
 export const googleMapsEmbedUrl =
   "https://www.google.com/maps?q=53.3877045,-6.0678292&z=17&output=embed";
 const whatsappNumber =
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") ?? "";
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") ||
+  confirmedContactPhone.e164.replace(/\D/g, "");
 const whatsappUrl = whatsappNumber
   ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
       "Hello Siriranee, I have a question about booking a massage.",
@@ -148,15 +155,10 @@ export const siteConfig = {
     guidance:
       "Siriranee is located on Floor 3 of Harbour House on Harbour Road.",
     assistance:
-      "Call the team before your first visit if you would like help finding the entrance or need building-access information.",
+      "Check the current contact options before your first visit if you would like help finding the entrance or need building-access information.",
   },
   contact: {
-    phone: {
-      display: "083 191 0469",
-      internationalDisplay: "+353 83 191 0469",
-      e164: "+353831910469",
-      href: "tel:+353831910469",
-    },
+    phone: confirmedContactPhone,
     email: emailAddress
       ? {
           address: emailAddress,

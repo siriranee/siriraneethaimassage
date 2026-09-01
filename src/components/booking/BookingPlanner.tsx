@@ -114,7 +114,7 @@ function formatDuration(minutes: number) {
 
 function formatPriceRange(pricing: readonly PricePoint[]) {
   if (!pricing.length) {
-    return "Contact the spa";
+    return "Price unavailable";
   }
 
   const prices = pricing.map((option) => option.priceEur);
@@ -353,9 +353,9 @@ export function BookingPlanner({
       <section className={styles.emptyState} aria-labelledby="booking-title">
         <p className={styles.eyebrow}>Book Now</p>
         <h2 id="booking-title">Booking is temporarily unavailable</h2>
-        <p>Please contact Siriranee.</p>
-        <Link className={styles.primaryAction} href="/contact">
-          Contact the spa <span aria-hidden="true">→</span>
+        <p>Please try again later. No appointment information was submitted.</p>
+        <Link className={styles.primaryAction} href="/visit">
+          View confirmed location <span aria-hidden="true">→</span>
         </Link>
       </section>
     );
@@ -495,7 +495,7 @@ export function BookingPlanner({
     } catch {
       setSubmissionState("error");
       setSubmissionMessage(
-        "We could not confirm whether the request reached the spa. Check your connection and retry once, or contact Siriranee directly.",
+        "We could not confirm whether the request reached Siriranee. Check your connection and retry once. If the problem continues, please return later.",
       );
     }
   }
@@ -747,7 +747,7 @@ export function BookingPlanner({
                     ) : availabilityState === "disabled" ? (
                       <div className={styles.timeEmpty}>
                         <strong>Online times are not live yet</strong>
-                        <p>Contact Siriranee and the team will arrange a time.</p>
+                        <p>Confirmed appointment options will appear here when they are ready.</p>
                       </div>
                     ) : availableSlots.length ? (
                       <div
@@ -812,7 +812,7 @@ export function BookingPlanner({
                   <strong>We could not send this request.</strong>
                   <p>{submissionMessage}</p>
                   <Link href={contactPreferenceHref}>
-                    Contact Siriranee with these preferences
+                    View current contact options
                   </Link>
                 </div>
               ) : null}
@@ -979,7 +979,7 @@ export function BookingPlanner({
               <strong>
                 {selectedDurationOption
                   ? formatPrice(selectedDurationOption.priceEur)
-                  : "Contact the spa"}
+                  : "Price unavailable"}
               </strong>
             </div>
           </div>

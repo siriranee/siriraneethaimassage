@@ -204,6 +204,16 @@ for (const route of ["/", "/contact", "/visit"]) {
 
 const renderedSource = [...pages.values()].join("\n");
 const homeMarkup = pages.get("/") ?? "";
+const contactMarkup = pages.get("/contact") ?? "";
+
+check(
+  contactMarkup.includes("Load Google Maps"),
+  "Contact page must offer a click-to-load Google Map",
+);
+check(
+  !/<iframe\b[^>]+src="[^"]*(?:google|maps)/i.test(contactMarkup),
+  "Contact page loaded the Google Map before visitor consent",
+);
 
 const contactFabToggles = [
   ...homeMarkup.matchAll(/<button\b[^>]*data-contact-fab-toggle=(?:""|"true")[^>]*>/gi),
@@ -229,35 +239,29 @@ if (contactFabToggles[0] && contactFabMenus[0]) {
   );
 }
 
+const heroSlideCount =
+  (homeMarkup.match(/data-hero-slide-active=/g) ?? []).length;
 check(
-  (homeMarkup.match(/data-hero-slide-active=/g) ?? []).length === 3,
-  "Homepage hero must render exactly three slides",
+  heroSlideCount >= 1 && heroSlideCount <= 8,
+  `Homepage hero rendered ${heroSlideCount} slides; expected 1 to 8`,
 );
-for (const heroImage of [
-  "slide-traditional-thai.webp",
-  "slide-hot-oil.webp",
-  "slide-hot-stone.webp",
-]) {
-  check(homeMarkup.includes(heroImage), `Homepage hero is missing ${heroImage}`);
-}
-for (const heroControl of [
-  'aria-roledescription="carousel"',
-]) {
-  check(homeMarkup.includes(heroControl), `Homepage hero is missing ${heroControl}`);
-}
+check(
+  homeMarkup.includes('aria-roledescription="carousel"') ===
+    (heroSlideCount > 1),
+  "Homepage hero carousel semantics do not match its slide count",
+);
 
-for (const voucherText of [
-  "Give someone time to unwind",
-  "Focused massage voucher",
-  "One-hour massage voucher",
-  "Extended massage voucher",
-  "Ask about this voucher",
-  "No online payment is taken here",
-]) {
-  check(
-    homeMarkup.includes(voucherText),
-    `Homepage voucher section is missing: ${voucherText}`,
-  );
+if (homeMarkup.includes('id="voucher-section-title"')) {
+  for (const voucherText of [
+    "Give someone time to unwind",
+    "Ask about this voucher",
+    "No online payment is taken here",
+  ]) {
+    check(
+      homeMarkup.includes(voucherText),
+      `Published voucher section is missing: ${voucherText}`,
+    );
+  }
 }
 check(
   !/>\s*Buy(?: now| voucher)?\s*</i.test(homeMarkup),
@@ -265,6 +269,15 @@ check(
 );
 checkNoTherapistSelection(pages.get("/book") ?? "", "Booking page");
 checkNoTherapistSelection(pages.get("/contact") ?? "", "Contact page");
+const teamMarkup = pages.get("/therapists") ?? "";
+if (!teamMarkup.includes('id="team-heading"')) {
+  check(
+    /<meta[^>]+name="robots"[^>]+content="noindex, nofollow"/i.test(
+      teamMarkup,
+    ),
+    "Empty team page must be noindex, nofollow",
+  );
+}
 check(
   !/(?:href|action)="[^"]*(?:\?|&amp;|&)therapist=/i.test(renderedSource),
   "Rendered site contains a link that preselects a therapist",
@@ -318,6 +331,10 @@ if (daySpa) {
     "DaySpa service areas are incorrect",
   );
   check(daySpa.currenciesAccepted === "EUR", "DaySpa currency is incorrect");
+  check(
+    daySpa.priceRange === "€40–€95",
+    "DaySpa price range does not match the published service prices",
+  );
 }
 
 const validContact = await request(
@@ -524,7 +541,17 @@ if (sitemap) {
   check(!sitemap.body.includes("admin-preview"), "Sitemap contains admin-preview");
   check(!sitemap.body.includes("/cms"), "Sitemap contains a CMS route");
   check(!sitemap.body.includes("/api/"), "Sitemap contains an API route");
-  for (const route of publicRoutes) {
+  check(!sitemap.body.includes("/therapists"), "Sitemap contains the team page");
+  const promotionsArePublished =
+    (pages.get("/promotions") ?? "").includes('id="current-offers-heading"');
+  check(
+    sitemap.body.includes(`<loc>${canonicalOrigin}/promotions</loc>`) ===
+      promotionsArePublished,
+    "Sitemap promotion visibility does not match published promotions",
+  );
+  for (const route of publicRoutes.filter(
+    (route) => route !== "/therapists" && route !== "/promotions",
+  )) {
     check(
       sitemap.body.includes(
         `<loc>${canonicalOrigin}${route === "/" ? "/" : route}</loc>`,

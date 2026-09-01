@@ -15,8 +15,11 @@ test("contact FAB uses live site channels and accessible disclosure behavior", a
 
   assert.match(shell, /<ContactFab site=\{site\} \/>/);
   assert.doesNotMatch(shell, /MobileBookingBar/);
-  assert.match(component, /site\.contact\.phone\.href/);
+  assert.match(component, /const phone = site\.contact\.phone/);
+  assert.match(component, /phone\s*\?[\s\S]*?phone\.href/);
   assert.match(component, /site\.contact\.whatsapp\.url/);
+  assert.match(component, /label: "Call Siriranee"/);
+  assert.match(component, /label: "WhatsApp"/);
   assert.match(component, /site\.address\.directionsUrl/);
   assert.match(component, /aria-expanded=\{isOpen\}/);
   assert.match(component, /aria-controls=\{actionsId\}/);
@@ -32,13 +35,14 @@ test("contact FAB uses live site channels and accessible disclosure behavior", a
     "Call-start.png",
     "Call-end.png",
     "Phone-2.png",
+    "Whatsapp.svg",
     "Location.png",
     "Email.png",
     "IG.svg",
   ]) {
     assert.match(component, new RegExp(`/icons/${icon.replace(".", "\\.")}`));
   }
-  assert.match(component, /MessageCircle/);
+  assert.doesNotMatch(component, /MessageCircle/);
   assert.doesNotMatch(component, /mainLabel/);
   assert.doesNotMatch(component, /Contact us|See all contact options/);
   assert.ok(
@@ -62,6 +66,7 @@ test("contact FAB replaces the mobile booking bar and follows UI constraints", a
   assert.match(styles, /font-size:\s*var\(--fs-sm\)/);
   assert.doesNotMatch(styles, /^\s*max-width\s*:/m);
   assert.doesNotMatch(styles, /font-size:\s*clamp\(/);
+  assert.doesNotMatch(styles, /outline-color:\s*var\(--color-purple-400\)/);
 });
 
 test("footer removes the Explore column and places Privacy in the bottom row", async () => {

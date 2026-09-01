@@ -1,8 +1,51 @@
+import type { CmsPageHeroSlide } from "@/domain/cms/page-hero";
+import type { CmsServiceGalleryImage } from "@/domain/cms/service-gallery";
+
+export type { CmsServiceGalleryImage } from "@/domain/cms/service-gallery";
+export type { CmsPageHeroSlide } from "@/domain/cms/page-hero";
+
 export const cmsRoles = ["administrator", "staff"] as const;
 export type CmsRole = (typeof cmsRoles)[number];
 
 export const cmsServiceStatuses = ["draft", "published", "archived"] as const;
 export type CmsServiceStatus = (typeof cmsServiceStatuses)[number];
+
+export const cmsMediaScopes = [
+  "service-cover",
+  "service-gallery",
+  "home-hero",
+  "site-gallery",
+] as const;
+export type CmsMediaScope = (typeof cmsMediaScopes)[number];
+
+export type CmsMediaAsset = {
+  readonly id: string;
+  readonly provider: "cloudinary";
+  readonly providerAssetId?: string;
+  readonly publicId: string;
+  readonly secureUrl: string;
+  readonly cloudinaryVersion: number;
+  readonly scope: CmsMediaScope;
+  readonly submissionId: string;
+  readonly ownerUserId: string;
+  readonly format: "avif" | "jpg" | "jpeg" | "png" | "webp";
+  readonly bytes: number;
+  readonly width: number;
+  readonly height: number;
+  readonly status:
+    | "authorized"
+    | "staged"
+    | "committed"
+    | "deleting"
+    | "deleted";
+  readonly providerSignatureExpiresAt: string;
+  readonly expiresAt: string;
+  readonly committedAt: string;
+  readonly deletedAt: string;
+  readonly version: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+};
 
 export const bookingStatuses = [
   "pending",
@@ -49,6 +92,7 @@ export type CmsServiceRecord = {
   readonly longDescription: string;
   readonly imageUrl: string;
   readonly imageAlt: string;
+  readonly galleryImages: readonly CmsServiceGalleryImage[];
   readonly prices: readonly CmsServicePrice[];
   readonly idealFor: readonly string[];
   readonly highlights: readonly string[];
@@ -86,6 +130,7 @@ export type CmsSiteSettings = {
   readonly country: string;
   readonly phoneDisplay: string;
   readonly phoneE164: string;
+  readonly phoneConfirmed: boolean;
   readonly email: string;
   readonly whatsappNumber: string;
   readonly instagramUrl: string;
@@ -170,12 +215,15 @@ export type CmsGalleryRecord = {
 
 export const cmsPageIds = [
   "home",
+  "services",
+  "book",
   "about",
   "contact",
   "visit",
   "privacy",
   "promotions",
   "gallery",
+  "therapists",
 ] as const;
 export type CmsPageId = (typeof cmsPageIds)[number];
 
@@ -186,13 +234,14 @@ export type CmsPageRecord = {
   readonly description: string;
   readonly seoTitle: string;
   readonly seoDescription: string;
+  readonly heroSlides?: readonly CmsPageHeroSlide[];
   readonly version: number;
   readonly updatedAt: string;
 };
 
 export type CmsContentState = {
   readonly id: "siriranee-content";
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2 | 3 | 4;
   readonly revision: number;
   readonly services: readonly CmsServiceRecord[];
   readonly site: CmsSiteSettings;

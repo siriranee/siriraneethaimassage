@@ -41,6 +41,14 @@ export type ServiceImage = {
   readonly alt: string;
 };
 
+export type ServiceGalleryImage = {
+  readonly src: string;
+  readonly alt: string;
+  readonly caption: string;
+  readonly focalX: number;
+  readonly focalY: number;
+};
+
 export type ServiceSeo = {
   readonly title: string;
   readonly description: string;
@@ -53,6 +61,7 @@ export type Service = {
   readonly longDescription: string;
   readonly category: ServiceCategoryId;
   readonly image: ServiceImage;
+  readonly gallery?: readonly ServiceGalleryImage[];
   readonly durations: readonly string[];
   readonly pricing: readonly ServicePrice[];
   readonly priceNote?: string;

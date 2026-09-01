@@ -4,6 +4,7 @@ import { GalleryEditorForm } from "@/components/cms/GalleryEditorForm";
 import { CmsNotice, CmsPageHeader, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
+import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
 
 type PageProps = { readonly params: Promise<{ readonly itemId: string }> };
 
@@ -22,9 +23,9 @@ export default async function CmsGalleryEditPage({ params }: PageProps) {
         eyebrow="Media library"
         title={item.caption}
       />
-      {!item.imageUrl.startsWith("/") ? (
-        <CmsNotice tone="warning" title="Remote rendering is gated">
-          This URL is stored as draft metadata but will not render publicly until its media provider and image host allowlist are approved.
+      {!isApprovedPublicImageUrl(item.imageUrl) ? (
+        <CmsNotice tone="warning" title="This image URL is not approved for publishing">
+          Use a local project image or upload to the configured Cloudinary account. Other remote image hosts remain hidden from the public website.
         </CmsNotice>
       ) : null}
       <GalleryEditorForm item={item} />

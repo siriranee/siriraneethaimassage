@@ -11,6 +11,7 @@ import Link from "next/link";
 
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
+import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
 import { getPublicPageCopy, getPublicPromotions } from "@/server/cms/public-adapter";
 
@@ -26,11 +27,10 @@ export default async function PromotionsPage() {
   return (
     <div>
       <PageHero
+        {...pageHeroImages.book}
         eyebrow={pageCopy.eyebrow}
         title={pageCopy.title}
         description={pageCopy.description}
-        image="/images/spa/aromatherapy-oil.webp"
-        imageAlt="Illustrative warm massage oil, folded towels and an orchid"
       />
 
       {promotions.length ? (
@@ -92,11 +92,11 @@ export default async function PromotionsPage() {
             <p className={styles.kicker}>Seasonal news</p>
             <h2>Offers will appear here when confirmed</h2>
             <p>
-              There is no placeholder promotion running. Contact the spa if you
-              would like to ask whether a current owner-approved offer is available.
+              There is no placeholder promotion running. Current owner-approved
+              offers will appear here when available.
             </p>
             <Link href="/contact">
-              Contact the spa <ArrowUpRight aria-hidden="true" />
+              View current contact details <ArrowUpRight aria-hidden="true" />
             </Link>
           </article>
 

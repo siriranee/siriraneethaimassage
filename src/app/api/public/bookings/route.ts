@@ -82,7 +82,7 @@ export async function POST(request: Request) {
       {
         error:
           error instanceof Error && /disabled/i.test(error.message)
-            ? "Online booking is not available yet. Contact the spa directly."
+            ? "Online booking is not available yet. Please try again later."
             : "The booking request could not be completed.",
       },
       { status: 503 },

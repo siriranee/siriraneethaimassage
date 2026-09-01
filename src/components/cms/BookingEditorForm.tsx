@@ -3,28 +3,30 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { bookingChangeReasons, bookingStatuses, type CmsBooking } from "@/domain/cms/types";
+import {
+  getAllowedBookingStatusTransitions,
+  isTerminalBookingStatus,
+} from "@/domain/booking/status";
+import { bookingChangeReasons, type CmsBooking } from "@/domain/cms/types";
 import { useUnsavedChanges } from "./useUnsavedChanges";
 
 import styles from "./CmsEditorForm.module.css";
 
-type StaffOption = {
-  readonly id: string;
-  readonly name: string;
-};
-
 export function BookingEditorForm({
   booking,
-  staff,
 }: Readonly<{
   booking: CmsBooking;
-  staff: readonly StaffOption[];
 }>) {
   const router = useRouter();
   const [version, setVersion] = useState(booking.version);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const { dirty, markDirty, markSaved } = useUnsavedChanges();
+  const statusOptions = [
+    booking.status,
+    ...getAllowedBookingStatusTransitions(booking.status),
+  ];
+  const appointmentLocked = isTerminalBookingStatus(booking.status);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,7 +44,6 @@ export function BookingEditorForm({
           localTime: data.get("localTime"),
           status: data.get("status"),
           changeReason: data.get("changeReason"),
-          assignedStaffId: data.get("assignedStaffId"),
           internalNotes: data.get("internalNotes"),
         }),
       });
@@ -71,24 +72,18 @@ export function BookingEditorForm({
         <div className={styles.grid}>
           <label className={styles.field}>Status
             <select defaultValue={booking.status} name="status">
-              {bookingStatuses.map((status) => <option key={status} value={status}>{status === "no-show" ? "No-show" : status.charAt(0).toUpperCase() + status.slice(1)}</option>)}
+              {statusOptions.map((status) => <option key={status} value={status}>{status === "no-show" ? "No-show" : status.charAt(0).toUpperCase() + status.slice(1)}</option>)}
             </select>
+            <small>Only safe next statuses are offered. Final statuses cannot be reopened.</small>
           </label>
-          <label className={styles.field}>Date<input defaultValue={booking.localDate} name="localDate" required type="date" /></label>
-          <label className={styles.field}>Dublin time<input defaultValue={booking.localTime} name="localTime" required step={300} type="time" /></label>
+          <label className={styles.field}>Date<input defaultValue={booking.localDate} disabled={appointmentLocked} name="localDate" required type="date" /></label>
+          <label className={styles.field}>Dublin time<input defaultValue={booking.localTime} disabled={appointmentLocked} name="localTime" required step={300} type="time" /></label>
           <label className={styles.field}>Change reason
             <select defaultValue="" name="changeReason">
               <option value="">Not changing status or time</option>
               {bookingChangeReasons.map((reason) => <option key={reason} value={reason}>{reason.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}</option>)}
             </select>
             <small>Required when changing status, date or time. Uses a controlled reason so sensitive details do not enter the audit log.</small>
-          </label>
-          <label className={styles.field}>Assigned staff, internal only
-            <select defaultValue={booking.assignedStaffId} name="assignedStaffId">
-              <option value="">Unassigned</option>
-              {staff.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
-            </select>
-            <small>Customers never see or choose this field.</small>
           </label>
           <label className={styles.fullField}>Internal notes<textarea defaultValue={booking.internalNotes} maxLength={1000} name="internalNotes" /></label>
         </div>

@@ -97,7 +97,7 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
     <>
       <CmsPageHeader
         actions={<><CmsPrimaryLink href={`/cms/bookings/new?date=${anchor}`}><Plus aria-hidden="true" /> Add booking</CmsPrimaryLink><CmsPrimaryLink href="/cms/calendar/closures" secondary><Ban aria-hidden="true" /> Days off & closures</CmsPrimaryLink></>}
-        description="A Dublin-time agenda for the whole treatment space. Staff assignment remains an optional internal operation."
+        description="A Dublin-time agenda for the whole treatment space."
         eyebrow="Availability"
         title="Calendar"
       />
@@ -144,7 +144,7 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
                   <time>{booking.localTime}</time>
                   <div>
                     <strong>{booking.customer.name} · {booking.serviceName}</strong>
-                    <small>{booking.durationMinutes} min · {booking.assignedStaffId || "Unassigned"}</small>
+                    <small>{booking.durationMinutes} min</small>
                     <CmsBookingStatus status={booking.status} />
                   </div>
                 </Link>
@@ -162,8 +162,7 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
       ) : null}
 
       <CmsNotice title="Customer booking rule">
-        <Clock3 aria-hidden="true" /> Customers select the treatment, date and time.
-        They do not see or select a therapist; assignment is handled here by staff.
+        <Clock3 aria-hidden="true" /> Customers select only the treatment, date and time.
       </CmsNotice>
     </>
   );

@@ -22,13 +22,13 @@ export default async function CmsNewTeamPage() {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/team" secondary>Back to team</CmsPrimaryLink>}
-        description="Create a profile draft while keeping public presentation separate from internal scheduling."
+        description="Create an informational profile for the public team page."
         eyebrow="Team editor"
         title="Add team profile"
       />
       <CmsNotice title="Customers never select a therapist">
-        A profile may be public, internally available, both or neither. New profiles
-        are hidden and operationally inactive until those choices are deliberately enabled.
+        Team profiles are website content only. New profiles stay hidden until
+        they are reviewed and deliberately enabled for public display.
       </CmsNotice>
       <TeamEditorForm isNew member={blankMember} />
     </>

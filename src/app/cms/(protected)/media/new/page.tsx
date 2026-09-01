@@ -2,6 +2,7 @@ import { GalleryEditorForm } from "@/components/cms/GalleryEditorForm";
 import { CmsNotice, CmsPageHeader, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import type { CmsGalleryRecord } from "@/domain/cms/types";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
+import { getCloudinaryMediaReadiness } from "@/server/media/config";
 
 const blankItem: CmsGalleryRecord = {
   id: "new",
@@ -16,6 +17,7 @@ const blankItem: CmsGalleryRecord = {
 
 export default async function CmsNewGalleryItemPage() {
   await requireCmsPageUser("content:write");
+  const media = getCloudinaryMediaReadiness();
   return (
     <>
       <CmsPageHeader
@@ -24,9 +26,13 @@ export default async function CmsNewGalleryItemPage() {
         eyebrow="Media library"
         title="Add gallery image"
       />
-      <CmsNotice tone="warning" title="Upload provider is still a mock integration">
-        Add a verified project image path for now. Remote upload, cropping and deletion
-        stay disabled until storage, limits, backup ownership and cleanup rules are approved.
+      <CmsNotice
+        tone={media.ready ? "success" : "warning"}
+        title={media.ready ? "Image upload is ready" : "Image upload is disabled"}
+      >
+        {media.ready
+          ? "Choose an image below. It will be validated and compressed locally, then uploaded only when you save."
+          : "You can keep using a verified local project path. Configure Cloudinary on the server to enable browser-compressed uploads."}
       </CmsNotice>
       <GalleryEditorForm isNew item={blankItem} />
     </>

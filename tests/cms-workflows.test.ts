@@ -39,6 +39,9 @@ test("publication restore creates a draft and preserves operational booking sett
   assert.match(service, /bookingSettings: current\.bookingSettings/);
   assert.match(service, /weeklyHours: current\.site\.weeklyHours/);
   assert.match(service, /openingHoursConfirmed: current\.site\.openingHoursConfirmed/);
+  assert.match(service, /phoneDisplay: current\.site\.phoneDisplay/);
+  assert.match(service, /phoneE164: current\.site\.phoneE164/);
+  assert.match(service, /phoneConfirmed: current\.site\.phoneConfirmed/);
   assert.match(service, /revision: current\.revision \+ 1/);
   assert.match(route, /requireCmsApiUser\("content:publish"\)/);
 });

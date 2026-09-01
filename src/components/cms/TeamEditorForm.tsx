@@ -31,7 +31,7 @@ export function TeamEditorForm({ member, isNew = false }: Readonly<{ member: Cms
           fullName: data.get("fullName"),
           publicRole: data.get("publicRole"),
           publicProfile: data.get("publicProfile") === "on",
-          operationalActive: data.get("operationalActive") === "on",
+          operationalActive: member.operationalActive,
           archived: data.get("archived") === "on",
           sortOrder: Number(data.get("sortOrder")),
         }),
@@ -69,14 +69,10 @@ export function TeamEditorForm({ member, isNew = false }: Readonly<{ member: Cms
       </section>
 
       <section className={styles.section}>
-        <header className={styles.sectionHeader}><h2>Internal scheduling status</h2><p>Public profile and operational availability are deliberately separate.</p></header>
-        <label className={styles.checkbox}>
-          <input defaultChecked={member.operationalActive} name="operationalActive" type="checkbox" />
-          <span>Available for internal staff assignment<small>Do not enable until working hours and treatment qualifications are confirmed.</small></span>
-        </label>
+        <header className={styles.sectionHeader}><h2>Profile status</h2><p>Archive a profile when it should no longer appear on the public website.</p></header>
         <label className={styles.checkbox}>
           <input defaultChecked={member.archived} name="archived" type="checkbox" />
-          <span>Archive this profile<small>Archived profiles are removed from both public display and internal assignment after saving.</small></span>
+          <span>Archive this profile<small>The record remains in the CMS but is removed from public display after saving.</small></span>
         </label>
       </section>
 

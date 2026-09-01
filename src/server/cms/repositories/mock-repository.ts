@@ -9,6 +9,7 @@ import type {
   CmsClosure,
   CmsContentState,
   CmsLoginAttempt,
+  CmsMediaAsset,
   CmsPublication,
   CmsSession,
   CmsUser,
@@ -22,11 +23,13 @@ import {
   CmsConflictError,
   type CmsRepository,
 } from "@/server/cms/repositories/repository";
+import { cmsContentReferencesMediaAsset } from "@/server/media/references";
 
 type MockState = {
   content: CmsContentState;
   publication: CmsPublication;
   publications: CmsPublication[];
+  mediaAssets: CmsMediaAsset[];
   users: CmsUser[];
   sessions: CmsSession[];
   loginAttempts: CmsLoginAttempt[];
@@ -60,6 +63,7 @@ function createState(): MockState {
     content,
     publication,
     publications: [publication],
+    mediaAssets: [],
     users: [createMockAdministrator()],
     sessions: [],
     loginAttempts: [],
@@ -74,6 +78,7 @@ function createState(): MockState {
 function getGlobalState() {
   const cmsGlobal = globalThis as MockGlobal;
   cmsGlobal.__siriraneeCmsMockState ??= createState();
+  cmsGlobal.__siriraneeCmsMockState.mediaAssets ??= [];
   cmsGlobal.__siriraneeCmsMockQueue ??= Promise.resolve();
 
   return cmsGlobal;
@@ -158,6 +163,56 @@ export class MockCmsRepository implements CmsRepository {
     this.state.publication = clone(publication);
     this.state.publications = this.state.publications.filter((item) => item.id !== publication.id);
     this.state.publications.unshift(clone(publication));
+  }
+
+  async getMediaAsset(publicId: string) {
+    return clone(
+      this.state.mediaAssets.find((asset) => asset.publicId === publicId) ?? null,
+    );
+  }
+
+  async listExpiredMediaAssets(nowIso: string, limit = 10) {
+    return clone(
+      this.state.mediaAssets
+        .filter(
+          (asset) =>
+            (asset.status === "authorized" ||
+              asset.status === "staged" ||
+              asset.status === "deleting") &&
+            asset.expiresAt <= nowIso,
+        )
+        .sort((first, second) => first.expiresAt.localeCompare(second.expiresAt))
+        .slice(0, Math.max(1, Math.min(limit, 25))),
+    );
+  }
+
+  async saveMediaAsset(asset: CmsMediaAsset, expectedVersion?: number) {
+    const index = this.state.mediaAssets.findIndex(
+      (item) => item.publicId === asset.publicId,
+    );
+
+    if (expectedVersion === undefined) {
+      if (index >= 0) throw new CmsConflictError("This image already exists.");
+      this.state.mediaAssets.push(clone(asset));
+      return clone(asset);
+    }
+
+    if (index < 0 || this.state.mediaAssets[index].version !== expectedVersion) {
+      throw new CmsConflictError();
+    }
+
+    this.state.mediaAssets[index] = clone(asset);
+    return clone(asset);
+  }
+
+  async isMediaAssetReferenced(publicId: string, secureUrl: string) {
+    const asset = { publicId, secureUrl };
+    return (
+      cmsContentReferencesMediaAsset(this.state.content, asset) ||
+      this.state.publications.some((publication) =>
+        cmsContentReferencesMediaAsset(publication.snapshot, asset),
+      )
+    );
   }
 
   async findUserByEmail(email: string) {
@@ -252,7 +307,6 @@ export class MockCmsRepository implements CmsRepository {
       if (query.status && booking.status !== query.status) return false;
       if (query.source && booking.source !== query.source) return false;
       if (query.serviceId && booking.serviceId !== query.serviceId) return false;
-      if (query.attention === "unassigned" && booking.assignedStaffId) return false;
       if (
         query.attention === "expired" &&
         !(

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { CSSProperties } from "react";
 
 import styles from "./PageHero.module.css";
 
@@ -8,6 +9,17 @@ type PageHeroProps = {
   description: string;
   image?: string;
   imageAlt?: string;
+  focalX?: number;
+  focalY?: number;
+  mobileFocalX?: number;
+  mobileFocalY?: number;
+};
+
+type PageHeroImageStyle = CSSProperties & {
+  "--page-hero-focal-x": string;
+  "--page-hero-focal-y": string;
+  "--page-hero-mobile-focal-x": string;
+  "--page-hero-mobile-focal-y": string;
 };
 
 export function PageHero({
@@ -16,7 +28,18 @@ export function PageHero({
   description,
   image = "/images/spa/spa-still-life.webp",
   imageAlt = "A calm massage treatment room with oils and flowers",
+  focalX = 50,
+  focalY = 50,
+  mobileFocalX = focalX,
+  mobileFocalY = focalY,
 }: PageHeroProps) {
+  const imageStyle: PageHeroImageStyle = {
+    "--page-hero-focal-x": `${focalX}%`,
+    "--page-hero-focal-y": `${focalY}%`,
+    "--page-hero-mobile-focal-x": `${mobileFocalX}%`,
+    "--page-hero-mobile-focal-y": `${mobileFocalY}%`,
+  };
+
   return (
     <section className={styles.hero}>
       <div className={styles.media}>
@@ -28,6 +51,7 @@ export function PageHero({
           quality={90}
           sizes="(max-width: 620px) 400vw, (max-width: 900px) 180vw, 100vw"
           src={image}
+          style={imageStyle}
         />
       </div>
 

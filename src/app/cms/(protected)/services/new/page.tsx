@@ -2,6 +2,7 @@ import { ServiceEditorForm } from "@/components/cms/ServiceEditorForm";
 import { CmsNotice, CmsPageHeader, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import type { CmsServiceRecord } from "@/domain/cms/types";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
+import { getCloudinaryMediaOwnershipConfig } from "@/server/media/config";
 
 const blankService: CmsServiceRecord = {
   id: "new",
@@ -12,6 +13,7 @@ const blankService: CmsServiceRecord = {
   longDescription: "",
   imageUrl: "/images/spa/hero-massage.webp",
   imageAlt: "",
+  galleryImages: [],
   prices: [
     { id: "new-60", durationMinutes: 60, priceCents: 6500, active: true },
   ],
@@ -29,6 +31,7 @@ const blankService: CmsServiceRecord = {
 
 export default async function CmsNewServicePage() {
   await requireCmsPageUser("content:write");
+  const cloudinaryOwnership = getCloudinaryMediaOwnershipConfig();
 
   return (
     <>
@@ -42,7 +45,11 @@ export default async function CmsNewServicePage() {
         The URL slug is checked for conflicts, archived treatments stay out of the
         public menu, and the public site changes only after an administrator publishes.
       </CmsNotice>
-      <ServiceEditorForm isNew service={blankService} />
+      <ServiceEditorForm
+        cloudinaryOwnership={cloudinaryOwnership}
+        isNew
+        service={blankService}
+      />
     </>
   );
 }

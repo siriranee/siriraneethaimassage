@@ -1,5 +1,13 @@
 import type { NextConfig } from "next";
 
+import {
+  getConfiguredCloudinaryCloudName,
+  getConfiguredCloudinaryFolder,
+} from "./src/lib/media/cloudinary-delivery";
+
+const cloudinaryCloudName = getConfiguredCloudinaryCloudName();
+const cloudinaryFolder = getConfiguredCloudinaryFolder();
+
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
@@ -15,6 +23,17 @@ const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
     qualities: [75, 90],
+    remotePatterns: cloudinaryCloudName && cloudinaryFolder
+      ? [
+          {
+            protocol: "https",
+            hostname: "res.cloudinary.com",
+            port: "",
+            pathname: `/${cloudinaryCloudName}/image/upload/v*/${cloudinaryFolder}/assets/**`,
+            search: "",
+          },
+        ]
+      : [],
   },
   async redirects() {
     return [
@@ -70,6 +89,13 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      {
+        source: "/cms",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
       },
       {
         source: "/cms/:path*",

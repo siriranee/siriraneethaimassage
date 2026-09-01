@@ -4,16 +4,28 @@ import Link from "next/link";
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink, CmsStatusBadge } from "@/components/cms/CmsUi";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
+import { getCloudinaryMediaReadiness } from "@/server/media/config";
 
 import styles from "@/components/cms/CmsViews.module.css";
 
 export default async function CmsIntegrationsPage() {
   await requireCmsPageUser("settings:view");
   const content = await getCmsContent();
+  const media = getCloudinaryMediaReadiness();
   const items = [
     { icon: CalendarDays, name: "Booking provider", value: content.site.booksyUrl, configured: Boolean(content.site.booksyUrl), edit: "/cms/settings/business" },
     { icon: MessageCircle, name: "Booking notifications", value: "Dashboard preview queue only — no messages are sent", configured: false, edit: "/cms/notifications" },
-    { icon: Camera, name: "Media storage", value: "Project images and metadata only — uploads are disabled", configured: false, edit: "/cms/media" },
+    {
+      icon: Camera,
+      name: "Media storage",
+      value: media.ready
+        ? "Cloudinary signed uploads and browser compression are ready"
+        : media.approved
+          ? "Cloudinary configuration is incomplete — uploads remain disabled"
+          : "Cloudinary uploads are disabled by the deployment gate",
+      configured: media.ready,
+      edit: "/cms/media",
+    },
     { icon: HeartPulse, name: "Monitoring & alerts", value: process.env.CMS_MONITORING_READY === "true" ? "Marked operationally ready" : "Provider and alert recipient required", configured: process.env.CMS_MONITORING_READY === "true", edit: "/cms/settings/recovery" },
     { icon: MessageCircle, name: "WhatsApp", value: content.site.whatsappNumber, configured: Boolean(content.site.whatsappNumber), edit: "/cms/settings/business" },
     { icon: Camera, name: "Instagram", value: content.site.instagramUrl, configured: Boolean(content.site.instagramUrl), edit: "/cms/settings/business" },
@@ -30,8 +42,8 @@ export default async function CmsIntegrationsPage() {
         title="Integrations"
       />
       <CmsNotice title="Server-only credentials">
-        Booking, email and media credentials will be configured through environment
-        variables after providers are approved. This screen records public links and honest connection health only.
+        Provider credentials stay in server environment variables and are never sent
+        to this page. This overview reports connection readiness without exposing secrets.
       </CmsNotice>
       <CmsPanel title="Connection overview" description="Public links can be edited in Business information.">
         <ul className={styles.activityList}>

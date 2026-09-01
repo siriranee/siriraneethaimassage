@@ -2,10 +2,11 @@ import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
 import { updateCmsService } from "@/server/cms/content-service";
 import {
-  cmsErrorResponse,
   cmsNoStoreJson,
   readCmsJsonObject,
 } from "@/server/cms/http";
+import { cmsMediaErrorResponse } from "@/server/media/http";
+import { removeCmsMediaSubmissionEnvelope } from "@/server/media/submission";
 
 export const dynamic = "force-dynamic";
 
@@ -22,18 +23,23 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (response || !user) return response;
 
   try {
-    const body = await readCmsJsonObject(request);
+    const requestBody = await readCmsJsonObject(request);
+    const { body, submission } = removeCmsMediaSubmissionEnvelope(requestBody);
     const expectedVersion = Number(body.expectedVersion);
     const { serviceId } = await context.params;
     const service = await updateCmsService(
       serviceId,
       body,
       expectedVersion,
-      { actor: user, requestId: getRequestId(request) },
+      {
+        actor: user,
+        requestId: getRequestId(request),
+        mediaSubmission: submission,
+      },
     );
 
     return cmsNoStoreJson({ service });
   } catch (error) {
-    return cmsErrorResponse(error);
+    return cmsMediaErrorResponse(error);
   }
 }

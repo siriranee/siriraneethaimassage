@@ -34,9 +34,9 @@ export type DaySpaJsonLd = {
   readonly description: string;
   readonly currenciesAccepted: "EUR";
   readonly image: string;
-  readonly priceRange: string;
+  readonly priceRange?: string;
   readonly hasMap: string;
-  readonly telephone: string;
+  readonly telephone?: string;
   readonly email?: string;
   readonly address: PostalAddressJsonLd;
   readonly openingHoursSpecification?: readonly OpeningHoursJsonLd[];
@@ -100,6 +100,7 @@ export type JsonLdSchema =
   | BreadcrumbJsonLd;
 
 type StructuredSiteData = typeof siteConfig | PublicSiteData;
+type ServiceWithPricing = Pick<Service, "pricing">;
 
 function businessId(site: StructuredSiteData) {
   return `${site.canonicalUrl}/#business`;
@@ -111,8 +112,34 @@ function siteDescription(site: StructuredSiteData) {
     : site.seo.description;
 }
 
+function formatEuroPrice(price: number) {
+  const value = Number.isInteger(price)
+    ? price.toString()
+    : price.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+
+  return "€" + value;
+}
+
+export function buildServicePriceRange(
+  services: readonly ServiceWithPricing[],
+): string | undefined {
+  const prices = services
+    .flatMap((service) => service.pricing.map((option) => option.priceEur))
+    .filter((price) => Number.isFinite(price) && price >= 0);
+
+  if (prices.length === 0) return undefined;
+
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+
+  return minimum === maximum
+    ? formatEuroPrice(minimum)
+    : formatEuroPrice(minimum) + "–" + formatEuroPrice(maximum);
+}
+
 export function buildDaySpaJsonLd(
   site: StructuredSiteData = siteConfig,
+  services: readonly ServiceWithPricing[] = [],
 ): DaySpaJsonLd {
   const booksyUrl =
     "booksy" in site.social
@@ -125,6 +152,8 @@ export function buildDaySpaJsonLd(
     booksyUrl,
     reviewUrl,
   ].filter((url): url is string => Boolean(url));
+  const priceRange = buildServicePriceRange(services);
+  const phone = site.contact.phone;
 
   return {
     "@context": "https://schema.org",
@@ -136,9 +165,11 @@ export function buildDaySpaJsonLd(
     description: siteDescription(site),
     currenciesAccepted: site.currency,
     image: absoluteUrl("/opengraph-image"),
-    priceRange: "€40–€95",
+    ...(priceRange ? { priceRange } : {}),
     hasMap: site.address.directionsUrl,
-    telephone: site.contact.phone.e164,
+    ...(phone
+      ? { telephone: phone.e164 }
+      : {}),
     ...(site.contact.email
       ? { email: site.contact.email.address }
       : {}),

@@ -61,7 +61,7 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
   const source = isBookingSource(sourceValue) ? sourceValue : undefined;
   const serviceId = single(params.serviceId).trim() || undefined;
   const attentionValue = single(params.attention);
-  const attention = attentionValue === "expired" || attentionValue === "unassigned" ? attentionValue : undefined;
+  const attention = attentionValue === "expired" ? attentionValue : undefined;
   const from = safeDate(single(params.from));
   const to = safeDate(single(params.to));
   const [bookings, content] = await Promise.all([
@@ -73,7 +73,7 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/bookings/new"><Plus aria-hidden="true" /> Add booking</CmsPrimaryLink>}
-        description="Search appointments, review their status and handle internal staff assignment. Staff is never selected by customers."
+        description="Search appointments, review their status and open any booking that needs attention."
         eyebrow="Booking operations"
         title="Bookings"
       />
@@ -95,7 +95,7 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
           </label>
           <label>Treatment<select defaultValue={serviceId ?? ""} name="serviceId"><option value="">All treatments</option>{content.services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
           <label>Source<select defaultValue={source ?? ""} name="source"><option value="">All sources</option>{bookingSources.map((item) => <option key={item} value={item}>{item.charAt(0).toUpperCase() + item.slice(1)}</option>)}</select></label>
-          <label>Needs attention<select defaultValue={attention ?? ""} name="attention"><option value="">All bookings</option><option value="expired">Expired pending holds</option><option value="unassigned">Unassigned upcoming</option></select></label>
+          <label>Needs attention<select defaultValue={attention ?? ""} name="attention"><option value="">All bookings</option><option value="expired">Expired pending holds</option></select></label>
           <label>From date<input defaultValue={from ?? ""} name="from" type="date" /></label>
           <label>To date<input defaultValue={to ?? ""} name="to" type="date" /></label>
           <div className={styles.filterActions}><button type="submit">Apply filters</button><Link href="/cms/bookings">Clear</Link></div>
@@ -115,7 +115,6 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
                     <th scope="col">Appointment</th>
                     <th scope="col">Treatment</th>
                     <th scope="col">Status</th>
-                    <th scope="col">Assigned staff</th>
                     <th scope="col">Action</th>
                   </tr>
                 </thead>
@@ -127,7 +126,6 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
                       <td><strong>{formatDate(booking.localDate)}</strong><small>{booking.localTime} · {booking.durationMinutes} min</small></td>
                       <td>{booking.serviceName}</td>
                       <td><BookingStatusCell booking={booking} /></td>
-                      <td>{booking.assignedStaffId || "Unassigned"}</td>
                       <td><Link href={`/cms/bookings/${booking.id}`}>View</Link></td>
                     </tr>
                   ))}
@@ -145,7 +143,6 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
                     <dt>Guest</dt><dd>{booking.customer.name}</dd>
                     <dt>When</dt><dd>{formatDate(booking.localDate)} · {booking.localTime}</dd>
                     <dt>Treatment</dt><dd>{booking.serviceName}</dd>
-                    <dt>Staff</dt><dd>{booking.assignedStaffId || "Unassigned"}</dd>
                   </dl>
                   <Link href={`/cms/bookings/${booking.id}`}>View booking</Link>
                 </article>

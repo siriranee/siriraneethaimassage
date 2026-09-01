@@ -21,7 +21,9 @@
 
 .image {
   object-fit: cover;
-  object-position: center;
+  object-position:
+    var(--page-hero-focal-x, 50%)
+    var(--page-hero-focal-y, 50%);
 }
 
 .scrim {
@@ -103,6 +105,12 @@
 
   .contentInner {
     width: 100%;
+  }
+
+  .image {
+    object-position:
+      var(--page-hero-mobile-focal-x, var(--page-hero-focal-x, 50%))
+      var(--page-hero-mobile-focal-y, var(--page-hero-focal-y, 50%));
   }
 
   .title {

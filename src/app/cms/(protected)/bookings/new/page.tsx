@@ -38,10 +38,6 @@ export default async function CmsNewBookingPage({ searchParams }: PageProps) {
           priceCents: price.priceCents,
         })),
     );
-  const staff = content.team
-    .filter((member) => member.operationalActive && !member.archived)
-    .map((member) => ({ id: member.id, name: member.name }));
-
   return (
     <>
       <CmsPageHeader
@@ -56,7 +52,7 @@ export default async function CmsNewBookingPage({ searchParams }: PageProps) {
           resets when the local server restarts.
         </CmsNotice>
       ) : null}
-      <AdminBookingForm defaultDate={requestedDate || nextDublinDate()} isMock={mode === "mock"} staff={staff} variants={variants} />
+      <AdminBookingForm defaultDate={requestedDate || nextDublinDate()} isMock={mode === "mock"} variants={variants} />
     </>
   );
 }

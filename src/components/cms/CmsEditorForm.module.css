@@ -4,6 +4,23 @@
   padding-bottom: 5rem;
 }
 
+.formFields {
+  display: grid;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 1rem;
+}
+
+.formBusy {
+  cursor: progress;
+}
+
+.formBusy .formFields {
+  pointer-events: none;
+}
+
 .section {
   padding: 1.25rem;
   border: 1px solid var(--color-line);
@@ -221,11 +238,17 @@
 }
 
 .success,
-.error {
+.error,
+.progressStatus {
   padding: 0.7rem 0.85rem;
   border-radius: 0.58rem;
   font-size: var(--fs-sm);
   font-weight: 750;
+}
+
+.progressStatus {
+  background: var(--color-purple-100);
+  color: var(--color-purple-800) !important;
 }
 
 .success {

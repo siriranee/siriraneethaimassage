@@ -100,6 +100,26 @@ try {
       { status: 1, createdAt: 1 },
       { name: "cms_notifications_status_created" },
     ),
+    db.collection("cmsMediaAssets").createIndex(
+      { providerAssetId: 1 },
+      {
+        name: "cms_media_provider_asset_id_unique",
+        unique: true,
+        partialFilterExpression: { providerAssetId: { $type: "string" } },
+      },
+    ),
+    db.collection("cmsMediaAssets").createIndex(
+      { status: 1, expiresAt: 1 },
+      { name: "cms_media_status_expiry" },
+    ),
+    db.collection("cmsMediaAssets").createIndex(
+      { secureUrl: 1 },
+      { name: "cms_media_secure_url" },
+    ),
+    db.collection("cmsMediaAssets").createIndex(
+      { ownerUserId: 1, submissionId: 1, status: 1 },
+      { name: "cms_media_owner_submission_status" },
+    ),
   ]);
 
   await db.command({ ping: 1 });

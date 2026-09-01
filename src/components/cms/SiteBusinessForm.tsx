@@ -33,6 +33,7 @@ export function SiteBusinessForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
       country: data.get("country"),
       phoneDisplay: data.get("phoneDisplay"),
       phoneE164: data.get("phoneE164"),
+      phoneConfirmed: data.get("phoneConfirmed") === "on",
       email: data.get("email"),
       whatsappNumber: data.get("whatsappNumber"),
       instagramUrl: data.get("instagramUrl"),
@@ -88,8 +89,12 @@ export function SiteBusinessForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
       <section className={styles.section}>
         <header className={styles.sectionHeader}><h2>Contact channels</h2><p>These values are reused by the header, footer, contact page and structured data.</p></header>
         <div className={styles.grid}>
-          <label className={styles.field}>Phone shown to visitors<input defaultValue={site.phoneDisplay} maxLength={40} minLength={5} name="phoneDisplay" required /></label>
-          <label className={styles.field}>Phone in E.164 format<input defaultValue={site.phoneE164} maxLength={25} minLength={8} name="phoneE164" required /></label>
+          <label className={styles.field}>Phone shown to visitors<input defaultValue={site.phoneDisplay} maxLength={40} name="phoneDisplay" /></label>
+          <label className={styles.field}>Phone in E.164 format<input defaultValue={site.phoneE164} maxLength={25} name="phoneE164" placeholder="+353123456789" /></label>
+          <label className={styles.checkbox}>
+            <input defaultChecked={site.phoneConfirmed} name="phoneConfirmed" type="checkbox" />
+            <span>I confirm this public phone number<small>Until confirmed and published, no phone number or call button appears on the website or in search data.</small></span>
+          </label>
           <label className={styles.field}>Email address<input defaultValue={site.email} maxLength={254} name="email" type="email" /></label>
           <label className={styles.field}>WhatsApp number<input defaultValue={site.whatsappNumber} maxLength={25} name="whatsappNumber" /></label>
           <label className={styles.fullField}>Instagram URL<input defaultValue={site.instagramUrl} name="instagramUrl" type="url" /></label>

@@ -4,21 +4,33 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
+import type { Metadata } from "next";
 
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { getServicePageHero } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
-import { getPublicTeam } from "@/server/cms/public-adapter";
+import {
+  getPublicPageCopy,
+  getPublicTeam,
+} from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
-export const metadata = createMetadata({
-  title: "Massage Therapists in Howth, Dublin",
-  description:
-    "Meet the confirmed team at Siriranee Thai Massage and book a massage treatment in Howth, Dublin.",
-  path: "/therapists",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const [page, teamMembers] = await Promise.all([
+    getPublicPageCopy("therapists"),
+    getPublicTeam(),
+  ]);
+
+  return createMetadata({
+    title: page.seoTitle,
+    description: page.seoDescription,
+    path: "/therapists",
+    noIndex: teamMembers.length === 0,
+  });
+}
 
 const carePrinciples = [
   {
@@ -48,44 +60,48 @@ function getInitials(name: string) {
 }
 
 export default async function TherapistsPage() {
-  const teamMembers = await getPublicTeam();
+  const [teamMembers, pageCopy] = await Promise.all([
+    getPublicTeam(),
+    getPublicPageCopy("therapists"),
+  ]);
 
   return (
     <div>
       <PageHero
-        eyebrow="Your comfort comes first"
-        title="The Siriranee Team"
-        description="Friendly, thoughtful care from the moment you arrive."
-        image="/images/spa/hero-massage.webp"
-        imageAlt="A massage treatment being provided in a softly lit spa room"
+        {...getServicePageHero("traditional-thai-massage")}
+        eyebrow={pageCopy.eyebrow}
+        title={pageCopy.title}
+        description={pageCopy.description}
       />
 
-      <section className={styles.teamSection} aria-labelledby="team-heading">
-        <div className={styles.container}>
-          <SectionHeading
-            title="Team Profiles"
-            headingId="team-heading"
-            description="The spa assigns the team member for each appointment."
-          />
-          <div className={styles.teamGrid}>
-            {teamMembers.map((member) => (
-              <article className={styles.memberCard} key={member.slug}>
-                <div className={styles.monogram} aria-hidden="true">
-                  <span>{getInitials(member.name)}</span>
-                </div>
-                <div className={styles.memberCopy}>
-                  <p>Team member</p>
-                  <h3>{member.name}</h3>
-                  <span className={styles.memberNote}>{member.role}</span>
-                </div>
-                <span className={styles.memberIcon} aria-hidden="true">
-                  <UserRound size={18} strokeWidth={1.7} />
-                </span>
-              </article>
-            ))}
+      {teamMembers.length ? (
+        <section className={styles.teamSection} aria-labelledby="team-heading">
+          <div className={styles.container}>
+            <SectionHeading
+              title="Team Profiles"
+              headingId="team-heading"
+              description="Published introductions to the Siriranee team."
+            />
+            <div className={styles.teamGrid}>
+              {teamMembers.map((member) => (
+                <article className={styles.memberCard} key={member.slug}>
+                  <div className={styles.monogram} aria-hidden="true">
+                    <span>{getInitials(member.name)}</span>
+                  </div>
+                  <div className={styles.memberCopy}>
+                    <p>Team member</p>
+                    <h3>{member.name}</h3>
+                    <span className={styles.memberNote}>{member.role}</span>
+                  </div>
+                  <span className={styles.memberIcon} aria-hidden="true">
+                    <UserRound size={18} strokeWidth={1.7} />
+                  </span>
+                </article>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className={styles.principlesSection} aria-labelledby="care-heading">
         <div className={styles.container}>
@@ -116,7 +132,7 @@ export default async function TherapistsPage() {
         <div className={styles.container}>
           <BookingCta
             title="Choose your treatment and duration"
-            description="Start with the service and treatment length you would like, then contact the team to request a date and time. Staff assignment is handled by the spa."
+            description="Choose your treatment and preferred duration, then request a date and time."
             secondaryHref="/services"
             secondaryLabel="Explore treatments"
           />
