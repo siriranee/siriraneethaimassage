@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 
+import { googleMapsDirectionsUrl } from "@/content/site";
+
 import "./globals.css";
 import styles from "./global-error.module.css";
 
@@ -36,7 +38,7 @@ export default function GlobalError({
                 Try again
               </button>
               <a
-                href="https://maps.app.goo.gl/ZVpLkfVQSHx6xkpS6"
+                href={googleMapsDirectionsUrl}
                 rel="noreferrer"
                 target="_blank"
               >

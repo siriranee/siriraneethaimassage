@@ -113,9 +113,9 @@ export const confirmedContactPhone = {
   href: "tel:+353899484585",
 } as const;
 export const googleMapsDirectionsUrl =
-  "https://maps.app.goo.gl/ZVpLkfVQSHx6xkpS6";
+  "https://maps.app.goo.gl/CFWPtF1oM92TTj7P6?g_st=al";
 export const googleMapsEmbedUrl =
-  "https://www.google.com/maps?q=53.3877045,-6.0678292&z=17&output=embed";
+  "https://www.google.com/maps?q=Siriranee%20Thai%20Massage%2C%20Harbour%20House%2C%20Harbour%20Road%2C%20Howth%2C%20Dublin%2C%20D13%20E9H9&output=embed";
 const whatsappNumber =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") ||
   confirmedContactPhone.e164.replace(/\D/g, "");

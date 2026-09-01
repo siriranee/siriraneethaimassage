@@ -3,7 +3,11 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 
-import { siteConfig } from "@/content/site";
+import {
+  googleMapsDirectionsUrl,
+  googleMapsEmbedUrl,
+  siteConfig,
+} from "@/content/site";
 import { buildDaySpaJsonLd } from "@/lib/structured-data";
 
 async function source(path: string) {
@@ -28,6 +32,14 @@ test("only owner-confirmed public contact data reaches static configuration and 
     "+353899484585",
   );
   assert.equal(siteConfig.contact.whatsapp.number, "353899484585");
+  assert.equal(
+    googleMapsDirectionsUrl,
+    "https://maps.app.goo.gl/CFWPtF1oM92TTj7P6?g_st=al",
+  );
+  assert.equal(siteConfig.address.directionsUrl, googleMapsDirectionsUrl);
+  assert.equal(siteConfig.address.mapsEmbedUrl, googleMapsEmbedUrl);
+  assert.match(googleMapsEmbedUrl, /Siriranee%20Thai%20Massage/);
+  assert.match(googleMapsEmbedUrl, /D13%20E9H9/);
   assert.equal("openingHoursSpecification" in buildDaySpaJsonLd(siteConfig), false);
   assert.match(defaults, /phoneDisplay: siteConfig\.contact\.phone\.display/);
   assert.match(defaults, /phoneE164: siteConfig\.contact\.phone\.e164/);
