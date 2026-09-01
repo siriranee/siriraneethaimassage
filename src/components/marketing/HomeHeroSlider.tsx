@@ -187,10 +187,10 @@ export function HomeHeroSlider({
         alt=""
         aria-hidden="true"
         className={styles.heroLogo}
-        height={1394}
+        height={1200}
         sizes="(max-width: 380px) 6.2rem, (max-width: 620px) 7.2rem, (max-width: 900px) 6.5rem, (max-width: 1100px) 5.8rem, 7.5rem"
-        src="/brand/siriranee-logo-gold-exact.webp"
-        width={1411}
+        src="/siriranee_logo.svg"
+        width={1200}
       />
 
       <p aria-live="polite" className="sr-only">

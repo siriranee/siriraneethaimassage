@@ -24,8 +24,8 @@ export default function GlobalError({
               className={styles.logo}
               height={180}
               priority
-              src="/brand/siriranee-logo-gold-exact.webp"
-              width={182}
+              src="/siriranee_logo.svg"
+              width={180}
             />
             <p className={styles.eyebrow}>Siriranee Thai Massage · Howth</p>
             <h1 id="global-error-title">We could not load this page</h1>

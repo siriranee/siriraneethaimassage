@@ -59,6 +59,10 @@ export function createMetadata({
     metadataBase: new URL(siteConfig.canonicalUrl),
     title: formattedTitle,
     description,
+    icons: {
+      icon: [{ url: "/siriranee_logo.svg", type: "image/svg+xml" }],
+      shortcut: ["/siriranee_logo.svg"],
+    },
     alternates: {
       canonical,
     },

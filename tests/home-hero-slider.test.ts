@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
-import sharp from "sharp";
 
 async function source(path: string) {
   return readFile(resolve(process.cwd(), path), "utf8");
@@ -17,7 +16,7 @@ const heroAssets = [
   "public/images/Hero/Home/6.png",
 ] as const;
 
-test("homepage hero uses all six supplied hero images and the official logo crop", async () => {
+test("homepage hero uses all six supplied hero images and the official logo", async () => {
   for (const path of heroAssets) {
     const [metadata, file] = await Promise.all([
       stat(resolve(process.cwd(), path)),
@@ -27,59 +26,15 @@ test("homepage hero uses all six supplied hero images and the official logo crop
     assert.equal(file.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
   }
 
-  const originalLogoPath = resolve(
-    process.cwd(),
-    "public/brand/siriranee-logo-gold-exact.svg",
-  );
-  const optimizedLogoPath = resolve(
-    process.cwd(),
-    "public/brand/siriranee-logo-gold-exact.webp",
-  );
-  const [originalLogo, optimizedLogo, optimizedFile, originalSource] =
-    await Promise.all([
-      stat(originalLogoPath),
-      stat(optimizedLogoPath),
-      readFile(optimizedLogoPath),
-      readFile(originalLogoPath, "utf8"),
-    ]);
-
-  assert.ok(originalLogo.size > 1_000_000);
-  assert.ok(optimizedLogo.size < originalLogo.size);
-  assert.equal(optimizedFile.subarray(0, 4).toString("ascii"), "RIFF");
-  assert.equal(optimizedFile.subarray(8, 12).toString("ascii"), "WEBP");
-
-  const embeddedPng = originalSource.match(/base64,([^"]+)/)?.[1];
-  assert.ok(embeddedPng, "The retained SVG source should contain its original PNG");
-
-  const [originalPixels, optimizedPixels] = await Promise.all([
-    sharp(Buffer.from(embeddedPng, "base64"))
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true }),
-    sharp(optimizedLogoPath)
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true }),
+  const logoPath = resolve(process.cwd(), "public/siriranee_logo.svg");
+  const [logo, logoSource] = await Promise.all([
+    stat(logoPath),
+    readFile(logoPath, "utf8"),
   ]);
 
-  assert.deepEqual(optimizedPixels.info, originalPixels.info);
-  let alphaDifferences = 0;
-  let visibleColourDifferences = 0;
-  for (let offset = 0; offset < originalPixels.data.length; offset += 4) {
-    const originalAlpha = originalPixels.data[offset + 3];
-    const optimizedAlpha = optimizedPixels.data[offset + 3];
-    if (originalAlpha !== optimizedAlpha) alphaDifferences += 1;
-    if (
-      originalAlpha > 0 &&
-      (originalPixels.data[offset] !== optimizedPixels.data[offset] ||
-        originalPixels.data[offset + 1] !== optimizedPixels.data[offset + 1] ||
-        originalPixels.data[offset + 2] !== optimizedPixels.data[offset + 2])
-    ) {
-      visibleColourDifferences += 1;
-    }
-  }
-  assert.equal(alphaDifferences, 0);
-  assert.equal(visibleColourDifferences, 0);
+  assert.ok(logo.size > 100_000);
+  assert.match(logoSource, /<svg\b/);
+  assert.match(logoSource, /viewBox="0 0 1200 1200"/);
 });
 
 test("homepage hero follows the autoplay and accessibility contract", async () => {
@@ -105,7 +60,7 @@ test("homepage hero follows the autoplay and accessibility contract", async () =
     /aria-roledescription=\{hasMultipleSlides \? "carousel" : undefined\}/,
   );
   assert.match(component, /className=\{styles\.heroLogo\}/);
-  assert.match(component, /siriranee-logo-gold-exact\.webp/);
+  assert.match(component, /siriranee_logo\.svg/);
   assert.doesNotMatch(component, /\bunoptimized\b/);
   assert.doesNotMatch(component, /Pause slideshow/);
   assert.doesNotMatch(component, /Play slideshow/);
@@ -140,10 +95,14 @@ test("homepage hero follows the autoplay and accessibility contract", async () =
   assert.match(styles, /opacity:\s*0\.5/);
 });
 
-test("brand mark uses the exact full transparent gold logo without a background", async () => {
-  const brand = await source("src/components/ui/BrandMark.tsx");
-  const brandStyles = await source("src/components/ui/BrandMark.module.css");
-  assert.match(brand, /siriranee-logo-gold-exact\.webp/);
+test("brand mark uses the supplied full SVG logo without a background", async () => {
+  const [brand, brandStyles, metadata] = await Promise.all([
+    source("src/components/ui/BrandMark.tsx"),
+    source("src/components/ui/BrandMark.module.css"),
+    source("src/lib/metadata.ts"),
+  ]);
+  assert.match(brand, /siriranee_logo\.svg/);
+  assert.match(metadata, /siriranee_logo\.svg/);
   assert.doesNotMatch(brand, /\bunoptimized\b/);
   assert.doesNotMatch(brand, /<svg/);
   assert.match(brand, /Siriranee Thai Massage/);
