@@ -361,7 +361,7 @@
 
 .areasCopy p:not(.eyebrow) {
   margin: 0;
-  color: rgba(255, 253, 249, 0.7);
+  color: rgb(var(--color-on-brand-rgb) / 0.7);
 }
 
 .areaChips {
@@ -377,10 +377,10 @@
   display: inline-flex;
   min-height: 3rem;
   padding: 0.65rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.15);
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgb(var(--color-surface-rgb) / 0.05);
+  color: rgb(var(--color-surface-rgb) / 0.8);
   align-items: center;
   gap: 0.5rem;
   font-size: var(--fs-sm);
@@ -433,7 +433,7 @@
 
 .ctaCard > div > p:not(.ctaEyebrow) {
   margin: 0;
-  color: rgba(255, 253, 249, 0.7);
+  color: rgb(var(--color-on-brand-rgb) / 0.7);
 }
 
 .ctaActions {
@@ -462,7 +462,7 @@
 }
 
 .ctaSecondary {
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.24);
   color: var(--color-cream);
 }
 

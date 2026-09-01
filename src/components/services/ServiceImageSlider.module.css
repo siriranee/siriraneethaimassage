@@ -113,12 +113,12 @@
   bottom: clamp(1.2rem, 4vw, 3rem);
   left: clamp(1.2rem, 4vw, 3rem);
   z-index: 2;
-  color: white;
+  color: var(--color-on-brand);
   font-size: var(--fs-md);
   font-weight: 700;
   line-height: 1.45;
   text-align: center;
-  text-shadow: 0 2px 1rem rgba(0, 0, 0, 0.72);
+  text-shadow: 0 2px 1rem rgb(var(--color-shadow-rgb) / 0.72);
   text-wrap: balance;
 }
 
@@ -129,11 +129,11 @@
   display: grid;
   width: 3.25rem;
   height: 3.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.42);
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.42);
   border-radius: 50%;
   background: rgb(var(--color-purple-950-rgb) / 0.52);
-  box-shadow: 0 0.65rem 1.6rem rgba(0, 0, 0, 0.24);
-  color: white;
+  box-shadow: 0 0.65rem 1.6rem rgb(var(--color-shadow-rgb) / 0.24);
+  color: var(--color-on-brand);
   place-items: center;
   transform: translateY(-50%);
   transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
@@ -233,7 +233,7 @@
   border-radius: 50%;
   background: rgb(var(--color-purple-950-rgb) / 0.92);
   box-shadow: 0 0.45rem 1.2rem rgb(var(--color-purple-950-rgb) / 0.16);
-  color: white;
+  color: var(--color-on-brand);
   place-items: center;
   transform: translateY(-50%);
   transition: background 180ms ease, border-color 180ms ease, opacity 180ms ease,

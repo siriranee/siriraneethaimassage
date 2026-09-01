@@ -34,7 +34,7 @@
   justify-content: center;
   border: 1px solid var(--color-line-strong);
   border-radius: 0.62rem;
-  background: white;
+  background: var(--color-surface);
   color: var(--color-purple-700);
 }
 
@@ -104,7 +104,7 @@
 .cardHeader {
   padding: 0.75rem 0.85rem;
   border-bottom: 1px solid var(--color-line);
-  background: white;
+  background: var(--color-surface);
 }
 
 .cardHeader > div:first-child {
@@ -137,7 +137,7 @@
 }
 
 .removeButton {
-  color: #9f2c36;
+  color: var(--color-danger);
 }
 
 .addButton:hover:not(:disabled),
@@ -222,7 +222,7 @@
   padding: 0.6rem 0.7rem;
   border: 1px solid var(--color-line-strong);
   border-radius: 0.58rem;
-  background: white;
+  background: var(--color-surface);
   font-size: var(--fs-sm);
   font-weight: 500;
 }
@@ -243,7 +243,7 @@
   padding: 0.8rem;
   border: 1px solid var(--color-line);
   border-radius: 0.65rem;
-  background: white;
+  background: var(--color-surface);
 }
 
 .focalGrid span {

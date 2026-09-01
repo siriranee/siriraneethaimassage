@@ -4,7 +4,7 @@
   padding: clamp(1rem, 2.5vw, 1.6rem);
   border: 1px solid rgb(var(--color-gold-500-rgb) / 0.34);
   border-radius: var(--radius-large);
-  background: rgba(255, 255, 255, 0.94);
+  background: rgb(var(--color-surface-rgb) / 0.94);
   box-shadow: var(--shadow-card);
   scroll-margin-top: calc(var(--sticky-header-height) + 1rem);
 }
@@ -64,10 +64,10 @@
   display: inline-flex;
   min-height: 2.5rem;
   padding: 0.55rem 0.8rem;
-  border: 1px solid rgba(57, 120, 58, 0.26);
+  border: 1px solid rgb(var(--color-success-rgb) / 0.26);
   border-radius: var(--radius-pill);
-  background: rgba(57, 120, 58, 0.08);
-  color: #256127;
+  background: rgb(var(--color-success-rgb) / 0.08);
+  color: var(--color-success);
   align-items: center;
   flex: 0 0 auto;
   font-size: var(--fs-sm);
@@ -86,7 +86,7 @@
   padding: 0.9rem 1rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-medium);
-  background: linear-gradient(135deg, var(--color-purple-50), #fffaf0);
+  background: linear-gradient(135deg, var(--color-purple-50), var(--color-ivory));
   color: var(--color-purple-700);
   align-items: center;
   gap: 0.75rem;

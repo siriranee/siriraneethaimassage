@@ -9,10 +9,10 @@
   min-height: 8.2rem;
   grid-template-columns: repeat(4, 1fr);
   padding: 1.2rem;
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.75);
   border-top: 3px solid var(--color-gold-400);
   border-radius: var(--radius-medium);
-  background: rgba(255, 253, 249, 0.97);
+  background: rgb(var(--color-on-brand-rgb) / 0.97);
   box-shadow: 0 1.5rem 4rem rgb(var(--color-purple-950-rgb) / 0.2);
   backdrop-filter: blur(16px);
 }
@@ -101,7 +101,7 @@
   overflow: hidden;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-medium);
-  background: white;
+  background: var(--color-surface);
   box-shadow: 0 0.65rem 2rem rgb(var(--color-purple-950-rgb) / 0.06);
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
@@ -193,7 +193,7 @@
 
 .storySection {
   padding-block: var(--section-y);
-  background: white;
+  background: var(--color-surface);
 }
 
 .storyGrid {
@@ -224,7 +224,7 @@
   width: 8rem;
   height: 8rem;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.38);
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.38);
   border-radius: 50%;
   background: rgb(var(--color-purple-900-rgb) / 0.9);
   color: var(--color-gold-400);
@@ -323,7 +323,7 @@
   border: 1px solid rgb(var(--color-purple-800-rgb) / 0.16);
   border-top: 0.25rem solid var(--color-gold-500);
   border-radius: var(--radius-medium);
-  background: rgba(255, 255, 255, 0.94);
+  background: rgb(var(--color-surface-rgb) / 0.94);
   box-shadow: 0 1rem 2.7rem rgb(var(--color-purple-950-rgb) / 0.08);
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
@@ -452,7 +452,7 @@
   padding: 1rem 1.15rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-small);
-  background: rgba(255, 255, 255, 0.7);
+  background: rgb(var(--color-surface-rgb) / 0.7);
 }
 
 .voucherNotice svg {
@@ -494,12 +494,12 @@
 
 .areasCopy h2 {
   margin-bottom: 1.1rem;
-  color: white;
+  color: var(--color-on-brand);
 }
 
 .areasCopy p {
   margin-bottom: 1.8rem;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgb(var(--color-surface-rgb) / 0.72);
 }
 
 .areaList {
@@ -517,10 +517,10 @@
   align-items: center;
   gap: 0.65rem;
   padding: 0.85rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.14);
   border-radius: var(--radius-small);
-  background: rgba(255, 255, 255, 0.07);
-  color: white;
+  background: rgb(var(--color-surface-rgb) / 0.07);
+  color: var(--color-on-brand);
   font-size: var(--fs-sm);
   font-weight: 750;
   backdrop-filter: blur(10px);
@@ -540,7 +540,7 @@
 
 .visitSection {
   padding-block: clamp(3rem, 6vw, 5rem);
-  background: white;
+  background: var(--color-surface);
 }
 
 .visitCard {
@@ -573,11 +573,11 @@
 
 .visitContent h2 {
   margin: 0.9rem 0 1rem;
-  color: white;
+  color: var(--color-on-brand);
 }
 
 .visitContent p {
-  color: rgba(255, 255, 255, 0.68);
+  color: rgb(var(--color-surface-rgb) / 0.68);
 }
 
 .visitActions {
@@ -633,7 +633,7 @@
   padding: 1.2rem 1.35rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-medium);
-  background: white;
+  background: var(--color-surface);
 }
 
 .faqList summary {

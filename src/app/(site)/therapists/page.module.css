@@ -37,7 +37,7 @@
   overflow: hidden;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-large);
-  background: rgba(255, 255, 255, 0.8);
+  background: rgb(var(--color-surface-rgb) / 0.8);
   box-shadow: 0 1rem 3rem rgb(var(--color-purple-950-rgb) / 0.07);
   align-items: center;
   grid-template-columns: auto minmax(0, 1fr) auto;

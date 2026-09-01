@@ -10,7 +10,7 @@ export default function OpenGraphImage() {
       <div
         style={{
           alignItems: "center",
-          background: "linear-gradient(135deg, #150224 0%, #240a3c 100%)",
+          background: "linear-gradient(135deg, #4a2246 0%, #7c2a90 100%)",
           color: "white",
           display: "flex",
           height: "100%",
@@ -22,7 +22,7 @@ export default function OpenGraphImage() {
       >
         <div
           style={{
-            border: "2px solid rgba(234,174,61,.35)",
+            border: "2px solid rgba(225,198,95,.4)",
             borderRadius: 999,
             height: 520,
             position: "absolute",
@@ -41,7 +41,7 @@ export default function OpenGraphImage() {
         >
           <div
             style={{
-              color: "#f2c56e",
+              color: "#e1c65f",
               fontSize: 24,
               fontWeight: 700,
               letterSpacing: 5,
@@ -56,7 +56,7 @@ export default function OpenGraphImage() {
           </div>
           <div
             style={{
-              color: "#eaae3d",
+              color: "#d5b350",
               fontSize: 30,
               fontWeight: 700,
               letterSpacing: 8,
@@ -66,7 +66,7 @@ export default function OpenGraphImage() {
           >
             Thai Massage
           </div>
-          <div style={{ color: "rgba(255,255,255,.75)", fontSize: 27, marginTop: 32 }}>
+          <div style={{ color: "rgba(249,244,234,.78)", fontSize: 27, marginTop: 32 }}>
             Thai massage and thoughtful spa treatments
           </div>
         </div>

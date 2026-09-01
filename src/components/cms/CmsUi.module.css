@@ -67,7 +67,7 @@
   margin-bottom: 1rem;
   border: 1px solid var(--color-line);
   border-radius: 0.85rem;
-  background: white;
+  background: var(--color-surface);
 }
 
 .notice > svg {
@@ -98,13 +98,13 @@
 
 .notice.warning {
   border-color: rgb(var(--color-gold-600-rgb) / 0.3);
-  background: #fffaf0;
-  color: #8b5707;
+  background: var(--color-ivory);
+  color: var(--color-warning);
 }
 
 .notice.success {
-  border-color: rgba(57, 120, 58, 0.25);
-  background: #f3faf1;
+  border-color: rgb(var(--color-success-rgb) / 0.25);
+  background: var(--color-success-surface);
   color: var(--color-success);
 }
 
@@ -132,18 +132,18 @@
 }
 
 .badge.success {
-  background: #eaf5e7;
-  color: #2f6d31;
+  background: var(--color-success-surface);
+  color: var(--color-success);
 }
 
 .badge.warning {
-  background: #fff2da;
-  color: #965909;
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
 }
 
 .badge.danger {
-  background: #fdebee;
-  color: #a92f3a;
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
 }
 
 .statCard {
@@ -198,11 +198,11 @@
 
 .statIcon.gold {
   background: var(--color-gold-100);
-  color: #9b6500;
+  color: var(--color-warning);
 }
 
 .statIcon.green {
-  background: #e9f5e7;
+  background: var(--color-success-surface);
   color: var(--color-success);
 }
 
@@ -222,12 +222,12 @@
 
 .primaryLink {
   background: linear-gradient(135deg, var(--color-purple-500), var(--color-purple-700));
-  color: white;
+  color: var(--color-on-brand);
   box-shadow: 0 0.55rem 1.25rem rgb(var(--color-purple-800-rgb) / 0.14);
 }
 
 .secondaryLink {
-  background: white;
+  background: var(--color-surface);
   color: var(--color-purple-700);
 }
 

@@ -42,7 +42,7 @@
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--color-line-strong);
   border-radius: 0.65rem;
-  background: white;
+  background: var(--color-surface);
 }
 
 .form input:focus {
@@ -61,7 +61,7 @@
   border: 1px solid var(--color-purple-700);
   border-radius: 0.68rem;
   background: linear-gradient(135deg, var(--color-purple-700), var(--color-purple-900));
-  color: white;
+  color: var(--color-on-brand);
   font-size: var(--fs-sm);
   font-weight: 800;
   box-shadow: 0 0.75rem 1.75rem rgb(var(--color-purple-800-rgb) / 0.16);
@@ -87,7 +87,7 @@
   place-items: center;
   border-radius: 1rem;
   background: var(--color-gold-100);
-  color: #936000;
+  color: var(--color-warning);
 }
 
 .demoIcon svg,
@@ -100,8 +100,8 @@
   margin: 0 !important;
   padding: 0.75rem;
   border-radius: 0.55rem;
-  background: #fdebee;
-  color: #9f2c36 !important;
+  background: var(--color-danger-surface);
+  color: var(--color-danger) !important;
   font-size: var(--fs-sm) !important;
   font-weight: 700;
 }

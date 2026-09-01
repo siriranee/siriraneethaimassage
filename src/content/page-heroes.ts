@@ -71,7 +71,7 @@ const serviceHeroImages = {
   },
   "neck-shoulder-upper-back-massage": {
     image:
-      "/images/Hero/Services/Neck, Shoulder & Upper Back Massage/Neck, Shoulder & Upper Back Massage hero image.png",
+      "/images/Hero/Services/neck-shoulder-upper-back-massage/hero.png",
     imageAlt: "Focused neck and shoulder massage in a calm treatment room",
     focalX: 50,
     focalY: 50,

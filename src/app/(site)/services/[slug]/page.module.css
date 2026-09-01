@@ -32,7 +32,7 @@
   padding: clamp(1.5rem, 4vw, 3rem);
   border: 1px solid rgb(var(--color-purple-800-rgb) / 0.14);
   border-radius: var(--radius-large);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgb(var(--color-gold-500-rgb) / 0.07));
+  background: linear-gradient(145deg, rgb(var(--color-surface-rgb) / 0.9), rgb(var(--color-gold-500-rgb) / 0.07));
   box-shadow: var(--shadow-card);
   grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
   gap: clamp(2rem, 6vw, 6rem);
@@ -103,7 +103,7 @@
   padding: 0.7rem 0.85rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-small);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgb(var(--color-surface-rgb) / 0.72);
   align-items: center;
   gap: 0.75rem;
   justify-content: space-between;
@@ -125,7 +125,7 @@
   padding: 0.9rem 1rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-small);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgb(var(--color-surface-rgb) / 0.72);
   color: var(--color-ink);
   font-size: var(--fs-sm);
 }
@@ -157,7 +157,7 @@
 
 .primaryAction {
   background: linear-gradient(135deg, var(--color-gold-400), var(--color-gold-500));
-  color: #24100d;
+  color: var(--color-on-gold);
 }
 
 .primaryAction:hover {
@@ -290,7 +290,7 @@
   padding: 1rem 1.15rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-medium);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgb(var(--color-surface-rgb) / 0.72);
   color: var(--color-purple-700);
   align-items: flex-start;
   gap: 0.75rem;

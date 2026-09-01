@@ -36,7 +36,7 @@
 
 .content > p:not(.eyebrow) {
   margin-bottom: 1.6rem;
-  color: rgba(255, 252, 245, 0.78);
+  color: rgb(var(--color-on-brand-rgb) / 0.78);
 }
 
 .actions {
@@ -61,11 +61,11 @@
 
 .primary {
   background: linear-gradient(135deg, var(--color-gold-400), var(--color-gold-500));
-  color: #24100e;
+  color: var(--color-on-gold);
 }
 
 .secondary {
-  border: 1px solid rgba(255, 252, 245, 0.35);
+  border: 1px solid rgb(var(--color-on-brand-rgb) / 0.35);
   color: var(--color-cream);
 }
 
@@ -76,7 +76,7 @@
 
 .secondary:hover {
   border-color: var(--color-gold-400);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgb(var(--color-surface-rgb) / 0.06);
 }
 
 .visual {

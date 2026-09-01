@@ -194,27 +194,37 @@ check(
 );
 
 for (const declaration of [
-  "--color-purple-950: #150224;",
-  "--color-purple-900: #1a0630;",
-  "--color-purple-800: #240a3c;",
-  "--color-purple-700: #341150;",
-  "--color-purple-600: #3d125a;",
-  "--color-purple-500: #46116d;",
-  "--color-purple-400: #521a82;",
-  "--color-gold-500: #eaae3d;",
-  "--color-gold-400: #f2c56e;",
-  "--color-ivory: #faf7f4;",
+  "--color-purple-950: #2b2028;",
+  "--color-purple-800: #4a2246;",
+  "--color-purple-600: #6a2467;",
+  "--color-purple-500: #7c2a90;",
+  "--color-purple-400: #90278d;",
+  "--color-gold-700: #7a590d;",
+  "--color-gold-500: #d5b350;",
+  "--color-gold-400: #e1c65f;",
+  "--color-cream: #f3ebd4;",
+  "--color-ivory: #f9f4ea;",
 ]) {
   check(
     globalStylesSource.includes(declaration),
-    `AI-reference-derived Siriranee palette is missing: ${declaration}`,
+    `Official-logo-derived Siriranee palette is missing: ${declaration}`,
   );
 }
 
-for (const retiredPurple of ["#51224e", "#6a2468", "#7c278a", "#872990", "#8d2a91", "#9b3aa2", "#ad5aaf"]) {
+for (const retiredColor of [
+  "#150224",
+  "#1a0630",
+  "#240a3c",
+  "#341150",
+  "#3d125a",
+  "#46116d",
+  "#521a82",
+  "#eaae3d",
+  "#f2c56e",
+]) {
   check(
-    !globalStylesSource.toLowerCase().includes(retiredPurple),
-    `Retired dark purple token remains in globals.css: ${retiredPurple}`,
+    !globalStylesSource.toLowerCase().includes(retiredColor),
+    `Retired pre-logo palette token remains in globals.css: ${retiredColor}`,
   );
 }
 

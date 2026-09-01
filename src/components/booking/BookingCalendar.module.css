@@ -5,7 +5,7 @@
   border-radius: var(--radius-large);
   background:
     radial-gradient(circle at 100% 0%, rgb(var(--color-gold-400-rgb) / 0.13), transparent 12rem),
-    rgba(255, 255, 255, 0.88);
+    rgb(var(--color-surface-rgb) / 0.88);
   box-shadow: 0 0.8rem 2rem rgb(var(--color-purple-950-rgb) / 0.06);
 }
 
@@ -70,7 +70,7 @@
   min-height: 2.75rem;
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-small);
-  background: white;
+  background: var(--color-surface);
   color: var(--color-purple-800);
   cursor: pointer;
   font: inherit;
@@ -152,7 +152,7 @@
   overflow: hidden;
   border: 1px solid var(--color-line);
   border-radius: 0.7rem;
-  background: white;
+  background: var(--color-surface);
   color: var(--color-purple-950);
   align-items: center;
   cursor: pointer;
@@ -179,7 +179,7 @@
 
 .dayAvailable {
   border-color: rgb(var(--color-purple-700-rgb) / 0.25);
-  background: linear-gradient(145deg, white, var(--color-purple-50));
+  background: linear-gradient(145deg, var(--color-surface), var(--color-purple-50));
   color: var(--color-purple-800);
 }
 
@@ -208,30 +208,30 @@
       transparent 0.3rem,
       transparent 0.6rem
     ),
-    #f6f2f5;
-  color: #756b74;
+    var(--color-purple-50);
+  color: var(--color-disabled-text);
 }
 
 .dayOff {
   border-color: rgb(var(--color-gold-600-rgb) / 0.24);
   background: var(--color-gold-100);
-  color: #72500f;
+  color: var(--color-gold-text);
 }
 
 .dayUnavailable,
 .dayOutsideWindow {
   border-color: transparent;
   background: transparent;
-  color: #9c949a;
+  color: var(--color-disabled-text);
   opacity: 0.58;
 }
 
 .dayLoading {
   background: linear-gradient(
     100deg,
-    rgba(242, 227, 242, 0.55) 20%,
-    rgba(255, 255, 255, 0.92) 42%,
-    rgba(242, 227, 242, 0.55) 64%
+    rgb(var(--color-purple-100-rgb) / 0.55) 20%,
+    rgb(var(--color-surface-rgb) / 0.92) 42%,
+    rgb(var(--color-purple-100-rgb) / 0.55) 64%
   );
   background-size: 220% 100%;
   animation: calendar-loading 1.3s ease-in-out infinite;
@@ -273,7 +273,7 @@
 }
 
 .legendFull {
-  background: #d7d0d5;
+  background: var(--color-disabled-surface);
 }
 
 .legendDayOff {
@@ -306,7 +306,7 @@
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--color-purple-600);
   border-radius: var(--radius-small);
-  background: white;
+  background: var(--color-surface);
   color: var(--color-purple-800);
   align-items: center;
   cursor: pointer;
@@ -323,8 +323,8 @@
 }
 
 .calendarError {
-  border-left-color: #a52b3d;
-  background: #fff2f3;
+  border-left-color: var(--color-danger);
+  background: var(--color-danger-surface);
 }
 
 @keyframes calendar-loading {

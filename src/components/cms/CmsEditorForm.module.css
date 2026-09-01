@@ -89,7 +89,7 @@
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--color-line-strong);
   border-radius: 0.62rem;
-  background: white;
+  background: var(--color-surface);
   font-size: var(--fs-sm);
   font-weight: 500;
 }
@@ -162,7 +162,7 @@
   padding: 0.5rem 0.8rem;
   border: 1px solid var(--color-line-strong);
   border-radius: 0.58rem;
-  background: white;
+  background: var(--color-surface);
   color: var(--color-purple-800);
   font-size: var(--fs-sm);
   font-weight: 800;
@@ -196,7 +196,7 @@
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--color-line-strong);
   border-radius: 0.55rem;
-  background: white;
+  background: var(--color-surface);
 }
 
 .saveBar {
@@ -227,7 +227,7 @@
   border: 1px solid var(--color-purple-700);
   border-radius: 0.62rem;
   background: linear-gradient(135deg, var(--color-purple-500), var(--color-purple-700));
-  color: white;
+  color: var(--color-on-brand);
   font-size: var(--fs-sm);
   font-weight: 800;
 }
@@ -252,13 +252,13 @@
 }
 
 .success {
-  background: #eaf5e7;
-  color: #2f6d31 !important;
+  background: var(--color-success-surface);
+  color: var(--color-success) !important;
 }
 
 .error {
-  background: #fdebee;
-  color: #9f2c36 !important;
+  background: var(--color-danger-surface);
+  color: var(--color-danger) !important;
 }
 
 .readOnly {
@@ -279,12 +279,12 @@
   padding: 1rem;
   border: 1px solid var(--color-line);
   border-radius: 0.75rem;
-  background: #fff;
+  background: var(--color-surface);
   box-shadow: 0 0.6rem 1.5rem rgb(var(--color-purple-950-rgb) / 0.04);
 }
 
 .seoPreview span {
-  color: #27633a;
+  color: var(--color-success);
   font-size: var(--fs-sm);
 }
 

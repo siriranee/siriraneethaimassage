@@ -39,19 +39,19 @@
 }
 
 .outline {
-  border-color: rgba(255, 255, 255, 0.34);
-  background: rgba(255, 255, 255, 0.04);
-  color: white;
+  border-color: rgb(var(--color-surface-rgb) / 0.34);
+  background: rgb(var(--color-surface-rgb) / 0.04);
+  color: var(--color-on-brand);
 }
 
 .outline:hover {
   border-color: var(--color-gold-400);
-  background: rgba(255, 255, 255, 0.09);
+  background: rgb(var(--color-surface-rgb) / 0.09);
 }
 
 .light {
   border-color: var(--color-line-strong);
-  background: white;
+  background: var(--color-surface);
   color: var(--color-purple-800);
 }
 

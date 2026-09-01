@@ -50,7 +50,7 @@
   height: 2.85rem;
   border: 1px solid rgb(var(--color-purple-800-rgb) / 0.16);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.76);
+  background: rgb(var(--color-surface-rgb) / 0.76);
   color: var(--color-purple-700);
   flex: 0 0 auto;
   place-items: center;

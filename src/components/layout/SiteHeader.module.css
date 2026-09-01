@@ -10,7 +10,7 @@
     rgb(var(--color-purple-950-rgb) / 0.99)
   );
   box-shadow: 0 0.5rem 2rem rgb(var(--color-purple-950-rgb) / 0.28);
-  color: white;
+  color: var(--color-on-brand);
 }
 
 .mainBar {
@@ -46,7 +46,7 @@
   min-height: 2.75rem;
   align-items: center;
   padding-block: 1.1rem;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgb(var(--color-surface-rgb) / 0.78);
   font-size: var(--fs-sm);
   font-weight: 700;
   white-space: nowrap;
@@ -95,7 +95,7 @@
   place-items: center;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgb(var(--color-surface-rgb) / 0.78);
 }
 
 .treatmentsToggle:hover,
@@ -146,7 +146,7 @@
   align-items: center;
   padding: 0.65rem 0.75rem;
   border-radius: 0.45rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgb(var(--color-surface-rgb) / 0.8);
   font-size: var(--fs-sm);
   font-weight: 700;
   line-height: 1.35;
@@ -162,9 +162,9 @@
 
 .treatmentsDropdown .allTreatmentsLink {
   margin-bottom: 0.35rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgb(var(--color-surface-rgb) / 0.1);
   border-radius: 0.45rem 0.45rem 0 0;
-  color: white;
+  color: var(--color-on-brand);
 }
 
 .actions {
@@ -208,14 +208,14 @@
   height: 2.9rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.2);
   border-radius: var(--radius-small);
-  background: rgba(255, 255, 255, 0.05);
-  color: white;
+  background: rgb(var(--color-surface-rgb) / 0.05);
+  color: var(--color-on-brand);
 }
 
 .menuButton[aria-expanded="true"] {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: rgb(var(--color-surface-rgb) / 0.18);
   background: transparent;
 }
 
@@ -224,7 +224,7 @@
   inset: 0;
   z-index: 101;
   border: 0;
-  background: rgba(0, 0, 0, 0.52);
+  background: rgb(var(--color-shadow-rgb) / 0.52);
   opacity: 0;
   overscroll-behavior: none;
   pointer-events: none;
@@ -252,7 +252,7 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
   background: linear-gradient(155deg, var(--color-purple-800), var(--color-purple-950));
-  box-shadow: -1.5rem 0 4rem rgba(0, 0, 0, 0.34);
+  box-shadow: -1.5rem 0 4rem rgb(var(--color-shadow-rgb) / 0.34);
   clip-path: inset(0 0 0 100%);
   opacity: 0;
   pointer-events: none;
@@ -279,7 +279,7 @@
   justify-content: flex-end;
   padding-top: 0.35rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgb(var(--color-surface-rgb) / 0.12);
 }
 
 .mobileNav {
@@ -292,8 +292,8 @@
   min-height: 2.75rem;
   align-items: center;
   padding: 0.9rem 0.35rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.83);
+  border-bottom: 1px solid rgb(var(--color-surface-rgb) / 0.08);
+  color: rgb(var(--color-surface-rgb) / 0.83);
   font-family: var(--font-display);
   font-size: var(--fs-lg);
   font-weight: 700;
@@ -308,7 +308,7 @@
 }
 
 .mobileTreatments > a span {
-  color: rgba(255, 255, 255, 0.55);
+  color: rgb(var(--color-surface-rgb) / 0.55);
   font-family: var(--font-body);
   font-size: var(--fs-sm);
   font-weight: 800;
@@ -321,7 +321,7 @@
   gap: 0.1rem;
   margin: 0;
   padding: 0.35rem 0 0.6rem 0.8rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgb(var(--color-surface-rgb) / 0.08);
   list-style: none;
 }
 
@@ -330,7 +330,7 @@
   padding: 0.55rem 0.7rem;
   border-bottom: 0;
   border-left: 1px solid rgb(var(--color-gold-400-rgb) / 0.26);
-  color: rgba(255, 255, 255, 0.68);
+  color: rgb(var(--color-surface-rgb) / 0.68);
   font-family: var(--font-body);
   font-size: var(--fs-sm);
   font-weight: 700;
@@ -357,9 +357,9 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.16);
   border-radius: var(--radius-small);
-  color: rgba(255, 255, 255, 0.82);
+  color: rgb(var(--color-surface-rgb) / 0.82);
   font-size: var(--fs-sm);
   font-weight: 750;
 }

@@ -11,7 +11,7 @@
   align-items: center;
   gap: 0.45rem;
   padding: 0.55rem 0.9rem;
-  border: 1px solid #9b6500;
+  border: 1px solid var(--color-warning);
   border-radius: 0.65rem;
   background: var(--color-gold-500);
   color: var(--color-purple-950);
@@ -34,7 +34,7 @@
 
 .wrap .secondary {
   border-color: var(--color-line-strong);
-  background: white;
+  background: var(--color-surface);
   color: var(--color-purple-800);
   box-shadow: none;
 }
@@ -57,11 +57,11 @@
 }
 
 .success {
-  background: #eaf5e7;
-  color: #2f6d31;
+  background: var(--color-success-surface);
+  color: var(--color-success);
 }
 
 .error {
-  background: #fdebee;
-  color: #9f2c36;
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
 }

@@ -93,7 +93,7 @@
 }
 
 .expiredHold {
-  color: #8a3d12 !important;
+  color: var(--color-warning) !important;
   font-weight: 800;
 }
 
@@ -344,7 +344,7 @@
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--color-line-strong);
   border-radius: 0.6rem;
-  background: white;
+  background: var(--color-surface);
 }
 
 .searchForm button {
@@ -354,7 +354,7 @@
   border: 1px solid var(--color-purple-700);
   border-radius: 0.6rem;
   background: var(--color-purple-700);
-  color: white;
+  color: var(--color-on-brand);
   font-size: var(--fs-sm);
   font-weight: 800;
 }

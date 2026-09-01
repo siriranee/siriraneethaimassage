@@ -5,7 +5,7 @@
   aspect-ratio: 3 / 1;
   overflow: hidden;
   background: var(--color-purple-950);
-  color: white;
+  color: var(--color-on-brand);
 }
 
 .media,
@@ -54,25 +54,25 @@
   font-size: var(--fs-sm);
   font-weight: 800;
   letter-spacing: 0.08em;
-  text-shadow: 0 2px 1rem rgba(0, 0, 0, 0.42);
+  text-shadow: 0 2px 1rem rgb(var(--color-shadow-rgb) / 0.42);
   text-transform: uppercase;
 }
 
 .title {
   margin-bottom: 0.9rem;
-  color: white;
+  color: var(--color-on-brand);
   font-size: var(--fs-5xl);
-  text-shadow: 0 3px 1.4rem rgba(0, 0, 0, 0.58);
+  text-shadow: 0 3px 1.4rem rgb(var(--color-shadow-rgb) / 0.58);
   text-wrap: balance;
 }
 
 .description {
   width: min(49rem, 100%);
   margin: 0 auto;
-  color: rgba(255, 255, 255, 0.88);
+  color: rgb(var(--color-surface-rgb) / 0.88);
   font-size: var(--fs-md);
   line-height: 1.55;
-  text-shadow: 0 2px 1rem rgba(0, 0, 0, 0.7);
+  text-shadow: 0 2px 1rem rgb(var(--color-shadow-rgb) / 0.7);
   text-wrap: balance;
 }
 

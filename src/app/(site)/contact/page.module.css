@@ -82,7 +82,7 @@
   position: relative;
   z-index: 1;
   margin: 0;
-  color: rgba(255, 252, 249, 0.76);
+  color: rgb(var(--color-on-brand-rgb) / 0.76);
   font-size: var(--fs-sm);
 }
 
@@ -106,7 +106,7 @@
   padding: 0.9rem 1rem;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-small);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgb(var(--color-surface-rgb) / 0.78);
 }
 
 .requestDetails > div:last-child:nth-child(odd) {
@@ -197,7 +197,7 @@
 .requestTertiary {
   color: var(--color-muted);
   text-decoration: underline;
-  text-decoration-color: rgba(109, 100, 113, 0.45);
+  text-decoration-color: rgb(var(--color-muted-rgb) / 0.45);
   text-underline-offset: 0.2rem;
 }
 
@@ -237,7 +237,7 @@
   padding: clamp(1.45rem, 3vw, 2.2rem);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-large);
-  background: rgba(255, 255, 255, 0.8);
+  background: rgb(var(--color-surface-rgb) / 0.8);
   box-shadow: 0 1rem 3rem rgb(var(--color-purple-950-rgb) / 0.07);
   align-items: flex-start;
   flex-direction: column;
@@ -247,7 +247,7 @@
   border-color: rgb(var(--color-gold-500-rgb) / 0.36);
   background:
     radial-gradient(circle at 110% 110%, rgb(var(--color-gold-500-rgb) / 0.15), transparent 56%),
-    rgba(255, 255, 255, 0.84);
+    rgb(var(--color-surface-rgb) / 0.84);
 }
 
 .iconWrap {
@@ -421,7 +421,7 @@
 
 .actionBar > div > p:not(.cardLabel) {
   margin: 0;
-  color: rgba(255, 252, 249, 0.7);
+  color: rgb(var(--color-on-brand-rgb) / 0.7);
   font-size: var(--fs-sm);
 }
 
@@ -452,7 +452,7 @@
 }
 
 .instagramAction {
-  border: 1px solid rgba(255, 255, 255, 0.26);
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.26);
   color: var(--color-cream);
 }
 

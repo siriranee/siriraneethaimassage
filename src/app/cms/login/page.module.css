@@ -17,7 +17,7 @@
     radial-gradient(circle at 15% 22%, rgb(var(--color-purple-600-rgb) / 0.62), transparent 22rem),
     radial-gradient(circle at 85% 78%, rgb(var(--color-gold-500-rgb) / 0.14), transparent 17rem),
     linear-gradient(150deg, var(--color-purple-800), var(--color-purple-900) 62%, var(--color-purple-950));
-  color: white;
+  color: var(--color-on-brand);
 }
 
 .brandPanel::after {
@@ -49,7 +49,7 @@
 }
 
 .brandTop > span {
-  color: rgba(255, 255, 255, 0.58);
+  color: rgb(var(--color-surface-rgb) / 0.58);
   font-size: var(--fs-sm);
   font-weight: 800;
   letter-spacing: 0.11em;
@@ -79,18 +79,18 @@
 
 .brandCopy h1 {
   margin-bottom: 1.2rem;
-  color: white;
+  color: var(--color-on-brand);
   font-size: var(--fs-5xl);
 }
 
 .brandCopy p {
   margin: 0;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgb(var(--color-surface-rgb) / 0.7);
   font-size: var(--fs-base);
 }
 
 .brandPanel > small {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgb(var(--color-surface-rgb) / 0.5);
   font-size: var(--fs-sm);
 }
 
@@ -108,7 +108,7 @@
   padding: clamp(1.4rem, 4vw, 2.2rem);
   border: 1px solid var(--color-line);
   border-radius: 1.2rem;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgb(var(--color-surface-rgb) / 0.92);
   box-shadow: var(--shadow-card);
 }
 
