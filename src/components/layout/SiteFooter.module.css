@@ -136,18 +136,16 @@
 }
 
 .bottomMeta a {
-  color: rgb(var(--color-surface-rgb) / 0.78);
-  font-weight: 750;
-  text-decoration: underline;
-  text-decoration-color: rgb(var(--color-gold-500-rgb) / 0.5);
-  text-underline-offset: 0.25rem;
-  transition: color 160ms ease, text-decoration-color 160ms ease;
+  color: rgb(var(--color-surface-rgb) / 0.68);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 160ms ease;
   white-space: nowrap;
 }
 
 .bottomMeta a:hover {
   color: var(--color-gold-400);
-  text-decoration-color: currentColor;
+  text-decoration: none;
 }
 
 @media (max-width: 1100px) {
