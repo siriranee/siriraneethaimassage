@@ -1,0 +1,93 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  box-shadow: 0 0.7rem 2rem rgb(var(--color-purple-950-rgb) / 0.05);
+}
+
+.cardTop {
+  display: flex;
+  min-height: 1.8rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.cardTop > span:first-child {
+  color: var(--color-purple-600);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.imageFrame {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  place-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: var(--color-purple-50);
+}
+
+.imageFrame img {
+  padding: 0.45rem;
+  object-fit: contain;
+}
+
+.imageFrame span {
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.card h2 {
+  margin: 0;
+  color: var(--color-purple-900);
+  font-size: var(--fs-lg);
+}
+
+.card > a {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 2.55rem;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: auto;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.55rem;
+  background: var(--color-purple-50);
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.card > a svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

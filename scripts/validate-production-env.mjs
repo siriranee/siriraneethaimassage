@@ -190,6 +190,63 @@ if (mediaReadyValue === "true") {
   }
 }
 
+const resendEnvironmentNames = [
+  "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
+  "RESEND_BOOKING_TO_EMAIL",
+];
+const resendEnvironment = Object.fromEntries(
+  resendEnvironmentNames.map((name) => [name, process.env[name]?.trim() ?? ""]),
+);
+const configuredResendNames = resendEnvironmentNames.filter(
+  (name) => resendEnvironment[name],
+);
+
+if (
+  configuredResendNames.length > 0 &&
+  configuredResendNames.length < resendEnvironmentNames.length
+) {
+  const missing = resendEnvironmentNames.filter(
+    (name) => !resendEnvironment[name],
+  );
+  console.error(
+    `Hosted build blocked: incomplete Resend booking-email configuration. Missing: ${missing.join(", ")}.`,
+  );
+  process.exit(1);
+}
+
+let resendReady = false;
+if (configuredResendNames.length === resendEnvironmentNames.length) {
+  const invalid = [];
+  const emailPattern = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+  const fromMatch = resendEnvironment.RESEND_FROM_EMAIL.match(
+    /^([^<>\r\n]{1,100})<([^<>]+)>$/,
+  );
+  const validFrom =
+    emailPattern.test(resendEnvironment.RESEND_FROM_EMAIL) ||
+    Boolean(fromMatch?.[1]?.trim() && emailPattern.test(fromMatch[2].trim()));
+
+  if (!/^re_[a-z0-9_-]{8,}$/i.test(resendEnvironment.RESEND_API_KEY)) {
+    invalid.push("RESEND_API_KEY");
+  }
+  if (
+    !validFrom
+  ) {
+    invalid.push("RESEND_FROM_EMAIL");
+  }
+  if (!emailPattern.test(resendEnvironment.RESEND_BOOKING_TO_EMAIL)) {
+    invalid.push("RESEND_BOOKING_TO_EMAIL");
+  }
+
+  if (invalid.length) {
+    console.error(
+      `Hosted build blocked: invalid Resend booking-email configuration: ${invalid.join(", ")}.`,
+    );
+    process.exit(1);
+  }
+  resendReady = true;
+}
+
 const readyValue = process.env.CMS_PUBLIC_BOOKING_READY?.trim().toLowerCase() ?? "";
 if (readyValue && !["true", "false"].includes(readyValue)) {
   console.error(
@@ -223,6 +280,12 @@ if (readyValue === "true") {
     );
     process.exit(1);
   }
+  if (!resendReady) {
+    console.error(
+      "Hosted build blocked: live public booking requires complete Resend owner-email configuration.",
+    );
+    process.exit(1);
+  }
 }
 
 console.log(
@@ -230,5 +293,7 @@ console.log(
     mediaReadyValue === "true" ? "ready gate enabled" : "disabled"
   }; public booking: ${
     readyValue === "true" ? "ready gate enabled" : "disabled"
+  }; owner booking email: ${
+    resendReady ? "configured" : "disabled"
   }.`,
 );

@@ -56,19 +56,18 @@ The current application uses:
 - cmsBookingDayLocks
 - cmsMediaAssets
 
-TTL indexes may remove expired sessions, login attempts and booking holds. A
-logical backup is therefore a point-in-time operational snapshot, not a
-permanent history of expired records.
+TTL indexes may remove expired sessions, login attempts and booking holds.
+Audit events are retained for 365 days from creation and then expire through a
+TTL index. A logical backup is therefore a point-in-time operational snapshot,
+not a permanent history of expired records.
 
-The cmsMediaAssets collection deliberately has no TTL index. Expired staged
-records retain the ownership evidence needed for safe, idempotent provider
-cleanup. Committed records also protect assets referenced by current content and
-immutable publication history.
-
-Cleanup is intentionally two-phase while a signed Cloudinary upload request can
-still be replayed. The first pass removes the current provider asset and retains
-a `deleting` tombstone; a later pass after the provider-signature safety window
-performs the final sweep and marks the registry record deleted.
+The cmsMediaAssets collection deliberately has no TTL index. Incomplete records
+retain the ownership evidence needed for safe, idempotent provider cleanup, and
+committed records protect assets referenced by current content and immutable
+publication history. Failed content saves attempt immediate rollback. There is
+no scheduled or batch cleanup API, so an interrupted browser or network session
+must be reconciled with Cloudinary as an operator recovery task. Preserve any
+`deleting` tombstone until the signed provider request can no longer be replayed.
 
 ## Create a logical backup
 
@@ -155,17 +154,20 @@ collide with a restored account.
 3. Compare collection counts with the backup manifest.
 4. Confirm cmsMeta/current-publication points to an existing publication.
 5. Sign in with the restore-only administrator username and password.
-6. Open the dashboard, services, page SEO, promotions, media, settings,
-   bookings, calendar, notification preview and audit pages.
+6. Open the dashboard, services, vouchers, settings, bookings, calendar, admin
+   and audit pages.
 7. Verify at least one encrypted booking can be opened with the recovered key.
 8. Verify a missing or incorrect key fails closed rather than exposing data.
-9. Confirm published services, prices, page copy, promotions, gallery metadata,
-   business information and site navigation match the restored publication.
+9. Confirm published services, prices, promotions, vouchers, business
+   information and site navigation match the restored publication. Confirm the
+   source-controlled page copy, home hero and site gallery match the deployed
+   source revision.
 10. Compare committed cmsMediaAssets records with every current and historical
     content reference, then verify a sample from each image scope resolves from
     the original Cloudinary account.
-11. Confirm expired staged records can be cleaned without deleting committed or
-    publication-referenced assets.
+11. Confirm a failed content save rolls its staged uploads back without deleting
+    committed or publication-referenced assets. Reconcile any incomplete staged
+    records left by an interrupted session directly against Cloudinary.
 12. Run npm.cmd run check.
 13. Start the isolated application and run npm.cmd run test:rendered.
 14. Confirm public booking and CMS media uploads remain disabled and no

@@ -4,18 +4,18 @@ import {
   CalendarDays,
   ClipboardList,
   ExternalLink,
-  FileImage,
-  FileText,
   Gift,
   LayoutDashboard,
   LogOut,
+  Menu,
   Settings,
   ShieldCheck,
   Sparkles,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { canCmsRole, getCmsRoleLabel } from "@/domain/cms/permissions";
 import type { CmsNotificationBellItem, CmsRole } from "@/domain/cms/types";
@@ -41,8 +41,6 @@ const navigation = [
   { href: "/cms/calendar", label: "Calendar", icon: CalendarDays, permission: "calendar:view" },
   { href: "/cms/services", label: "Services", icon: Sparkles, permission: "content:view" },
   { href: "/cms/vouchers", label: "Vouchers", icon: Gift, permission: "content:view" },
-  { href: "/cms/pages", label: "Pages", icon: FileText, permission: "content:view" },
-  { href: "/cms/media", label: "Media", icon: FileImage, permission: "content:view" },
   { href: "/cms/settings", label: "Settings", icon: Settings, permission: "settings:view" },
   { href: "/cms/admin", label: "Admin", icon: ShieldCheck, permission: "users:manage" },
 ] as const;
@@ -54,11 +52,37 @@ function isActivePath(pathname: string, href: string) {
 export function CmsShell({ children, mode, notifications, user }: CmsShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const [drawerPath, setDrawerPath] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const drawerOpen = drawerPath === pathname;
   const allowedNavigation = navigation.filter((item) =>
     canCmsRole(user.role, item.permission),
   );
   const canViewNotifications = canCmsRole(user.role, "bookings:view");
+  const currentSection = allowedNavigation.find((item) =>
+    isActivePath(pathname, item.href),
+  )?.label ?? "Admin workspace";
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+
+    function closeFromKeyboard(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setDrawerPath(null);
+      menuButtonRef.current?.focus();
+    }
+
+    document.addEventListener("keydown", closeFromKeyboard);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeFromKeyboard);
+    };
+  }, [drawerOpen]);
 
   async function logOut() {
     setLoggingOut(true);
@@ -88,10 +112,81 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
         />
       ) : null}
 
-      <aside className={styles.sidebar}>
-        <Link aria-label="Siriranee CMS overview" className={styles.brand} href="/cms">
-          <BrandMark />
-        </Link>
+      <header className={styles.topbar}>
+        <div className={styles.topbarPrimary}>
+          <button
+            aria-controls="cms-navigation-drawer"
+            aria-expanded={drawerOpen}
+            aria-label="Open CMS navigation"
+            className={styles.menuButton}
+            onClick={() => setDrawerPath(pathname)}
+            ref={menuButtonRef}
+            type="button"
+          >
+            <Menu aria-hidden="true" />
+          </button>
+          <Link aria-label="Siriranee CMS overview" className={styles.topbarBrand} href="/cms">
+            <BrandMark compact />
+          </Link>
+          <div className={styles.topbarTitle}>
+            <span>Siriranee CMS</span>
+            <strong>{currentSection}</strong>
+          </div>
+        </div>
+        <div className={styles.topbarActions}>
+          <Link aria-label="View website in a new tab" href="/" rel="noreferrer" target="_blank">
+            <ExternalLink aria-hidden="true" />
+          </Link>
+          <button
+            aria-label={loggingOut ? "Signing out" : "Sign out"}
+            disabled={loggingOut}
+            onClick={logOut}
+            type="button"
+          >
+            <LogOut aria-hidden="true" />
+          </button>
+          {canViewNotifications ? (
+            <CmsNotificationBell items={notifications} placement="mobile" />
+          ) : null}
+        </div>
+      </header>
+
+      <button
+        aria-label="Close CMS navigation"
+        className={styles.backdrop}
+        hidden={!drawerOpen}
+        onClick={() => {
+          setDrawerPath(null);
+          menuButtonRef.current?.focus();
+        }}
+        tabIndex={-1}
+        type="button"
+      />
+
+      <aside
+        aria-label="CMS navigation drawer"
+        className={styles.sidebar}
+        data-open={drawerOpen}
+        id="cms-navigation-drawer"
+        inert={!drawerOpen}
+      >
+        <div className={styles.drawerHeader}>
+          <Link aria-label="Siriranee CMS overview" className={styles.brand} href="/cms">
+            <BrandMark />
+          </Link>
+          <button
+            aria-label="Close CMS navigation"
+            className={styles.closeButton}
+            onClick={() => {
+              setDrawerPath(null);
+              menuButtonRef.current?.focus();
+            }}
+            ref={closeButtonRef}
+            type="button"
+          >
+            <X aria-hidden="true" />
+          </button>
+        </div>
 
         <div className={styles.workspaceLabel}>
           <span>Content & bookings</span>
@@ -103,7 +198,7 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
             const active = isActivePath(pathname, href);
 
             return (
-              <Link aria-current={active ? "page" : undefined} className={active ? styles.activeNav : undefined} href={href} key={href}>
+              <Link aria-current={active ? "page" : undefined} className={active ? styles.activeNav : undefined} href={href} key={href} onClick={() => setDrawerPath(null)}>
                 <Icon aria-hidden="true" />
                 <span>{label}</span>
               </Link>
@@ -145,45 +240,6 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
             <span>Fictional data only. Changes reset when the server restarts.</span>
           </div>
         ) : null}
-
-        <header className={styles.mobileHeader}>
-          <Link aria-label="Siriranee CMS overview" href="/cms">
-            <BrandMark compact />
-          </Link>
-          <div className={styles.mobileActions}>
-            <span>Admin workspace</span>
-            <Link
-              aria-label="View website in a new tab"
-              href="/"
-              rel="noreferrer"
-              target="_blank"
-            >
-              <ExternalLink aria-hidden="true" />
-            </Link>
-            <button
-              aria-label={loggingOut ? "Signing out" : "Sign out"}
-              disabled={loggingOut}
-              onClick={logOut}
-              type="button"
-            >
-              <LogOut aria-hidden="true" />
-            </button>
-            {canViewNotifications ? (
-              <CmsNotificationBell items={notifications} placement="mobile" />
-            ) : null}
-          </div>
-        </header>
-
-        <nav aria-label="CMS mobile navigation" className={styles.mobileNavigation}>
-          {allowedNavigation.map(({ href, label }) => {
-            const active = isActivePath(pathname, href);
-            return (
-              <Link aria-current={active ? "page" : undefined} className={active ? styles.activeMobileNav : undefined} href={href} key={href}>
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
 
         <main className={styles.main} id="cms-main">
           {children}

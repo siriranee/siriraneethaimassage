@@ -173,17 +173,12 @@ export function collectCmsScopedMediaReferences(
     }
   }
 
-  for (const item of content.gallery ?? []) {
-    if (typeof item.imageUrl === "string" && item.imageUrl) {
-      references.push({ scope: "site-gallery", secureUrl: item.imageUrl });
-    }
-  }
-
-  for (const page of content.pages ?? []) {
-    for (const slide of page.heroSlides ?? []) {
-      if (typeof slide.imageUrl === "string" && slide.imageUrl) {
-        references.push({ scope: "home-hero", secureUrl: slide.imageUrl });
-      }
+  for (const voucher of content.vouchers ?? []) {
+    if (typeof voucher.imageUrl === "string" && voucher.imageUrl) {
+      references.push({
+        scope: "voucher-image",
+        secureUrl: voucher.imageUrl,
+      });
     }
   }
 

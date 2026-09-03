@@ -4,50 +4,20 @@ import type { Metadata } from "next";
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { galleryImages } from "@/content/gallery";
+import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
-import { getPublicGallery, getPublicPageCopy } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPublicPageCopy("gallery");
+  const page = getPageCopy("gallery");
   return createMetadata({ title: page.seoTitle, description: page.seoDescription, path: "/gallery" });
 }
 
-const fallbackGalleryImages = [
-  {
-    src: "/images/spa/hero-massage.webp",
-    alt: "Relaxing massage treatment in a softly lit spa setting",
-    caption: "Time set aside for calm",
-  },
-  {
-    src: "/images/spa/aromatherapy-oil.webp",
-    alt: "Warm massage oils arranged beside spa towels",
-    caption: "Warm oils and considered details",
-  },
-  {
-    src: "/images/spa/deep-tissue-massage.webp",
-    alt: "Illustrative deep tissue massage in warm ambient light",
-    caption: "Focused, comfort-led pressure",
-  },
-  {
-    src: "/images/spa/traditional-thai-massage.webp",
-    alt: "Traditional Thai massage treatment in progress",
-    caption: "Thai-inspired care",
-  },
-  {
-    src: "/images/spa/spa-still-life.webp",
-    alt: "Spa towels, massage oils, stones and flowers",
-    caption: "A warm, unhurried atmosphere",
-  },
-] as const;
-
-export default async function GalleryPage() {
-  const [publishedImages, pageCopy] = await Promise.all([getPublicGallery(), getPublicPageCopy("gallery")]);
-  const galleryImages = publishedImages.length
-    ? publishedImages
-    : fallbackGalleryImages.map((image, index) => ({ id: `fallback-${index}`, ...image }));
+export default function GalleryPage() {
+  const pageCopy = getPageCopy("gallery");
 
   return (
     <div>

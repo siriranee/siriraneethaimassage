@@ -1,12 +1,10 @@
-import type { CmsPageHeroSlide } from "@/domain/cms/page-hero";
 import type { CmsServiceGalleryImage } from "@/domain/cms/service-gallery";
 import type { CmsServiceHero } from "@/domain/cms/service-hero";
 
 export type { CmsServiceGalleryImage } from "@/domain/cms/service-gallery";
-export type { CmsPageHeroSlide } from "@/domain/cms/page-hero";
 export type { CmsServiceHero } from "@/domain/cms/service-hero";
 
-export const CMS_CONTENT_SCHEMA_VERSION = 6 as const;
+export const CMS_CONTENT_SCHEMA_VERSION = 7 as const;
 
 export const cmsRoles = ["administrator", "staff"] as const;
 export type CmsRole = (typeof cmsRoles)[number];
@@ -14,8 +12,7 @@ export type CmsRole = (typeof cmsRoles)[number];
 export const cmsMediaScopes = [
   "service-cover",
   "service-gallery",
-  "home-hero",
-  "site-gallery",
+  "voucher-image",
 ] as const;
 export type CmsMediaScope = (typeof cmsMediaScopes)[number];
 
@@ -191,56 +188,17 @@ export type CmsPromotionRecord = {
 export type CmsVoucherRecord = {
   readonly id: string;
   readonly title: string;
-  readonly description: string;
-  readonly amountCents: number;
-  readonly badge: string;
-  readonly terms: string;
+  readonly imageUrl: string;
+  readonly imageAlt: string;
   readonly status: "draft" | "published" | "archived";
   readonly sortOrder: number;
   readonly version: number;
   readonly updatedAt: string;
 };
 
-export type CmsGalleryRecord = {
-  readonly id: string;
-  readonly imageUrl: string;
-  readonly altText: string;
-  readonly caption: string;
-  readonly published: boolean;
-  readonly sortOrder: number;
-  readonly version: number;
-  readonly updatedAt: string;
-};
-
-export const cmsPageIds = [
-  "home",
-  "services",
-  "book",
-  "about",
-  "contact",
-  "visit",
-  "privacy",
-  "promotions",
-  "gallery",
-  "therapists",
-] as const;
-export type CmsPageId = (typeof cmsPageIds)[number];
-
-export type CmsPageRecord = {
-  readonly id: CmsPageId;
-  readonly eyebrow: string;
-  readonly title: string;
-  readonly description: string;
-  readonly seoTitle: string;
-  readonly seoDescription: string;
-  readonly heroSlides?: readonly CmsPageHeroSlide[];
-  readonly version: number;
-  readonly updatedAt: string;
-};
-
 export type CmsContentState = {
   readonly id: "siriranee-content";
-  readonly schemaVersion: 1 | 2 | 3 | 4 | 5 | 6;
+  readonly schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   readonly revision: number;
   readonly services: readonly CmsServiceRecord[];
   readonly site: CmsSiteSettings;
@@ -248,8 +206,6 @@ export type CmsContentState = {
   readonly team: readonly CmsTeamRecord[];
   readonly promotions: readonly CmsPromotionRecord[];
   readonly vouchers?: readonly CmsVoucherRecord[];
-  readonly gallery: readonly CmsGalleryRecord[];
-  readonly pages?: readonly CmsPageRecord[];
   readonly updatedAt: string;
   readonly updatedBy: string;
 };
@@ -416,9 +372,24 @@ export type CmsBookingNotification = {
   readonly bookingId: string;
   readonly bookingReference: string;
   readonly channel: CmsNotificationChannel;
+  readonly audience?: "customer" | "owner";
   readonly kind: CmsNotificationKind;
-  readonly status: "preview" | "queued" | "sent" | "failed";
+  readonly status:
+    | "preview"
+    | "queued"
+    | "sending"
+    | "sent"
+    | "failed"
+    | "indeterminate";
+  readonly provider?: "resend";
+  readonly providerMessageId?: string;
   readonly attemptCount: number;
+  readonly firstAttemptedAt?: string;
+  readonly attemptedAt?: string;
+  readonly sentAt?: string;
+  readonly deliveryClaimId?: string;
+  readonly deliveryClaimedAt?: string;
+  readonly deliveryPayloadHash?: string;
   readonly lastError: string;
   readonly createdAt: string;
   readonly updatedAt: string;

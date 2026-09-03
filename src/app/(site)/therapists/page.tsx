@@ -9,20 +9,16 @@ import type { Metadata } from "next";
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
-import {
-  getPublicPageCopy,
-  getPublicTeam,
-} from "@/server/cms/public-adapter";
+import { getPublicTeam } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [page, teamMembers] = await Promise.all([
-    getPublicPageCopy("therapists"),
-    getPublicTeam(),
-  ]);
+  const page = getPageCopy("therapists");
+  const teamMembers = await getPublicTeam();
 
   return createMetadata({
     title: page.seoTitle,
@@ -60,10 +56,8 @@ function getInitials(name: string) {
 }
 
 export default async function TherapistsPage() {
-  const [teamMembers, pageCopy] = await Promise.all([
-    getPublicTeam(),
-    getPublicPageCopy("therapists"),
-  ]);
+  const pageCopy = getPageCopy("therapists");
+  const teamMembers = await getPublicTeam();
 
   return (
     <div>

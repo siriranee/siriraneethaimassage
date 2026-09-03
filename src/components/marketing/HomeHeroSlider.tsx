@@ -5,8 +5,10 @@ import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { defaultHomeHeroSlides } from "@/content/home-hero";
-import type { CmsPageHeroSlide } from "@/domain/cms/page-hero";
+import {
+  defaultHomeHeroSlides,
+  type HomeHeroSlide,
+} from "@/content/home-hero";
 
 import styles from "./HomeHeroSlider.module.css";
 
@@ -18,7 +20,7 @@ type HomeHeroSliderProps = {
   eyebrow: string;
   title: string;
   description: string;
-  slides?: readonly CmsPageHeroSlide[];
+  slides?: readonly HomeHeroSlide[];
 };
 
 function normaliseSlide(index: number, slideCount: number) {

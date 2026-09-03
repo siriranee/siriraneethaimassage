@@ -1,5 +1,7 @@
 import { MongoClient } from "mongodb";
 
+const auditRetentionDays = 365;
+
 const uri = process.env.MONGODB_URI?.trim();
 const dbName = process.env.MONGODB_DB?.trim() || "siriranee";
 
@@ -17,6 +19,7 @@ try {
   await client.connect();
   const db = client.db(dbName);
   const users = db.collection("cmsUsers");
+  const audit = db.collection("cmsAuditEvents");
   const usersCollectionExists = await db
     .listCollections({ name: "cmsUsers" }, { nameOnly: true })
     .hasNext();
@@ -40,6 +43,58 @@ try {
   if (obsoleteEmailIndex?.name) {
     await users.dropIndex(obsoleteEmailIndex.name);
     console.log("Removed obsolete CMS email login index.");
+  }
+
+  const auditBackfill = await audit.updateMany(
+    {
+      $expr: {
+        $ne: [{ $type: "$expiresAtDate" }, "date"],
+      },
+    },
+    [
+      {
+        $set: {
+          expiresAtDate: {
+            $dateAdd: {
+              startDate: {
+                $let: {
+                  vars: {
+                    parsedCreatedAt: {
+                      $convert: {
+                        input: "$createdAt",
+                        to: "date",
+                        onError: null,
+                        onNull: null,
+                      },
+                    },
+                  },
+                  in: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $ne: ["$$parsedCreatedAt", null] },
+                          { $lte: ["$$parsedCreatedAt", "$$NOW"] },
+                        ],
+                      },
+                      "$$parsedCreatedAt",
+                      "$$NOW",
+                    ],
+                  },
+                },
+              },
+              unit: "day",
+              amount: auditRetentionDays,
+            },
+          },
+        },
+      },
+    ],
+  );
+
+  if (auditBackfill.modifiedCount) {
+    console.log(
+      `Added one-year retention dates to ${auditBackfill.modifiedCount} CMS audit event${auditBackfill.modifiedCount === 1 ? "" : "s"}.`,
+    );
   }
 
   await Promise.all([
@@ -68,6 +123,10 @@ try {
     db.collection("cmsAuditEvents").createIndex(
       { createdAt: -1 },
       { name: "cms_audit_created_at" },
+    ),
+    db.collection("cmsAuditEvents").createIndex(
+      { expiresAtDate: 1 },
+      { name: "cms_audit_expiry_ttl", expireAfterSeconds: 0 },
     ),
     db.collection("cmsBookings").createIndex(
       { reference: 1 },
@@ -132,10 +191,6 @@ try {
         unique: true,
         partialFilterExpression: { providerAssetId: { $type: "string" } },
       },
-    ),
-    db.collection("cmsMediaAssets").createIndex(
-      { status: 1, expiresAt: 1 },
-      { name: "cms_media_status_expiry" },
     ),
     db.collection("cmsMediaAssets").createIndex(
       { secureUrl: 1 },

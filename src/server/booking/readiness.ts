@@ -3,6 +3,7 @@ import "server-only";
 import type { CmsContentState } from "@/domain/cms/types";
 import { getCmsMode } from "@/server/cms/config";
 import { hasCmsPiiEncryptionKey } from "@/server/cms/pii";
+import { getResendBookingEmailReadiness } from "@/server/booking/resend-booking-email";
 
 export function isLivePublicBookingReady(content: CmsContentState) {
   return (
@@ -11,7 +12,8 @@ export function isLivePublicBookingReady(content: CmsContentState) {
     content.bookingSettings.rulesConfirmed &&
     content.bookingSettings.publicBookingEnabled &&
     process.env.CMS_PUBLIC_BOOKING_READY === "true" &&
-    hasCmsPiiEncryptionKey()
+    hasCmsPiiEncryptionKey() &&
+    getResendBookingEmailReadiness().ready
   );
 }
 

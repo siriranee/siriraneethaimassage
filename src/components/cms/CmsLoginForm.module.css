@@ -117,6 +117,29 @@
   height: 1.15rem;
 }
 
+.rememberControl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  color: var(--color-ink);
+  align-items: start;
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  gap: 0.65rem;
+}
+
+.rememberControl input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0.16rem 0 0;
+  accent-color: var(--color-purple-700);
+}
+
+.rememberControl input:focus-visible {
+  outline: 0.18rem solid var(--color-gold-500);
+  outline-offset: 0.12rem;
+}
+
 .submitButton,
 .demoState button,
 .disabledState a {

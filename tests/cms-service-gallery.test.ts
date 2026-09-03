@@ -135,7 +135,7 @@ test("service gallery permits safe project paths and credential-free HTTPS URLs"
 });
 
 test("legacy gallery normalization is idempotent and preserves an intentional empty list", () => {
-  assert.equal(CMS_CONTENT_SCHEMA_VERSION, 6);
+  assert.ok(CMS_CONTENT_SCHEMA_VERSION >= 6);
 
   const migrated = normaliseStoredServiceGalleryImages(undefined, [validImage]);
   const migratedAgain = normaliseStoredServiceGalleryImages(migrated, [

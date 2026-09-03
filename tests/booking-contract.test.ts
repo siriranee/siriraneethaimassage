@@ -85,6 +85,7 @@ test("booking settings use the API response contract and gate public enablement"
   assert.match(readiness, /content\.bookingSettings\.publicBookingEnabled/);
   assert.match(readiness, /CMS_PUBLIC_BOOKING_READY/);
   assert.match(readiness, /hasCmsPiiEncryptionKey\(\)/);
+  assert.match(readiness, /getResendBookingEmailReadiness\(\)\.ready/);
   assert.doesNotMatch(
     readiness,
     /CMS_(?:PRIVACY_NOTICE_APPROVED|BOOKING_NOTIFICATION_READY|MONITORING_READY|RECOVERY_DRILL_VERIFIED)/,
@@ -203,16 +204,20 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
   );
 });
 
-test("booking page keeps customer instructions concise", async () => {
-  const [planner, bookPage, calendar, plannerStyles] = await Promise.all([
+test("booking page uses static copy and keeps customer instructions concise", async () => {
+  const [planner, bookPage, pageCopy, calendar, plannerStyles] = await Promise.all([
     source("src/components/booking/BookingPlanner.tsx"),
     source("src/app/(site)/book/page.tsx"),
+    source("src/content/page-copy.ts"),
     source("src/components/booking/BookingCalendar.tsx"),
     source("src/components/booking/BookingPlanner.module.css"),
   ]);
   const bookingCopy = `${bookPage}\n${planner}`;
 
-  assert.match(bookPage, /getPublicPageCopy\("book"\)/);
+  assert.match(bookPage, /getPageCopy\("book"\)/);
+  assert.match(bookPage, /\.\.\.pageHeroImages\.book/);
+  assert.match(pageCopy, /book:\s*\{/);
+  assert.doesNotMatch(bookPage, /getPublicPageCopy|getPublishedCmsContent/);
   assert.match(bookPage, /title=\{pageCopy\.title\}/);
   assert.match(bookPage, /description=\{pageCopy\.description\}/);
   assert.match(planner, />Choose your appointment</);

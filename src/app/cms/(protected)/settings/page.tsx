@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpenCheck, Clock3, DatabaseBackup, PlugZap, ScrollText, ShieldCheck, Store, Users } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Clock3, PlugZap, ScrollText, ShieldCheck, Store, Users } from "lucide-react";
 import Link from "next/link";
 
 import { CmsPageHeader } from "@/components/cms/CmsUi";
@@ -12,7 +12,6 @@ const settingCards = [
   { href: "/cms/settings/hours", icon: Clock3, permission: "settings:view", title: "Opening hours", text: "Weekly hours and owner confirmation status." },
   { href: "/cms/settings/booking", icon: BookOpenCheck, permission: "settings:view", title: "Booking rules", text: "Dublin timezone, capacity, notice, buffers, horizon and cancellation cutoff." },
   { href: "/cms/settings/integrations", icon: PlugZap, permission: "settings:view", title: "Integrations", text: "Booking provider, maps, WhatsApp, Instagram and review links." },
-  { href: "/cms/settings/recovery", icon: DatabaseBackup, permission: "settings:view", title: "Recovery safeguards", text: "Persistence, encryption-key, backup and isolated-restore guidance without exposing secrets." },
   { href: "/cms/admin", icon: Users, permission: "users:manage", title: "Admin users", text: "Create accounts, control access, reset passwords and revoke sessions." },
   { href: "/cms/audit-log", icon: ScrollText, permission: "audit:view", title: "Audit log", text: "Review security and content changes without exposing secrets." },
 ] as const;

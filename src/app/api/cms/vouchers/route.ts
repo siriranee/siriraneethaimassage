@@ -1,7 +1,18 @@
 import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
 import { createCmsVoucher } from "@/server/cms/content-service";
-import { cmsErrorResponse, cmsNoStoreJson, readCmsJsonObject } from "@/server/cms/http";
+import { cmsNoStoreJson, readCmsJsonObject } from "@/server/cms/http";
+import { isMongoCommitResultIndeterminate } from "@/server/cms/mongo-error-label";
+import { getCmsMediaCleanupGrantUserId } from "@/server/media/cleanup-grant";
+import {
+  rollbackCmsMediaSubmission,
+  rollbackCmsMediaSubmissionWithCapability,
+} from "@/server/media/cloudinary-service";
+import { cmsMediaErrorResponse } from "@/server/media/http";
+import {
+  removeCmsMediaSubmissionEnvelope,
+  type CmsMediaSubmission,
+} from "@/server/media/submission";
 
 export const dynamic = "force-dynamic";
 
@@ -9,15 +20,69 @@ export async function POST(request: Request) {
   if (!isSameOriginMutation(request)) {
     return cmsNoStoreJson({ error: "Invalid request origin." }, { status: 403 });
   }
-  const { response, user } = await requireCmsApiUser("content:write");
-  if (response || !user) return response;
+  const requestId = getRequestId(request);
+  let submission: CmsMediaSubmission | null = null;
+  let authenticatedUser: Parameters<typeof rollbackCmsMediaSubmission>[1] | null =
+    null;
   try {
-    const voucher = await createCmsVoucher(await readCmsJsonObject(request), {
+    const parsed = removeCmsMediaSubmissionEnvelope(
+      await readCmsJsonObject(request),
+    );
+    submission = parsed.submission;
+    const { response, user } = await requireCmsApiUser("content:write");
+    authenticatedUser = user;
+    if (response || !user) {
+      const capabilityUserId = await getCmsMediaCleanupGrantUserId();
+      const mediaRollback = submission?.assets.length && capabilityUserId
+        ? await rollbackCmsMediaSubmissionWithCapability(
+            submission,
+            capabilityUserId,
+            requestId,
+          )
+        : null;
+      const status = response?.status ?? 401;
+      return cmsNoStoreJson(
+        {
+          error:
+            status === 403
+              ? "You do not have permission for this action."
+              : "Unauthorized.",
+          ...(mediaRollback ? { mediaRollback } : {}),
+        },
+        { status },
+      );
+    }
+    const voucher = await createCmsVoucher(parsed.body, {
       actor: user,
-      requestId: getRequestId(request),
+      requestId,
+      mediaSubmission: submission,
     });
     return cmsNoStoreJson({ voucher }, { status: 201 });
   } catch (error) {
-    return cmsErrorResponse(error);
+    const commitIndeterminate = isMongoCommitResultIndeterminate(error);
+    const capabilityUserId = !authenticatedUser && submission?.assets.length
+      ? await getCmsMediaCleanupGrantUserId()
+      : null;
+    const mediaRollback = !commitIndeterminate && submission?.assets.length
+      ? authenticatedUser
+        ? await rollbackCmsMediaSubmission(
+            submission,
+            authenticatedUser,
+            requestId,
+          )
+        : capabilityUserId
+          ? await rollbackCmsMediaSubmissionWithCapability(
+              submission,
+              capabilityUserId,
+              requestId,
+            )
+          : null
+      : null;
+    return cmsMediaErrorResponse(error, {
+      ...(commitIndeterminate
+        ? { mediaCommitState: "indeterminate" as const }
+        : {}),
+      ...(mediaRollback ? { mediaRollback } : {}),
+    });
   }
 }

@@ -26,23 +26,12 @@ const euroFormatter = new Intl.NumberFormat("en-IE", {
   maximumFractionDigits: 0,
 });
 
-const voucherEuroFormatter = new Intl.NumberFormat("en-IE", {
-  style: "currency",
-  currency: "EUR",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
-
 function firstValue(value: QueryValue) {
   return Array.isArray(value) ? value[0] : value;
 }
 
 export function formatAppointmentPrice(priceEur: number) {
   return euroFormatter.format(priceEur);
-}
-
-export function formatVoucherValue(amountEur: number) {
-  return voucherEuroFormatter.format(amountEur);
 }
 
 export function formatAppointmentDuration(durationMinutes: number) {
@@ -159,23 +148,4 @@ export function buildAppointmentWhatsAppUrl(
   ].join("\n");
 
   return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-}
-
-export function buildVoucherWhatsAppUrl(
-  voucher: { readonly title: string; readonly amountEur: number },
-  contact: {
-    readonly businessName: string;
-    readonly whatsappNumber: string | null;
-  },
-) {
-  if (!contact.whatsappNumber) return null;
-
-  const message = [
-    `Hello ${contact.businessName}, I would like to ask about a gift voucher.`,
-    `Voucher: ${voucher.title}`,
-    `Listed value: ${formatVoucherValue(voucher.amountEur)}`,
-    "Please let me know how it can be arranged and confirm the current voucher details.",
-  ].join("\n");
-
-  return `https://wa.me/${contact.whatsappNumber}?text=${encodeURIComponent(message)}`;
 }

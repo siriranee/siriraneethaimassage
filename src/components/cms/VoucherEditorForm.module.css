@@ -1,0 +1,29 @@
+.mediaField {
+  gap: 1rem;
+}
+
+.savedPreview {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.savedPreview > div {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--color-line);
+  border-radius: 0.85rem;
+  background: var(--color-purple-50);
+}
+
+.savedPreview img {
+  padding: 0.75rem;
+  object-fit: contain;
+}
+
+.savedPreview figcaption {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}

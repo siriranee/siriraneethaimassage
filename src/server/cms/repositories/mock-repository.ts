@@ -14,6 +14,7 @@ import type {
   CmsSession,
   CmsUser,
 } from "@/domain/cms/types";
+import type { PublicBookingIdentifier } from "@/domain/booking/public-status";
 import {
   createDefaultContentState,
   createMockAdministrator,
@@ -168,21 +169,6 @@ export class MockCmsRepository implements CmsRepository {
   async getMediaAsset(publicId: string) {
     return clone(
       this.state.mediaAssets.find((asset) => asset.publicId === publicId) ?? null,
-    );
-  }
-
-  async listExpiredMediaAssets(nowIso: string, limit = 10) {
-    return clone(
-      this.state.mediaAssets
-        .filter(
-          (asset) =>
-            (asset.status === "authorized" ||
-              asset.status === "staged" ||
-              asset.status === "deleting") &&
-            asset.expiresAt <= nowIso,
-        )
-        .sort((first, second) => first.expiresAt.localeCompare(second.expiresAt))
-        .slice(0, Math.max(1, Math.min(limit, 25))),
     );
   }
 
@@ -421,6 +407,21 @@ export class MockCmsRepository implements CmsRepository {
     return clone(this.state.bookings.find((booking) => booking.id === id) ?? null);
   }
 
+  async findBookingPublicStatus(identifier: PublicBookingIdentifier) {
+    const booking = this.state.bookings.find((item) =>
+      identifier.kind === "id"
+        ? item.id.toLowerCase() === identifier.value
+        : item.reference.toUpperCase() === identifier.value,
+    );
+
+    return booking
+      ? {
+          status: booking.status,
+          capacityExpiresAt: booking.capacityExpiresAt,
+        }
+      : null;
+  }
+
   async findBookingByIdempotencyHash(hash: string) {
     return clone(
       this.state.bookings.find(
@@ -493,10 +494,72 @@ export class MockCmsRepository implements CmsRepository {
     );
   }
 
+  async getNotification(id: string) {
+    return clone(this.state.notifications.find((item) => item.id === id) ?? null);
+  }
+
   async saveNotification(notification: CmsBookingNotification) {
     const index = this.state.notifications.findIndex((item) => item.id === notification.id);
     if (index >= 0) this.state.notifications[index] = clone(notification);
     else this.state.notifications.push(clone(notification));
+  }
+
+  async saveNotificationIfAbsent(notification: CmsBookingNotification) {
+    const existing = this.state.notifications.find(
+      (item) => item.id === notification.id,
+    );
+    if (existing) return clone(existing);
+    this.state.notifications.push(clone(notification));
+    return clone(notification);
+  }
+
+  async claimNotificationDelivery(
+    id: string,
+    expectedStatus: CmsBookingNotification["status"],
+    expectedAttemptCount: number,
+    expectedClaimId: string | undefined,
+    claimId: string,
+    attemptedAt: string,
+    firstAttemptedAt: string,
+  ) {
+    const index = this.state.notifications.findIndex((item) => item.id === id);
+    const current = this.state.notifications[index];
+    if (
+      !current ||
+      current.status !== expectedStatus ||
+      current.attemptCount !== expectedAttemptCount ||
+      current.deliveryClaimId !== expectedClaimId
+    ) {
+      return null;
+    }
+
+    const claimed: CmsBookingNotification = {
+      ...current,
+      status: "sending",
+      attemptCount: current.attemptCount + 1,
+      firstAttemptedAt,
+      attemptedAt,
+      deliveryClaimId: claimId,
+      deliveryClaimedAt: attemptedAt,
+      updatedAt: attemptedAt,
+    };
+    this.state.notifications[index] = clone(claimed);
+    return clone(claimed);
+  }
+
+  async completeNotificationDelivery(
+    notification: CmsBookingNotification,
+    claimId: string,
+  ) {
+    const index = this.state.notifications.findIndex(
+      (item) =>
+        item.id === notification.id &&
+        item.status === "sending" &&
+        item.deliveryClaimId === claimId,
+    );
+    if (index < 0) return false;
+    this.state.notifications[index] = clone(notification);
+    return true;
   }
 
   async listActiveHolds(nowIso: string) {

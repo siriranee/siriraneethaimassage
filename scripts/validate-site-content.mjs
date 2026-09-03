@@ -41,6 +41,7 @@ const siteSource = await read("src/content/site.ts");
 const serviceDomainSource = await read("src/domain/service.ts");
 const serviceGallerySource = await read("src/content/service-galleries.ts");
 const pageHeroSource = await read("src/content/page-heroes.ts");
+const pageCopySource = await read("src/content/page-copy.ts");
 const globalStylesSource = await read("src/app/globals.css");
 const schemaSource = await read("src/lib/structured-data.ts");
 const homePageSource = await read("src/app/(site)/page.tsx");
@@ -130,6 +131,7 @@ check(
 check(siteSource.includes(expectedAddress), "Formatted address is incorrect");
 
 const conciseHeroSource = [
+  pageCopySource,
   defaultContentSource,
   servicesPageSource,
   therapistsPageSource,

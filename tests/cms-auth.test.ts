@@ -470,6 +470,12 @@ test("the login boundary stays username-only and does not expose password hashes
   const readService = source("src/server/cms/read-service.ts");
 
   assert.match(form, /name="username"/);
+  assert.match(form, /name="rememberUsername"/);
+  assert.match(form, /rememberedUsernameKey/);
+  assert.match(form, /localStorage\.setItem/);
+  assert.match(form, /localStorage\.removeItem/);
+  assert.match(form, /normalizeCmsUsername\(username\)/);
+  assert.doesNotMatch(form, /localStorage\.setItem\([^;]*password/);
   assert.doesNotMatch(form, /name="email"/);
   assert.match(loginRoute, /username\?: string/);
   assert.doesNotMatch(loginRoute, /email\?: string/);

@@ -6,14 +6,15 @@ import Link from "next/link";
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
-import { getPublicPageCopy, getPublicSiteData } from "@/server/cms/public-adapter";
+import { getPublicSiteData } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPublicPageCopy("about");
+  const page = getPageCopy("about");
   return createMetadata({ title: page.seoTitle, description: page.seoDescription, path: "/about" });
 }
 
@@ -36,7 +37,8 @@ const values = [
 ];
 
 export default async function AboutPage() {
-  const [site, pageCopy] = await Promise.all([getPublicSiteData(), getPublicPageCopy("about")]);
+  const pageCopy = getPageCopy("about");
+  const site = await getPublicSiteData();
 
   return (
     <div>

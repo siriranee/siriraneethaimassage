@@ -5,17 +5,15 @@ import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
 import { ServiceExplorer } from "@/components/services/ServiceExplorer";
+import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
-import {
-  getPublicPageCopy,
-  getPublicServicesSnapshot,
-} from "@/server/cms/public-adapter";
+import { getPublicServicesSnapshot } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPublicPageCopy("services");
+  const page = getPageCopy("services");
   return createMetadata({
     title: page.seoTitle,
     description: page.seoDescription,
@@ -42,10 +40,8 @@ const experienceNotes = [
 ];
 
 export default async function ServicesPage() {
-  const [{ services }, pageCopy] = await Promise.all([
-    getPublicServicesSnapshot(),
-    getPublicPageCopy("services"),
-  ]);
+  const pageCopy = getPageCopy("services");
+  const { services } = await getPublicServicesSnapshot();
 
   return (
     <div>

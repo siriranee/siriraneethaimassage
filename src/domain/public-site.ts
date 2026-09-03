@@ -24,10 +24,8 @@ export type PublicTeamMember = {
 export type PublicVoucher = {
   readonly id: string;
   readonly title: string;
-  readonly description: string;
-  readonly amountEur: number;
-  readonly badge: string;
-  readonly terms: string;
+  readonly imageUrl: string;
+  readonly imageAlt: string;
 };
 
 export type PublicSiteData = {

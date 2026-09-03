@@ -118,15 +118,15 @@ test("stored service hero normalization preserves valid data and safely clones f
   assert.deepEqual(normaliseStoredServiceHero(migrated, validHero), migrated);
 });
 
-test("schema v6 removes retired fields and normalises legacy heroes from their own cover", async () => {
+test("the current schema removes retired fields and normalises legacy heroes from their own cover", async () => {
   const [types, defaults, contentService] = await Promise.all([
     source("src/domain/cms/types.ts"),
     source("src/server/cms/default-content.ts"),
     source("src/server/cms/content-service.ts"),
   ]);
 
-  assert.equal(CMS_CONTENT_SCHEMA_VERSION, 6);
-  assert.match(types, /schemaVersion:\s*1\s*\|\s*2\s*\|\s*3\s*\|\s*4\s*\|\s*5\s*\|\s*6/);
+  assert.ok(CMS_CONTENT_SCHEMA_VERSION >= 6);
+  assert.match(types, /schemaVersion:\s*1\s*\|\s*2\s*\|\s*3\s*\|\s*4\s*\|\s*5\s*\|\s*6\s*\|\s*7/);
   assert.match(types, /hero:\s*CmsServiceHero/);
   assert.match(types, /priceNote:\s*string/);
   assert.doesNotMatch(types, /readonly category:\s*string/);
@@ -304,11 +304,10 @@ test("content mutations publish only their saved section immediately", async () 
   assert.match(immediatePublication, /replacePublishedService\(publicBase\.services, service\)/);
   assert.match(immediatePublication, /case "site"/);
   assert.match(immediatePublication, /case "bookingSettings"/);
-  assert.match(immediatePublication, /case "pages"/);
   assert.match(immediatePublication, /case "team"/);
-  assert.match(immediatePublication, /case "gallery"/);
   assert.match(immediatePublication, /case "promotions"/);
   assert.match(immediatePublication, /case "vouchers"/);
+  assert.doesNotMatch(immediatePublication, /case "pages"|case "gallery"/);
   assert.match(immediatePublication, /createSafePublicContentState\(\)/);
   assert.match(immediatePublication, /assertCmsContentMediaReferencesApproved\(snapshot\)/);
   assert.match(immediatePublication, /savePublication/);
@@ -316,9 +315,9 @@ test("content mutations publish only their saved section immediately", async () 
   assert.match(createAndUpdate, /Updated and published treatment content and pricing/);
   assert.equal((createAndUpdate.match(/\{ section: "services", entityId: serviceId \}/g) ?? []).length, 2);
   assert.equal((contentService.match(/\{ section: "team", entityId: memberId \}/g) ?? []).length, 2);
-  assert.equal((contentService.match(/\{ section: "gallery", entityId: itemId \}/g) ?? []).length, 2);
   assert.equal((contentService.match(/\{ section: "promotions", entityId: promotionId \}/g) ?? []).length, 2);
   assert.equal((contentService.match(/\{ section: "vouchers", entityId: voucherId \}/g) ?? []).length, 2);
+  assert.doesNotMatch(contentService, /section: "gallery"|entityId: itemId/);
   assert.doesNotMatch(contentService, /publishCmsContent|getCmsPublicationPreview/);
 });
 

@@ -11,19 +11,21 @@ import Link from "next/link";
 
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
+import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
-import { getPublicPageCopy, getPublicPromotions } from "@/server/cms/public-adapter";
+import { getPublicPromotions } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPublicPageCopy("promotions");
+  const page = getPageCopy("promotions");
   return createMetadata({ title: page.seoTitle, description: page.seoDescription, path: "/promotions" });
 }
 
 export default async function PromotionsPage() {
-  const [promotions, pageCopy] = await Promise.all([getPublicPromotions(), getPublicPageCopy("promotions")]);
+  const pageCopy = getPageCopy("promotions");
+  const promotions = await getPublicPromotions();
   return (
     <div>
       <PageHero

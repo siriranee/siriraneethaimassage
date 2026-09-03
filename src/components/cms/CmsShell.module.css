@@ -1,8 +1,6 @@
 .canvas {
-  --cms-sidebar: 17.5rem;
-  display: grid;
+  display: block;
   min-height: 100vh;
-  grid-template-columns: var(--cms-sidebar) minmax(0, 1fr);
   overflow-x: clip;
   background:
     radial-gradient(circle at 96% 0%, rgb(var(--color-gold-500-rgb) / 0.09), transparent 22rem),
@@ -27,13 +25,15 @@
 }
 
 .sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  z-index: 70;
   display: flex;
-  height: 100vh;
-  min-height: 42rem;
+  width: min(19rem, calc(100vw - 3rem));
+  height: 100dvh;
   flex-direction: column;
-  padding: 2rem 1.25rem 1.25rem;
+  padding: 1.1rem 1.25rem 1.25rem;
   overflow-x: hidden;
   overflow-y: auto;
   background:
@@ -42,6 +42,18 @@
   color: var(--color-on-brand);
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--color-gold-400-rgb) / 0.35) transparent;
+  box-shadow: 1.4rem 0 4rem rgb(var(--color-purple-950-rgb) / 0.3);
+  transform: translateX(-105%);
+  transition:
+    transform 220ms ease,
+    visibility 0s linear 220ms;
+  visibility: hidden;
+}
+
+.sidebar[data-open="true"] {
+  transform: translateX(0);
+  transition: transform 220ms ease;
+  visibility: visible;
 }
 
 .sidebar::after {
@@ -63,13 +75,142 @@
   position: relative;
   z-index: 1;
   display: flex;
-  width: 100%;
-  margin: 0.25rem 0 2.25rem;
-  justify-content: center;
+  width: fit-content;
+  margin: 0;
+  justify-content: flex-start;
 }
 
 .brand img {
-  width: 6.35rem;
+  width: 5.4rem;
+}
+
+.drawerHeader {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 4.4rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.closeButton,
+.menuButton,
+.topbarActions > a,
+.topbarActions > button {
+  display: grid;
+  width: 2.85rem;
+  height: 2.85rem;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border-radius: 0.72rem;
+}
+
+.closeButton {
+  border: 1px solid rgb(var(--color-surface-rgb) / 0.2);
+  background: rgb(var(--color-surface-rgb) / 0.08);
+  color: var(--color-on-brand);
+}
+
+.closeButton:hover {
+  border-color: rgb(var(--color-gold-400-rgb) / 0.5);
+  color: var(--color-gold-400);
+}
+
+.closeButton svg,
+.menuButton svg,
+.topbarActions svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  min-height: 4.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.75rem;
+  border-bottom: 1px solid rgb(var(--color-purple-800-rgb) / 0.14);
+  background: rgb(var(--color-surface-rgb) / 0.96);
+  box-shadow: 0 0.7rem 2.2rem rgb(var(--color-purple-950-rgb) / 0.06);
+  backdrop-filter: blur(0.9rem);
+}
+
+.topbarPrimary,
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.menuButton,
+.topbarActions > a,
+.topbarActions > button {
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
+  color: var(--color-purple-700);
+}
+
+.menuButton:hover,
+.topbarActions > a:hover,
+.topbarActions > button:hover {
+  border-color: rgb(var(--color-purple-600-rgb) / 0.5);
+  background: var(--color-purple-50);
+  color: var(--color-purple-500);
+}
+
+.topbarActions > button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.topbarBrand {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 0.3rem;
+}
+
+.topbarBrand img {
+  width: 2.75rem;
+}
+
+.topbarTitle {
+  display: grid;
+  gap: 0.08rem;
+  padding-left: 0.2rem;
+}
+
+.topbarTitle span {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 750;
+}
+
+.topbarTitle strong {
+  color: var(--color-purple-900);
+  font-size: var(--fs-base);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: rgb(var(--color-purple-950-rgb) / 0.48);
+  backdrop-filter: blur(0.12rem);
+}
+
+.backdrop[hidden] {
+  display: none;
 }
 
 .workspaceLabel {
@@ -225,7 +366,7 @@
 
 .mockBanner {
   position: sticky;
-  top: 0;
+  top: 4.75rem;
   z-index: 20;
   display: flex;
   min-height: 3.25rem;
@@ -249,115 +390,25 @@
   font-size: var(--fs-sm);
 }
 
-.mobileHeader,
-.mobileNavigation {
-  display: none;
-}
-
 .main {
-  width: calc(100% - 3.5rem);
+  width: min(88rem, calc(100% - 3.5rem));
   margin-inline: auto;
-  padding: 5.25rem 0 5rem;
+  padding: 3.5rem 0 5rem;
 }
 
 @media (max-width: 980px) {
-  .canvas {
-    display: block;
-  }
-
-  .sidebar {
-    display: none;
-  }
-
   .mockBanner {
-    position: relative;
+    top: 4.5rem;
   }
 
-  .mobileHeader {
-    position: relative;
-    z-index: 30;
-    display: flex;
+  .topbar {
     min-height: 4.5rem;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.65rem 1.25rem;
-    background: var(--color-purple-950);
-    color: var(--color-gold-400);
-    font-size: var(--fs-sm);
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-.mobileHeader a {
-  display: inline-flex;
-}
-
-  .mobileActions {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-  }
-
-  .mobileActions > a,
-  .mobileActions > button {
-    display: grid;
-    width: 2.65rem;
-    height: 2.65rem;
-    place-items: center;
-    padding: 0;
-    border: 1px solid rgb(var(--color-surface-rgb) / 0.18);
-    border-radius: 0.65rem;
-    background: rgb(var(--color-surface-rgb) / 0.07);
-    color: var(--color-on-brand);
-  }
-
-  .mobileActions > button:disabled {
-    cursor: wait;
-    opacity: 0.55;
-  }
-
-  .mobileActions svg {
-    width: 1rem;
-    height: 1rem;
-  }
-
-  .mobileNavigation {
-    position: sticky;
-    top: 0;
-    z-index: 15;
-    display: flex;
-    gap: 0.35rem;
-    padding: 0.55rem 1.25rem;
-    overflow-x: auto;
-    border-bottom: 1px solid var(--color-line);
-    background: rgb(var(--color-surface-rgb) / 0.96);
-    scrollbar-width: thin;
-  }
-
-  .mobileNavigation a {
-    display: inline-flex;
-    min-height: 2.75rem;
-    align-items: center;
-    padding: 0.45rem 0.8rem;
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-pill);
-    background: var(--color-surface);
-    color: var(--color-purple-700);
-    font-size: var(--fs-sm);
-    font-weight: 800;
-    white-space: nowrap;
-  }
-
-  .mobileNavigation .activeMobileNav {
-    border-color: var(--color-purple-700);
-    background: var(--color-purple-700);
-    color: var(--color-on-brand);
+    padding-inline: 1.25rem;
   }
 
   .main {
     width: calc(100% - 2.5rem);
-    padding-top: 1.75rem;
+    padding-top: 2.5rem;
   }
 }
 
@@ -369,8 +420,7 @@
     padding: 0.65rem 1rem;
   }
 
-  .mobileHeader,
-  .mobileNavigation {
+  .topbar {
     padding-inline: 1rem;
   }
 
@@ -381,7 +431,7 @@
 }
 
 @media (max-width: 430px) {
-  .mobileActions > span {
+  .topbarTitle {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -394,7 +444,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .navigation a {
+  .navigation a,
+  .sidebar {
     transition: none;
   }
 }

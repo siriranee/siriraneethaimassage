@@ -1,20 +1,22 @@
 import type { Metadata } from "next";
 
 import { PageHero } from "@/components/marketing/PageHero";
+import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { bookingPrivacyNotice } from "@/domain/privacy";
 import { createMetadata } from "@/lib/metadata";
-import { getPublicPageCopy, getPublicSiteData } from "@/server/cms/public-adapter";
+import { getPublicSiteData } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPublicPageCopy("privacy");
+  const page = getPageCopy("privacy");
   return createMetadata({ title: page.seoTitle, description: page.seoDescription, path: "/privacy" });
 }
 
 export default async function PrivacyPage() {
-  const [site, pageCopy] = await Promise.all([getPublicSiteData(), getPublicPageCopy("privacy")]);
+  const pageCopy = getPageCopy("privacy");
+  const site = await getPublicSiteData();
   const phone = site.contact.phone;
   const email = site.contact.email;
 
@@ -40,8 +42,8 @@ export default async function PrivacyPage() {
             used.
           </p>
           <p>
-            Direct website booking remains disabled until the owner has approved
-            the final retention period, lawful basis, service-provider list and
+            Direct website booking is enabled only after the owner has approved
+            the retention period, lawful basis, service-provider list and
             operational process. While it is disabled, the booking page stores no
             personal information and shows only the options currently available.
           </p>
@@ -68,17 +70,21 @@ export default async function PrivacyPage() {
           <p>
             Booking contact details are encrypted before they are stored. Access is
             limited to authorised Siriranee administrators and staff who need the
-            information to manage appointments. Hosting, database, notification and
-            support providers may process limited information only when configured
-            for this service.
+            information to manage appointments. MongoDB stores the encrypted
+            booking record. After a website request is stored, Resend processes the
+            appointment and contact details needed to deliver an operational email
+            notification to the owner. Optional notes remain in the encrypted CMS
+            booking record and are not copied into that email. Hosting and support
+            providers may process limited information only when configured for this
+            service.
           </p>
           <p>
             The owner must set and publish the final retention period before direct
             booking is enabled. Records will then be kept only for the confirmed
             operational, legal and accounting period, after which they will be
-            securely deleted or anonymised. Provider names and any international
-            transfer safeguards must also be added once the production services are
-            selected.
+            securely deleted or anonymised. The owner must also approve the final
+            provider-retention and international-transfer wording before production
+            booking is enabled.
           </p>
         </section>
 

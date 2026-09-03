@@ -1,11 +1,6 @@
 import "server-only";
 
 import {
-  CmsPageHeroValidationError,
-  parseCmsPageHeroSlides,
-  type CmsPageHeroSlide,
-} from "@/domain/cms/page-hero";
-import {
   CmsServiceGalleryValidationError,
   parseCmsServiceGalleryImages,
   type CmsServiceGalleryImage,
@@ -17,8 +12,6 @@ import {
 } from "@/domain/cms/service-hero";
 import {
   type CmsBookingSettings,
-  type CmsGalleryRecord,
-  type CmsPageRecord,
   type CmsPromotionRecord,
   type CmsServicePrice,
   type CmsServiceRecord,
@@ -271,23 +264,6 @@ function serviceGalleryImages(
     return parseCmsServiceGalleryImages(value);
   } catch (error) {
     if (error instanceof CmsServiceGalleryValidationError) {
-      throw new CmsValidationError(error.message, error.fields);
-    }
-
-    throw error;
-  }
-}
-
-function pageHeroSlides(
-  value: unknown,
-  current: readonly CmsPageHeroSlide[] | undefined,
-) {
-  if (value === undefined) return current;
-
-  try {
-    return parseCmsPageHeroSlides(value);
-  } catch (error) {
-    if (error instanceof CmsPageHeroValidationError) {
       throw new CmsValidationError(error.message, error.fields);
     }
 
@@ -586,48 +562,6 @@ export function parseTeamCreate(
   return parseTeamUpdate(value, initial);
 }
 
-export function parseGalleryUpdate(
-  value: unknown,
-  current: CmsGalleryRecord,
-): CmsGalleryRecord {
-  const source =
-    value && typeof value === "object"
-      ? (value as Record<string, unknown>)
-      : {};
-  const imageValue = typeof source.imageUrl === "string" ? source.imageUrl.trim() : "";
-  const imageUrl = imageValue.startsWith("/") && !imageValue.startsWith("//")
-    ? imageValue
-    : validUrl(imageValue, "imageUrl", false);
-
-  return {
-    ...current,
-    imageUrl,
-    altText: text(source.altText, "altText", 8, 180),
-    caption: text(source.caption, "caption", 2, 240),
-    published: source.published === true,
-    sortOrder: integer(source.sortOrder, "sortOrder", 0, 1000),
-    version: current.version + 1,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-export function parseGalleryCreate(
-  value: unknown,
-  id: string,
-): CmsGalleryRecord {
-  const initial: CmsGalleryRecord = {
-    id,
-    imageUrl: "",
-    altText: "",
-    caption: "",
-    published: false,
-    sortOrder: 0,
-    version: 0,
-    updatedAt: new Date().toISOString(),
-  };
-  return parseGalleryUpdate(value, initial);
-}
-
 export function parsePromotionUpdate(
   value: unknown,
   current: CmsPromotionRecord,
@@ -689,10 +623,8 @@ export function parseVoucherUpdate(
   return {
     ...current,
     title: text(source.title, "title", 2, 120),
-    description: text(source.description, "description", 10, 500),
-    amountCents: integer(source.amountCents, "amountCents", 100, 100_000),
-    badge: optionalText(source.badge, 40),
-    terms: text(source.terms, "terms", 10, 500),
+    imageUrl: validUrl(source.imageUrl, "imageUrl", false),
+    imageAlt: text(source.imageAlt, "imageAlt", 4, 180),
     status,
     sortOrder: integer(source.sortOrder, "sortOrder", 0, 9_999),
     version: current.version + 1,
@@ -707,38 +639,12 @@ export function parseVoucherCreate(
   const initial: CmsVoucherRecord = {
     id,
     title: "",
-    description: "",
-    amountCents: 0,
-    badge: "",
-    terms: "",
+    imageUrl: "",
+    imageAlt: "",
     status: "draft",
     sortOrder: 0,
     version: 0,
     updatedAt: new Date().toISOString(),
   };
   return parseVoucherUpdate(value, initial);
-}
-
-export function parsePageUpdate(
-  value: unknown,
-  current: CmsPageRecord,
-): CmsPageRecord {
-  const source =
-    value && typeof value === "object"
-      ? (value as Record<string, unknown>)
-      : {};
-  return {
-    ...current,
-    eyebrow: text(source.eyebrow, "eyebrow", 2, 100),
-    title: text(source.title, "title", 4, 120),
-    description: text(source.description, "description", 20, 400),
-    seoTitle: text(source.seoTitle, "seoTitle", 10, 70),
-    seoDescription: text(source.seoDescription, "seoDescription", 40, 170),
-    heroSlides:
-      current.id === "home"
-        ? pageHeroSlides(source.heroSlides, current.heroSlides)
-        : undefined,
-    version: current.version + 1,
-    updatedAt: new Date().toISOString(),
-  };
 }

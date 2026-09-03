@@ -2,12 +2,9 @@ import {
   ArrowRight,
   CalendarCheck,
   Clock3,
-  Gift,
   HeartHandshake,
   Leaf,
   MapPin,
-  MessageCircle,
-  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
@@ -16,9 +13,10 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { HomeHeroSlider } from "@/components/marketing/HomeHeroSlider";
+import { VoucherSlider } from "@/components/marketing/VoucherSlider";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { LotusIcon } from "@/components/ui/LotusIcon";
-import { buildVoucherWhatsAppUrl, formatVoucherValue } from "@/lib/contact-links";
+import { getPageCopy } from "@/content/page-copy";
 import { createMetadata } from "@/lib/metadata";
 import {
   buildDaySpaJsonLd,
@@ -27,7 +25,6 @@ import {
 } from "@/lib/structured-data";
 import {
   getPublicServices,
-  getPublicPageCopy,
   getPublicSiteData,
   getPublicVouchers,
 } from "@/server/cms/public-adapter";
@@ -35,7 +32,7 @@ import {
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPublicPageCopy("home");
+  const page = getPageCopy("home");
 
   return createMetadata({
     title: page.seoTitle,
@@ -102,10 +99,10 @@ function buildFaqs(address: string, hasVouchers: boolean) {
 }
 
 export default async function HomePage() {
-  const [services, site, pageCopy, vouchers] = await Promise.all([
+  const pageCopy = getPageCopy("home");
+  const [services, site, vouchers] = await Promise.all([
     getPublicServices(),
     getPublicSiteData(),
-    getPublicPageCopy("home"),
     getPublicVouchers(),
   ]);
   const featuredServices = services.slice(0, 4);
@@ -248,47 +245,7 @@ export default async function HomePage() {
               </p>
             </header>
 
-            <div className={styles.voucherGrid}>
-              {vouchers.map((voucher) => {
-                const whatsappHref = buildVoucherWhatsAppUrl(voucher, {
-                  businessName: site.alternateName,
-                  whatsappNumber: site.contact.whatsapp.number,
-                });
-
-                return (
-                  <article className={styles.voucherCard} key={voucher.id}>
-                    <div className={styles.voucherTopline}>
-                      <span className={styles.voucherIcon}><Gift aria-hidden="true" /></span>
-                      <span>{voucher.badge || "Gift voucher"}</span>
-                    </div>
-                    <strong className={styles.voucherValue}>{formatVoucherValue(voucher.amountEur)}</strong>
-                    <h3>{voucher.title}</h3>
-                    <p>{voucher.description}</p>
-                    <details className={styles.voucherDetails}>
-                      <summary>Voucher details <span aria-hidden="true">+</span></summary>
-                      <p>{voucher.terms}</p>
-                    </details>
-                    <ButtonLink
-                      external={Boolean(whatsappHref)}
-                      href={whatsappHref ?? "/contact"}
-                      icon={<MessageCircle aria-hidden="true" />}
-                      variant="light"
-                    >
-                      Ask about this voucher
-                    </ButtonLink>
-                  </article>
-                );
-              })}
-            </div>
-
-            <div className={styles.voucherNotice}>
-              <ShieldCheck aria-hidden="true" />
-              <p>
-                Voucher information is shown for enquiry only. No online payment is
-                taken here; purchase, collection or delivery and final terms are
-                confirmed directly by the Siriranee team.
-              </p>
-            </div>
+            <VoucherSlider vouchers={vouchers} />
           </div>
         </section>
       ) : null}

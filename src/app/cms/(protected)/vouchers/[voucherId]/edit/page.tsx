@@ -16,7 +16,7 @@ export default async function CmsVoucherEditPage({ params }: PageProps) {
 
   return (
     <>
-      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/vouchers" secondary>Back to vouchers</CmsPrimaryLink>} description="Review the value, wording, order and public status. Archive the voucher to hide it without deleting its history." eyebrow="Website content" title={voucher.title} />
+      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/vouchers" secondary>Back to vouchers</CmsPrimaryLink>} description="Replace the artwork, adjust its order or archive it. Every successful save publishes immediately." eyebrow="Website content" title={voucher.title} />
       <VoucherEditorForm voucher={voucher} />
     </>
   );

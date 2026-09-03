@@ -14,6 +14,7 @@ import Link from "next/link";
 import { MapEmbed } from "@/components/contact/MapEmbed";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
+import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import {
   buildAppointmentWhatsAppUrl,
@@ -24,12 +25,12 @@ import {
 } from "@/lib/contact-links";
 import { createMetadata } from "@/lib/metadata";
 import { resolvePublishedAppointmentPreference } from "@/server/booking/contact-preference";
-import { getPublicPageCopy, getPublicSiteData } from "@/server/cms/public-adapter";
+import { getPublicSiteData } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPublicPageCopy("contact");
+  const page = getPageCopy("contact");
   return createMetadata({ title: page.seoTitle, description: page.seoDescription, path: "/contact" });
 }
 
@@ -38,10 +39,10 @@ type ContactPageProps = {
 };
 
 export default async function ContactPage({ searchParams }: ContactPageProps) {
-  const [query, site, pageCopy] = await Promise.all([
+  const pageCopy = getPageCopy("contact");
+  const [query, site] = await Promise.all([
     searchParams,
     getPublicSiteData(),
-    getPublicPageCopy("contact"),
   ]);
   const appointmentPreference = await resolvePublishedAppointmentPreference(query);
   const appointmentWhatsappUrl = appointmentPreference

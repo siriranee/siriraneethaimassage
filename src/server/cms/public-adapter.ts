@@ -2,13 +2,11 @@ import "server-only";
 
 import { cache } from "react";
 
-import { defaultHomeHeroSlides } from "@/content/home-hero";
 import {
   googleMapsDirectionsUrl,
   googleMapsEmbedUrl,
   siteConfig,
 } from "@/content/site";
-import type { CmsPageId } from "@/domain/cms/types";
 import type { CmsServiceHero } from "@/domain/cms/service-hero";
 import type {
   PublicOpeningHours,
@@ -157,21 +155,6 @@ export const getPublicTeam = cache(
   },
 );
 
-export const getPublicGallery = cache(async () => {
-  const content = await getPublicContent();
-  return [...content.gallery]
-    .filter(
-      (item) => item.published && isPublicProjectImage(item.imageUrl),
-    )
-    .sort((first, second) => first.sortOrder - second.sortOrder)
-    .map((item) => ({
-      id: item.id,
-      src: item.imageUrl,
-      alt: item.altText,
-      caption: item.caption,
-    }));
-});
-
 export const getPublicPromotions = cache(async () => {
   const content = await getPublicContent();
   const parts = new Intl.DateTimeFormat("en-IE", {
@@ -195,36 +178,18 @@ export const getPublicVouchers = cache(async (): Promise<readonly PublicVoucher[
   const content = await getPublicContent();
 
   return [...(content.vouchers ?? [])]
-    .filter((voucher) => voucher.status === "published")
+    .filter(
+      (voucher) =>
+        voucher.status === "published" &&
+        isPublicProjectImage(voucher.imageUrl),
+    )
     .sort((first, second) => first.sortOrder - second.sortOrder)
     .map((voucher) => ({
       id: voucher.id,
       title: voucher.title,
-      description: voucher.description,
-      amountEur: voucher.amountCents / 100,
-      badge: voucher.badge,
-      terms: voucher.terms,
+      imageUrl: voucher.imageUrl,
+      imageAlt: voucher.imageAlt,
     }));
-});
-
-export const getPublicPageCopy = cache(async (pageId: CmsPageId) => {
-  const content = await getPublicContent();
-  const page = content.pages?.find((item) => item.id === pageId);
-  if (!page) throw new Error(`Public page copy is missing for ${pageId}.`);
-
-  if (page.id !== "home") return page;
-
-  const publishedSlides = (page.heroSlides ?? []).filter((slide) =>
-    isPublicProjectImage(slide.imageUrl),
-  );
-
-  return {
-    ...page,
-    heroSlides: (publishedSlides.length
-      ? publishedSlides
-      : defaultHomeHeroSlides
-    ).map((slide) => ({ ...slide })),
-  };
 });
 
 export const getPublicSiteData = cache(async (): Promise<PublicSiteData> => {

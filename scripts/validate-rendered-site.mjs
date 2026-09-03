@@ -1,5 +1,5 @@
 const baseUrl = new URL(
-  process.env.RENDERED_SITE_BASE_URL || "http://localhost:3107",
+  process.env.RENDERED_SITE_BASE_URL || "http://localhost:3000",
 );
 const failures = [];
 
@@ -7,6 +7,7 @@ const publicRoutes = [
   "/",
   "/about",
   "/book",
+  "/book/status",
   "/contact",
   "/gallery",
   "/privacy",
@@ -126,6 +127,7 @@ for (const [route, html] of pages) {
   const openGraphImage = metaContent(html, "property", "og:image");
   const twitterImage = metaContent(html, "name", "twitter:image");
   const h1Count = (html.match(/<h1(?:\s|>)/gi) || []).length;
+  const mainCount = (html.match(/<main(?:\s|>)/gi) || []).length;
   const ids = [...html.matchAll(/\sid="([^"]+)"/gi)].map((match) => match[1]);
   const idSet = new Set(ids);
 
@@ -158,6 +160,7 @@ for (const [route, html] of pages) {
   check(Boolean(title), `${route} is missing a title`);
   check(Boolean(description), `${route} is missing a description`);
   check(h1Count === 1, `${route} has ${h1Count} H1 elements`);
+  check(mainCount === 1, `${route} has ${mainCount} main landmarks`);
   check(/<html[^>]+lang="en-IE"/i.test(html), `${route} is missing lang=en-IE`);
   check(
     /<main[^>]+id="main-content"/i.test(html),
@@ -252,16 +255,30 @@ check(
 );
 
 if (homeMarkup.includes('id="voucher-section-title"')) {
+  const headingIndex = homeMarkup.indexOf('id="voucher-section-title"');
+  const sectionStart = homeMarkup.lastIndexOf("<section", headingIndex);
+  const sectionEnd = homeMarkup.indexOf("</section>", headingIndex);
+  const voucherMarkup = homeMarkup.slice(sectionStart, sectionEnd + 10);
+
   for (const voucherText of [
     "Give someone time to unwind",
-    "Ask about this voucher",
-    "No online payment is taken here",
+    'aria-label="Gift vouchers"',
+    'aria-roledescription="carousel"',
+    "Drag horizontally, swipe, or use the left and right arrow keys",
   ]) {
     check(
-      homeMarkup.includes(voucherText),
+      voucherMarkup.includes(voucherText),
       `Published voucher section is missing: ${voucherText}`,
     );
   }
+  check(
+    /<h3(?:\s|>)/i.test(voucherMarkup),
+    "Published voucher section has no voucher title",
+  );
+  check(
+    !/<button(?:\s|>)/i.test(voucherMarkup),
+    "Published voucher slider contains navigation buttons",
+  );
 }
 check(
   !/>\s*Buy(?: now| voucher)?\s*</i.test(homeMarkup),
@@ -278,6 +295,13 @@ if (!teamMarkup.includes('id="team-heading"')) {
     "Empty team page must be noindex, nofollow",
   );
 }
+const bookingStatusMarkup = pages.get("/book/status") ?? "";
+check(
+  /<meta[^>]+name="robots"[^>]+content="noindex, nofollow"/i.test(
+    bookingStatusMarkup,
+  ),
+  "Booking status page must be noindex, nofollow",
+);
 check(
   !/(?:href|action)="[^"]*(?:\?|&amp;|&)therapist=/i.test(renderedSource),
   "Rendered site contains a link that preselects a therapist",
@@ -321,10 +345,38 @@ if (daySpa) {
   check(daySpa.address?.addressLocality === "Howth", "DaySpa locality is incorrect");
   check(!("postalCode" in daySpa.address), "Unconfirmed Eircode appears in DaySpa schema");
   check(!("geo" in daySpa), "Unconfirmed coordinates appear in DaySpa schema");
-  check(
-    !("openingHoursSpecification" in daySpa),
-    "Provisional hours appear in DaySpa schema",
-  );
+  const openingHours = daySpa.openingHoursSpecification;
+  const homepageMarkup = pages.get("/") ?? "";
+  if (openingHours === undefined) {
+    check(
+      homepageMarkup.includes("Opening hours are being confirmed"),
+      "Unconfirmed DaySpa hours are not explained on the page",
+    );
+  } else {
+    check(
+      Array.isArray(openingHours) && openingHours.length > 0 && openingHours.length <= 7,
+      "Confirmed DaySpa hours must contain one to seven entries",
+    );
+    check(
+      homepageMarkup.includes("Current published schedule"),
+      "Confirmed DaySpa hours are not identified as the published schedule",
+    );
+    const days = [];
+    for (const entry of Array.isArray(openingHours) ? openingHours : []) {
+      const day = entry?.dayOfWeek;
+      days.push(day);
+      check(
+        entry?.["@type"] === "OpeningHoursSpecification" &&
+          typeof day === "string" &&
+          /^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/.test(day) &&
+          /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(entry?.opens ?? "") &&
+          /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(entry?.closes ?? "") &&
+          entry.opens < entry.closes,
+        "DaySpa contains an invalid confirmed opening-hours entry",
+      );
+    }
+    check(new Set(days).size === days.length, "DaySpa repeats an opening-hours day");
+  }
   check(
     JSON.stringify(daySpa.areaServed?.map((area) => area.name)) ===
       JSON.stringify(expectedAreas),
@@ -541,6 +593,7 @@ if (sitemap) {
   check(!sitemap.body.includes("admin-preview"), "Sitemap contains admin-preview");
   check(!sitemap.body.includes("/cms"), "Sitemap contains a CMS route");
   check(!sitemap.body.includes("/api/"), "Sitemap contains an API route");
+  check(!sitemap.body.includes("/book/status"), "Sitemap contains booking status");
   check(!sitemap.body.includes("/therapists"), "Sitemap contains the team page");
   const promotionsArePublished =
     (pages.get("/promotions") ?? "").includes('id="current-offers-heading"');
@@ -550,7 +603,10 @@ if (sitemap) {
     "Sitemap promotion visibility does not match published promotions",
   );
   for (const route of publicRoutes.filter(
-    (route) => route !== "/therapists" && route !== "/promotions",
+    (route) =>
+      route !== "/book/status" &&
+      route !== "/therapists" &&
+      route !== "/promotions",
   )) {
     check(
       sitemap.body.includes(
@@ -658,6 +714,27 @@ if (rejectedBooking) {
   check(
     /no-store/i.test(rejectedBooking.response.headers.get("cache-control") || ""),
     "Public booking error response is cacheable",
+  );
+}
+
+const rejectedBookingStatus = await request("/api/public/bookings/status", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Origin: "https://invalid.example",
+  },
+  body: "{}",
+});
+if (rejectedBookingStatus) {
+  check(
+    rejectedBookingStatus.response.status === 403,
+    `Cross-origin booking status request returned ${rejectedBookingStatus.response.status}`,
+  );
+  check(
+    /no-store/i.test(
+      rejectedBookingStatus.response.headers.get("cache-control") || "",
+    ),
+    "Public booking status error response is cacheable",
   );
 }
 

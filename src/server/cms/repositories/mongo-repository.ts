@@ -23,6 +23,11 @@ import type {
   CmsSession,
   CmsUser,
 } from "@/domain/cms/types";
+import {
+  isInternalBookingStatus,
+  type PublicBookingIdentifier,
+} from "@/domain/booking/public-status";
+import { getCmsAuditExpiryDate } from "@/server/cms/audit-retention";
 import { createDefaultContentState } from "@/server/cms/default-content";
 import { decryptCmsPii, encryptCmsPii } from "@/server/cms/pii";
 import {
@@ -63,6 +68,13 @@ function decode<T extends Identified>(value: Document | null): T | null {
   if (!value) return null;
   const { _id, ...rest } = value;
   return { id: String(_id), ...rest } as T;
+}
+
+function decodeAudit(value: Document | null): CmsAuditEvent | null {
+  if (!value) return null;
+  const { _id, ...stored } = value;
+  delete stored.expiresAtDate;
+  return { id: String(_id), ...stored } as CmsAuditEvent;
 }
 
 function rethrowCmsUserWriteError(error: unknown): never {
@@ -244,23 +256,6 @@ export class MongoCmsRepository implements CmsRepository {
         .collection<CmsMongoDocument>(collections.mediaAssets)
         .findOne({ _id: publicId }, this.options()),
     );
-  }
-
-  async listExpiredMediaAssets(nowIso: string, limit = 10) {
-    const db = await this.db();
-    const rows = await db
-      .collection<CmsMongoDocument>(collections.mediaAssets)
-      .find(
-        {
-          status: { $in: ["authorized", "staged", "deleting"] },
-          expiresAt: { $lte: nowIso },
-        },
-        this.options(),
-      )
-      .sort({ expiresAt: 1 })
-      .limit(Math.max(1, Math.min(limit, 25)))
-      .toArray();
-    return rows.map((row) => decode<CmsMediaAsset>(row)!);
   }
 
   async saveMediaAsset(asset: CmsMediaAsset, expectedVersion?: number) {
@@ -528,7 +523,13 @@ export class MongoCmsRepository implements CmsRepository {
     const db = await this.db();
     await db
       .collection<CmsMongoDocument>(collections.audit)
-      .insertOne(encode(event), this.options());
+      .insertOne(
+        {
+          ...encode(event),
+          expiresAtDate: getCmsAuditExpiryDate(event.createdAt),
+        },
+        this.options(),
+      );
   }
 
   async listAudit(limit = 100) {
@@ -539,7 +540,7 @@ export class MongoCmsRepository implements CmsRepository {
       .sort({ createdAt: -1 })
       .limit(Math.max(1, Math.min(limit, 500)))
       .toArray();
-    return rows.map((row) => decode<CmsAuditEvent>(row)!);
+    return rows.map((row) => decodeAudit(row)!);
   }
 
   async listAuditForEntity(entityType: string, entityId: string, limit = 100) {
@@ -550,7 +551,7 @@ export class MongoCmsRepository implements CmsRepository {
       .sort({ createdAt: -1 })
       .limit(Math.max(1, Math.min(limit, 500)))
       .toArray();
-    return rows.map((row) => decode<CmsAuditEvent>(row)!);
+    return rows.map((row) => decodeAudit(row)!);
   }
 
   async listBookingOccupancy(
@@ -632,6 +633,31 @@ export class MongoCmsRepository implements CmsRepository {
         .collection<CmsMongoDocument>(collections.bookings)
         .findOne({ _id: id }, this.options()),
     );
+  }
+
+  async findBookingPublicStatus(identifier: PublicBookingIdentifier) {
+    const db = await this.db();
+    const row = await db
+      .collection<CmsMongoDocument>(collections.bookings)
+      .findOne(
+        identifier.kind === "id"
+          ? { _id: identifier.value }
+          : { reference: identifier.value },
+        {
+          ...this.options(),
+          projection: { _id: 0, status: 1, capacityExpiresAt: 1 },
+        },
+      );
+
+    if (!row || !isInternalBookingStatus(row.status)) return null;
+
+    return {
+      status: row.status,
+      capacityExpiresAt:
+        typeof row.capacityExpiresAt === "string"
+          ? row.capacityExpiresAt
+          : "",
+    };
   }
 
   async findBookingByIdempotencyHash(hash: string) {
@@ -720,6 +746,15 @@ export class MongoCmsRepository implements CmsRepository {
     return rows.map((row) => decode<CmsBookingNotification>(row)!);
   }
 
+  async getNotification(id: string) {
+    const db = await this.db();
+    return decode<CmsBookingNotification>(
+      await db
+        .collection<CmsMongoDocument>(collections.notifications)
+        .findOne({ _id: id }, this.options()),
+    );
+  }
+
   async saveNotification(notification: CmsBookingNotification) {
     const db = await this.db();
     await db.collection<CmsMongoDocument>(collections.notifications).replaceOne(
@@ -727,6 +762,72 @@ export class MongoCmsRepository implements CmsRepository {
       encode(notification),
       { ...this.options(), upsert: true },
     );
+  }
+
+  async saveNotificationIfAbsent(notification: CmsBookingNotification) {
+    const db = await this.db();
+    await db.collection<CmsMongoDocument>(collections.notifications).updateOne(
+      { _id: notification.id },
+      { $setOnInsert: encode(notification) },
+      { ...this.options(), upsert: true },
+    );
+    const stored = await this.getNotification(notification.id);
+    if (!stored) throw new Error("Notification outbox insert could not be read.");
+    return stored;
+  }
+
+  async claimNotificationDelivery(
+    id: string,
+    expectedStatus: CmsBookingNotification["status"],
+    expectedAttemptCount: number,
+    expectedClaimId: string | undefined,
+    claimId: string,
+    attemptedAt: string,
+    firstAttemptedAt: string,
+  ) {
+    const db = await this.db();
+    const row = await db
+      .collection<CmsMongoDocument>(collections.notifications)
+      .findOneAndUpdate(
+        {
+          _id: id,
+          status: expectedStatus,
+          attemptCount: expectedAttemptCount,
+          deliveryClaimId: expectedClaimId ?? { $exists: false },
+        },
+        {
+          $inc: { attemptCount: 1 },
+          $set: {
+            status: "sending",
+            firstAttemptedAt,
+            attemptedAt,
+            deliveryClaimId: claimId,
+            deliveryClaimedAt: attemptedAt,
+            updatedAt: attemptedAt,
+          },
+        },
+        { ...this.options(), returnDocument: "after" },
+      );
+    return decode<CmsBookingNotification>(row);
+  }
+
+  async completeNotificationDelivery(
+    notification: CmsBookingNotification,
+    claimId: string,
+  ) {
+    const db = await this.db();
+    const result = await db
+      .collection<CmsMongoDocument>(collections.notifications)
+      .replaceOne(
+        {
+          _id: notification.id,
+          status: "sending",
+          deliveryClaimId: claimId,
+        },
+        encode(notification),
+        this.options(),
+      );
+    return result.matchedCount === 1;
   }
 
   async listActiveHolds(nowIso: string) {

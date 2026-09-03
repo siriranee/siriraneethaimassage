@@ -1,0 +1,45 @@
+.main {
+  overflow: clip;
+  background: var(--color-ivory);
+}
+
+.lookupSection {
+  position: relative;
+  padding-block: 3.5rem 5rem;
+  background:
+    radial-gradient(circle at 6% 18%, rgb(var(--color-purple-600-rgb) / 0.09), transparent 24rem),
+    radial-gradient(circle at 94% 84%, rgb(var(--color-gold-500-rgb) / 0.11), transparent 22rem),
+    var(--color-ivory);
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  width: calc(100% - (var(--pad-x) * 2));
+  margin-inline: auto;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 1.25rem;
+  color: var(--color-purple-800);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  color: var(--color-purple-950);
+}
+
+.backLink svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+@media (max-width: 640px) {
+  .lookupSection {
+    padding-block: 2.5rem 3.5rem;
+  }
+}

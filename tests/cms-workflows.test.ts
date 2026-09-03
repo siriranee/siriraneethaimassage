@@ -69,34 +69,56 @@ test("public service details resolve current CMS slugs only at request time", as
   assert.match(page, /notFound\(\)/);
 });
 
-test("notification preview records duplicate no contact details or message bodies", async () => {
-  const [types, notifications] = await Promise.all([
+test("notification records keep owner Resend delivery metadata free of contact details and message bodies", async () => {
+  const [types, notifications, publicBooking] = await Promise.all([
     source("src/domain/cms/types.ts"),
     source("src/server/cms/notification-service.ts"),
+    source("src/server/booking/public-booking.ts"),
   ]);
   const record = types.slice(types.indexOf("export type CmsBookingNotification"), types.indexOf("export type CmsBookingQuery"));
   assert.doesNotMatch(record, /recipient|phone|email|messageBody|body:/i);
   assert.match(notifications, /status: "preview"/);
+  assert.match(
+    notifications,
+    /id: ownerBookingRequestEmailNotificationId\(booking\.id\)/,
+  );
+  assert.match(notifications, /audience: "owner"/);
+  assert.match(notifications, /status: "queued"/);
+  assert.match(notifications, /provider: "resend"/);
+  assert.match(
+    publicBooking,
+    /const result = await create\(\);[\s\S]*?await attemptOwnerEmail\(result\.booking\)/,
+  );
 });
 
-test("CMS navigation omits retired sections and manual publishing", async () => {
-  const [shell, pages, integrations] = await Promise.all([
+test("CMS navigation omits retired pages, media, recovery and manual publishing", async () => {
+  const [shell, settings, integrations, types, contentService] = await Promise.all([
     source("src/components/cms/CmsShell.tsx"),
-    source("src/app/cms/(protected)/pages/page.tsx"),
+    source("src/app/cms/(protected)/settings/page.tsx"),
     source("src/app/cms/(protected)/settings/integrations/page.tsx"),
+    source("src/domain/cms/types.ts"),
+    source("src/server/cms/content-service.ts"),
   ]);
-  assert.doesNotMatch(shell, /\/cms\/(?:team|content|notifications|search)/);
-  assert.match(shell, /href: "\/cms\/pages"/);
-  assert.doesNotMatch(pages, /content\/preview|Review & publish/);
+  assert.doesNotMatch(
+    shell,
+    /\/cms\/(?:team|content|notifications|search|pages|media)/,
+  );
+  assert.doesNotMatch(settings, /\/cms\/settings\/recovery|Recovery/);
   assert.doesNotMatch(integrations, /\/cms\/notifications/);
-  await assert.rejects(
-    source("src/app/cms/(protected)/content/preview/page.tsx"),
-    { code: "ENOENT" },
-  );
-  await assert.rejects(
-    source("src/app/api/cms/content/publish/route.ts"),
-    { code: "ENOENT" },
-  );
+  assert.doesNotMatch(types, /CmsPageRecord|CmsGalleryRecord|readonly pages\??:|readonly gallery:/);
+  assert.doesNotMatch(contentService, /updateCmsPage|createCmsGalleryItem|updateCmsGalleryItem/);
+
+  for (const retiredPath of [
+    "src/app/cms/(protected)/pages/page.tsx",
+    "src/app/cms/(protected)/media/page.tsx",
+    "src/app/cms/(protected)/settings/recovery/page.tsx",
+    "src/app/cms/(protected)/content/preview/page.tsx",
+    "src/app/api/cms/pages/[pageId]/route.ts",
+    "src/app/api/cms/gallery/route.ts",
+    "src/app/api/cms/content/publish/route.ts",
+  ]) {
+    await assert.rejects(source(retiredPath), { code: "ENOENT" });
+  }
 });
 
 test("notification bell loads one safe dashboard feed per CMS page load", async () => {
@@ -161,41 +183,74 @@ test("closures repeat within a bounded range and use soft deactivation", async (
   assert.doesNotMatch(editor, /method:\s*"DELETE"/);
 });
 
-test("published page headings and SEO come from the immutable CMS snapshot", async () => {
-  const [adapter, home, contact] = await Promise.all([
+test("public page headings and SEO come from static project content", async () => {
+  const [adapter, home, contact, pageCopy, types, contentService] = await Promise.all([
     source("src/server/cms/public-adapter.ts"),
     source("src/app/(site)/page.tsx"),
     source("src/app/(site)/contact/page.tsx"),
+    source("src/content/page-copy.ts"),
+    source("src/domain/cms/types.ts"),
+    source("src/server/cms/content-service.ts"),
   ]);
-  assert.match(adapter, /getPublicPageCopy/);
-  assert.match(home, /getPublicPageCopy\("home"\)/);
-  assert.match(contact, /getPublicPageCopy\("contact"\)/);
+  assert.match(pageCopy, /export function getPageCopy/);
+  assert.match(pageCopy, /home:\s*\{/);
+  assert.match(pageCopy, /contact:\s*\{/);
+  assert.match(home, /getPageCopy\("home"\)/);
+  assert.match(contact, /getPageCopy\("contact"\)/);
   assert.match(home, /pageCopy\.title/);
   assert.match(contact, /pageCopy\.description/);
+  assert.doesNotMatch(adapter, /getPublicPageCopy|publishedSlides/);
+  assert.doesNotMatch(types, /CmsPageRecord|readonly pages\??:/);
+  assert.doesNotMatch(contentService, /parsePageUpdate|updateCmsPage|case "pages"/);
 });
 
-test("gift vouchers publish on save and remain information-only enquiries", async () => {
-  const [types, service, adapter, home, editor, collectionRoute, itemRoute] = await Promise.all([
+test("image-only vouchers publish on save and render in a navigation-free drag slider", async () => {
+  const [types, service, adapter, home, slider, sliderStyles, editor, collectionRoute, itemRoute] = await Promise.all([
     source("src/domain/cms/types.ts"),
     source("src/server/cms/content-service.ts"),
     source("src/server/cms/public-adapter.ts"),
     source("src/app/(site)/page.tsx"),
+    source("src/components/marketing/VoucherSlider.tsx"),
+    source("src/components/marketing/VoucherSlider.module.css"),
     source("src/components/cms/VoucherEditorForm.tsx"),
     source("src/app/api/cms/vouchers/route.ts"),
     source("src/app/api/cms/vouchers/[voucherId]/route.ts"),
   ]);
 
-  assert.match(types, /export type CmsVoucherRecord/);
+  const voucherType = types.slice(
+    types.indexOf("export type CmsVoucherRecord"),
+    types.indexOf("export type CmsContentState"),
+  );
+  assert.match(voucherType, /readonly title:\s*string/);
+  assert.match(voucherType, /readonly imageUrl:\s*string/);
+  assert.match(voucherType, /readonly imageAlt:\s*string/);
+  assert.doesNotMatch(voucherType, /description|amountCents|badge|terms/);
   assert.match(service, /vouchers: \[\.\.\.\(current\.vouchers \?\? \[\]\), created\]/);
   assert.equal((service.match(/\{ section: "vouchers", entityId: voucherId \}/g) ?? []).length, 2);
   assert.match(adapter, /voucher\.status === "published"/);
   assert.match(adapter, /first\.sortOrder - second\.sortOrder/);
-  assert.match(home, /Voucher information is shown for enquiry only/);
-  assert.match(home, /No online payment is/);
+  assert.match(adapter, /imageUrl:\s*voucher\.imageUrl/);
+  assert.match(adapter, /imageAlt:\s*voucher\.imageAlt/);
+  assert.match(home, /<VoucherSlider vouchers=\{vouchers\} \/>/);
+  assert.match(slider, /onPointerDown/);
+  assert.match(slider, /onPointerMove/);
+  assert.match(slider, /onKeyDown=\{handleKeyDown\}/);
+  assert.match(slider, /aria-roledescription="carousel"/);
+  assert.match(slider, /<h3>\{voucher\.title\}<\/h3>/);
+  assert.doesNotMatch(slider, /<button(?:\s|>)/i);
+  assert.doesNotMatch(slider, />\s*(?:Previous|Next)\s*</i);
+  assert.match(sliderStyles, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(sliderStyles, /object-fit:\s*contain/);
+  assert.match(sliderStyles, /scrollbar-width:\s*none/);
   assert.doesNotMatch(home, />\s*Buy(?: now| voucher)?\s*</i);
   assert.doesNotMatch(editor, /\/api\/(?:checkout|stripe)|stripe\.com/i);
-  assert.match(editor, /does not create an online product or payment link/i);
+  assert.match(editor, /scope:\s*"voucher-image"/);
+  assert.match(editor, /uploadCmsMediaSequentially/);
+  assert.match(editor, /rollbackStagedCmsMediaAssets/);
+  assert.doesNotMatch(editor, /name="(?:description|amountCents|badge|terms)"/);
   assert.match(collectionRoute, /isSameOriginMutation/);
   assert.match(collectionRoute, /requireCmsApiUser\("content:write"\)/);
-  assert.match(itemRoute, /Number\(body\.expectedVersion\)/);
+  assert.match(collectionRoute, /rollbackCmsMediaSubmission/);
+  assert.match(itemRoute, /Number\(parsed\.body\.expectedVersion\)/);
+  assert.match(itemRoute, /rollbackCmsMediaSubmission/);
 });

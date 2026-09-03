@@ -1,10 +1,11 @@
-import { CalendarDays, Camera, MapPinned, MessageCircle, Star } from "lucide-react";
+import { CalendarDays, Camera, Mail, MapPinned, MessageCircle, Star } from "lucide-react";
 import Link from "next/link";
 
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink, CmsStatusBadge } from "@/components/cms/CmsUi";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
 import { getCloudinaryMediaReadiness } from "@/server/media/config";
+import { getResendBookingEmailReadiness } from "@/server/booking/resend-booking-email";
 
 import styles from "@/components/cms/CmsViews.module.css";
 
@@ -12,6 +13,7 @@ export default async function CmsIntegrationsPage() {
   await requireCmsPageUser("settings:view");
   const content = await getCmsContent();
   const media = getCloudinaryMediaReadiness();
+  const bookingEmail = getResendBookingEmailReadiness();
   const items = [
     { icon: CalendarDays, name: "Booking provider", value: content.site.booksyUrl, configured: Boolean(content.site.booksyUrl), edit: "/cms/settings/business" },
     {
@@ -23,7 +25,14 @@ export default async function CmsIntegrationsPage() {
           ? "Cloudinary configuration is incomplete — uploads remain disabled"
           : "Cloudinary uploads are disabled by the deployment gate",
       configured: media.ready,
-      edit: "/cms/media",
+      edit: "/cms/services",
+    },
+    {
+      icon: Mail,
+      name: "Owner booking emails",
+      value: `${bookingEmail.summary}. New website requests are saved before Resend is called.`,
+      configured: bookingEmail.ready,
+      edit: "",
     },
     { icon: MessageCircle, name: "WhatsApp", value: content.site.whatsappNumber, configured: Boolean(content.site.whatsappNumber), edit: "/cms/settings/business" },
     { icon: Camera, name: "Instagram", value: content.site.instagramUrl, configured: Boolean(content.site.instagramUrl), edit: "/cms/settings/business" },
@@ -50,7 +59,10 @@ export default async function CmsIntegrationsPage() {
               <Icon aria-hidden="true" />
               <div>
                 <strong>{name} <CmsStatusBadge label={configured ? "Configured" : "Not configured"} tone={configured ? "success" : "warning"} /></strong>
-                <span>{value || "Owner or provider information required."} · <Link className={styles.miniLink} href={edit}>Edit</Link></span>
+                <span>
+                  {value || "Owner or provider information required."}
+                  {edit ? <> · <Link className={styles.miniLink} href={edit}>Edit</Link></> : " · Deployment settings"}
+                </span>
               </div>
             </li>
           ))}

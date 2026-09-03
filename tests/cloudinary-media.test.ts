@@ -104,7 +104,7 @@ test("media policy only accepts compressed image types and bounded dimensions", 
     width: 4_000,
     height: 4_000,
   });
-  assert.equal(parseCmsMediaScope("home-hero"), "home-hero");
+  assert.equal(parseCmsMediaScope("voucher-image"), "voucher-image");
 
   assert.throws(
     () => parseCmsMediaContentType("image/svg+xml"),
@@ -119,6 +119,8 @@ test("media policy only accepts compressed image types and bounded dimensions", 
     CmsMediaValidationError,
   );
   assert.throws(() => parseCmsMediaScope("avatar"), CmsMediaValidationError);
+  assert.throws(() => parseCmsMediaScope("home-hero"), CmsMediaValidationError);
+  assert.throws(() => parseCmsMediaScope("site-gallery"), CmsMediaValidationError);
 });
 
 test("upload tokens are short-lived and bound to user, submission, scope and public ID", () => {
@@ -340,33 +342,33 @@ test("the central CMS image boundary covers every editable image surface", () =>
     "https://res.cloudinary.com/siriranee/image/upload/v123/siriranee/cms/assets/0123456789abcdef/submission-123/asset-123.webp";
   type ImageLocations = {
     serviceCover: string;
+    serviceHero: string;
     serviceGallery: string;
-    siteGallery: string;
-    homeHero: string;
+    voucherImage: string;
   };
   const contentWith = (locations: ImageLocations) =>
     ({
       services: [
         {
           imageUrl: locations.serviceCover,
+          hero: { imageUrl: locations.serviceHero },
           galleryImages: [{ imageUrl: locations.serviceGallery }],
         },
       ],
-      gallery: [{ imageUrl: locations.siteGallery }],
-      pages: [{ heroSlides: [{ imageUrl: locations.homeHero }] }],
+      vouchers: [{ imageUrl: locations.voucherImage }],
     }) as unknown as CmsContentState;
   const localLocations: ImageLocations = {
     serviceCover: "/images/services/cover.webp",
+    serviceHero: "/images/services/hero.webp",
     serviceGallery: "/images/services/gallery.webp",
-    siteGallery: "/images/gallery/room.webp",
-    homeHero: "/images/home/hero.webp",
+    voucherImage: "/images/vouchers/gift.webp",
   };
 
   assert.deepEqual(
     collectCmsScopedMediaReferences(contentWith(localLocations)).map(
       (reference) => reference.scope,
     ),
-    ["service-cover", "service-gallery", "site-gallery", "home-hero"],
+    ["service-cover", "service-cover", "service-gallery", "voucher-image"],
   );
   assert.doesNotThrow(() =>
     assertCmsContentImageReferencesApproved(
@@ -379,8 +381,8 @@ test("the central CMS image boundary covers every editable image surface", () =>
       contentWith({
         serviceCover: ownedUrl,
         serviceGallery: ownedUrl,
-        siteGallery: ownedUrl,
-        homeHero: ownedUrl,
+        serviceHero: ownedUrl,
+        voucherImage: ownedUrl,
       }),
       ownership,
     ),
@@ -403,7 +405,7 @@ test("the central CMS image boundary covers every editable image surface", () =>
   assert.throws(
     () =>
       assertCmsContentImageReferencesApproved(
-        contentWith({ ...localLocations, homeHero: "/images/../secret.webp" }),
+        contentWith({ ...localLocations, voucherImage: "/images/../secret.webp" }),
         ownership,
       ),
     CmsMediaValidationError,
@@ -424,18 +426,16 @@ test("the central CMS image boundary covers every editable image surface", () =>
   const reusedInNewScope = contentWith({
     ...localLocations,
     serviceCover: ownedUrl,
-    homeHero: ownedUrl,
+    voucherImage: ownedUrl,
   });
   assert.deepEqual(
     collectNewCmsScopedMediaReferences(current, reusedInNewScope),
-    [{ scope: "home-hero", secureUrl: ownedUrl }],
+    [{ scope: "voucher-image", secureUrl: ownedUrl }],
   );
   assert.deepEqual(collectNewCmsScopedMediaReferences(current, current), []);
 
   const legacySnapshot = {
     services: [{ imageUrl: ownedUrl }],
-    gallery: [],
-    pages: [],
   } as unknown as CmsContentState;
   assert.deepEqual(collectCmsScopedMediaReferences(legacySnapshot), [
     { scope: "service-cover", secureUrl: ownedUrl },
@@ -443,26 +443,30 @@ test("the central CMS image boundary covers every editable image surface", () =>
 });
 
 test("Cloudinary routes and persistence enforce the authenticated staged workflow", async () => {
-  const [rootRoute, completeRoute, cleanupRoute, service, repository, mongo, indexes] =
+  const [rootRoute, completeRoute, service, repository, mongo, indexes] =
     await Promise.all([
       source("src/app/api/cms/media-upload/route.ts"),
       source("src/app/api/cms/media-upload/complete/route.ts"),
-      source("src/app/api/cms/media-upload/cleanup/route.ts"),
       source("src/server/media/cloudinary-service.ts"),
       source("src/server/cms/repositories/repository.ts"),
       source("src/server/cms/repositories/mongo-repository.ts"),
       source("scripts/cms-indexes.mjs"),
     ]);
 
-  for (const route of [rootRoute, completeRoute, cleanupRoute]) {
+  for (const route of [rootRoute, completeRoute]) {
     assert.match(route, /requireCmsApiUser\("content:write"\)/);
     assert.match(route, /cmsNoStoreJson/);
   }
-  for (const route of [rootRoute, completeRoute, cleanupRoute]) {
+  for (const route of [rootRoute, completeRoute]) {
     if (route.includes("export async function POST") || route.includes("DELETE")) {
       assert.match(route, /isSameOriginMutation/);
     }
   }
+  assert.match(rootRoute, /export async function DELETE/);
+  await assert.rejects(
+    source("src/app/api/cms/media-upload/cleanup/route.ts"),
+    { code: "ENOENT" },
+  );
   assert.match(service, /status: "authorized"/);
   assert.match(service, /providerSignatureExpiresAt/);
   assert.match(service, /verifyCloudinaryUploadResponseSignature/);
@@ -476,7 +480,7 @@ test("Cloudinary routes and persistence enforce the authenticated staged workflo
   assert.match(repository, /isMediaAssetReferenced/);
   assert.match(mongo, /for await \(const row of cursor\)/);
   assert.match(indexes, /cms_media_provider_asset_id_unique/);
-  assert.match(indexes, /cms_media_status_expiry/);
+  assert.doesNotMatch(indexes, /cms_media_status_expiry/);
   assert.doesNotMatch(rootRoute + completeRoute, /CLOUDINARY_API_SECRET/);
 });
 
@@ -488,9 +492,8 @@ test("content writes commit media in the same repository transaction", async () 
     Promise.all([
       source("src/app/api/cms/services/route.ts"),
       source("src/app/api/cms/services/[serviceId]/route.ts"),
-      source("src/app/api/cms/pages/[pageId]/route.ts"),
-      source("src/app/api/cms/gallery/route.ts"),
-      source("src/app/api/cms/gallery/[itemId]/route.ts"),
+      source("src/app/api/cms/vouchers/route.ts"),
+      source("src/app/api/cms/vouchers/[voucherId]/route.ts"),
     ]),
   ]);
 
@@ -511,7 +514,7 @@ test("content writes commit media in the same repository transaction", async () 
     assert.match(route, /removeCmsMediaSubmissionEnvelope/);
     assert.match(route, /mediaSubmission: submission/);
   }
-  for (const route of routes.slice(0, 2)) {
+  for (const route of routes) {
     assert.match(route, /rollbackCmsMediaSubmission\(/);
     assert.match(route, /rollbackCmsMediaSubmissionWithCapability\(/);
     assert.match(route, /isMongoCommitResultIndeterminate\(error\)/);
@@ -574,18 +577,17 @@ test("service auth failures and media DELETE retain bounded dual-capability clea
   assert.match(cloudinaryService, /isMediaAssetReferenced/);
 });
 
-test("CMS image forms defer uploads until valid final save and roll back failures", async () => {
-  const [galleryForm, serviceForm, pageForm, serviceGallery, heroEditor, formStyles] =
+test("service and voucher forms defer uploads until final save and roll back failures", async () => {
+  const [serviceForm, voucherForm, serviceGallery, formStyles] =
     await Promise.all([
-      source("src/components/cms/GalleryEditorForm.tsx"),
       source("src/components/cms/ServiceEditorForm.tsx"),
-      source("src/components/cms/PageEditorForm.tsx"),
+      source("src/components/cms/VoucherEditorForm.tsx"),
       source("src/components/cms/ServiceGalleryEditor.tsx"),
-      source("src/components/cms/HomeHeroSlidesEditor.tsx"),
       source("src/components/cms/CmsEditorForm.module.css"),
     ]);
 
-  for (const form of [galleryForm, serviceForm, pageForm]) {
+  {
+    const form = serviceForm;
     const validationIndex = form.indexOf("form.reportValidity()");
     const uploadIndex = form.indexOf("uploadCmsMediaSequentially({", validationIndex);
 
@@ -603,9 +605,21 @@ test("CMS image forms defer uploads until valid final save and roll back failure
     assert.match(form, /cache: "no-store"/);
   }
 
-  assert.match(galleryForm, /scope: "site-gallery"/);
-  assert.match(galleryForm, /required=\{!preparedImage\}/);
-  assert.match(galleryForm, /setPreparedImage\(null\)/);
+  const voucherImageCheck = voucherForm.indexOf("if (!imageUrl && !preparedImage)");
+  const voucherUpload = voucherForm.indexOf(
+    "uploadCmsMediaSequentially({",
+    voucherImageCheck,
+  );
+  assert.ok(voucherImageCheck >= 0 && voucherUpload > voucherImageCheck);
+  assert.match(voucherForm, /createCmsMediaSubmissionId\(\)/);
+  assert.match(voucherForm, /createCmsMediaSubmissionEnvelope\(/);
+  assert.match(voucherForm, /rollbackStagedCmsMediaAssets\(/);
+  assert.match(voucherForm, /saveLockRef\.current/);
+  assert.match(voucherForm, /<fieldset className=\{styles\.formFields\} disabled=\{locked\}>/);
+  assert.match(voucherForm, /cache: "no-store"/);
+  assert.match(voucherForm, /scope: "voucher-image"/);
+  assert.match(voucherForm, /required=\{!imageUrl\}/);
+  assert.match(voucherForm, /setPreparedImage\(null\)/);
 
   assert.match(serviceForm, /scope: "service-cover"/);
   assert.match(serviceForm, /key: "service-hero", scope: "service-cover"/);
@@ -621,11 +635,13 @@ test("CMS image forms defer uploads until valid final save and roll back failure
   assert.doesNotMatch(serviceGallery, /Image path or approved HTTPS URL/);
   assert.doesNotMatch(serviceGallery, /placeholderPath|serviceSlug/);
 
-  assert.match(pageForm, /scope: "home-hero"/);
-  assert.match(pageForm, /for \(const slide of heroSlides\)/);
-  assert.match(pageForm, /preparedImages=\{preparedHeroImages\}/);
-  assert.match(pageForm, /setPreparedHeroImages\(\{\}\)/);
-  assert.match(heroEditor, /required=\{!preparedImages\[slide\.id\]\}/);
+  for (const retiredForm of [
+    "src/components/cms/GalleryEditorForm.tsx",
+    "src/components/cms/PageEditorForm.tsx",
+    "src/components/cms/HomeHeroSlidesEditor.tsx",
+  ]) {
+    await assert.rejects(source(retiredForm), { code: "ENOENT" });
+  }
 
   assert.match(formStyles, /\.formFields\s*\{/);
   assert.match(formStyles, /\.formBusy \.formFields\s*\{/);

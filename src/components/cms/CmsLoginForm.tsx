@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import {
   CMS_PASSWORD_HTML_PATTERN,
@@ -18,10 +18,29 @@ import {
   CMS_USERNAME_HTML_PATTERN,
   CMS_USERNAME_MAX_LENGTH,
   CMS_USERNAME_MIN_LENGTH,
+  isValidCmsUsername,
+  normalizeCmsUsername,
 } from "@/domain/cms/account-policy";
 import type { CmsMode } from "@/server/cms/config";
 
 import styles from "./CmsLoginForm.module.css";
+
+const rememberedUsernameKey = "siriranee.cms.rememberedUsername";
+
+function updateRememberedUsername(username: string, remember: boolean) {
+  try {
+    if (remember) {
+      window.localStorage.setItem(
+        rememberedUsernameKey,
+        normalizeCmsUsername(username),
+      );
+    } else {
+      window.localStorage.removeItem(rememberedUsernameKey);
+    }
+  } catch {
+    // Sign-in still works when browser storage is unavailable.
+  }
+}
 
 export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
   const router = useRouter();
@@ -30,12 +49,31 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
   const passwordId = useId();
   const passwordHintId = useId();
   const errorId = useId();
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const rememberRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
   const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const hasError = status === "error" && Boolean(message);
 
-  async function submit(payload: { demo?: boolean; username?: string; password?: string }) {
+  useEffect(() => {
+    try {
+      const rememberedUsername = window.localStorage.getItem(
+        rememberedUsernameKey,
+      );
+      if (!rememberedUsername || !isValidCmsUsername(rememberedUsername)) return;
+
+      if (usernameRef.current) usernameRef.current.value = rememberedUsername;
+      if (rememberRef.current) rememberRef.current.checked = true;
+    } catch {
+      // Leave both controls empty when browser storage is unavailable.
+    }
+  }, []);
+
+  async function submit(
+    payload: { demo?: boolean; username?: string; password?: string },
+    rememberUsername = false,
+  ) {
     setStatus("working");
     setMessage("");
 
@@ -55,6 +93,9 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
         return;
       }
 
+      if (payload.username) {
+        updateRememberedUsername(payload.username, rememberUsername);
+      }
       router.replace("/cms");
       router.refresh();
     } catch {
@@ -70,7 +111,7 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
     void submit({
       username: String(data.get("username") ?? ""),
       password: String(data.get("password") ?? ""),
-    });
+    }, data.get("rememberUsername") === "on");
   }
 
   function clearError() {
@@ -140,6 +181,7 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
           minLength={CMS_USERNAME_MIN_LENGTH}
           name="username"
           pattern={CMS_USERNAME_HTML_PATTERN}
+          ref={usernameRef}
           required
           spellCheck={false}
           title={`${CMS_USERNAME_MIN_LENGTH}–${CMS_USERNAME_MAX_LENGTH} characters using letters and numbers only.`}
@@ -183,6 +225,11 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
           Letters and numbers only.
         </p>
       </div>
+
+      <label className={styles.rememberControl}>
+        <input name="rememberUsername" ref={rememberRef} type="checkbox" />
+        <span>Remember username</span>
+      </label>
 
       <button className={styles.submitButton} disabled={status === "working"} type="submit">
         {status === "working" ? "Signing in..." : "Sign in"}

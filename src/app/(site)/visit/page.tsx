@@ -13,18 +13,19 @@ import Link from "next/link";
 
 import { MapEmbed } from "@/components/contact/MapEmbed";
 import { PageHero } from "@/components/marketing/PageHero";
+import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
 import {
   buildBreadcrumbJsonLd,
   jsonLdScriptProps,
 } from "@/lib/structured-data";
-import { getPublicPageCopy, getPublicSiteData } from "@/server/cms/public-adapter";
+import { getPublicSiteData } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPublicPageCopy("visit");
+  const page = getPageCopy("visit");
   return createMetadata({ title: page.seoTitle, description: page.seoDescription, path: "/visit" });
 }
 
@@ -34,7 +35,8 @@ const breadcrumbJsonLd = buildBreadcrumbJsonLd([
 ]);
 
 export default async function VisitPage() {
-  const [site, pageCopy] = await Promise.all([getPublicSiteData(), getPublicPageCopy("visit")]);
+  const pageCopy = getPageCopy("visit");
+  const site = await getPublicSiteData();
   const phone = site.contact.phone;
 
   return (

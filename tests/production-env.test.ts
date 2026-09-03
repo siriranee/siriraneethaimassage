@@ -24,6 +24,9 @@ const relevantKeys = [
   "CLOUDINARY_UPLOAD_PRESET",
   "CLOUDINARY_FOLDER",
   "CMS_MEDIA_TOKEN_SECRET",
+  "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
+  "RESEND_BOOKING_TO_EMAIL",
 ];
 
 function run(overrides: Record<string, string> = {}) {
@@ -45,6 +48,12 @@ const database = {
   MONGODB_DB: "siriranee_test",
   CMS_ORIGIN: validOrigin,
   CMS_COOKIE_SECURE: "true",
+};
+
+const resend = {
+  RESEND_API_KEY: "re_test_booking_notifications_123456",
+  RESEND_FROM_EMAIL: "Siriranee Bookings <bookings@siriranee.example>",
+  RESEND_BOOKING_TO_EMAIL: "owner@siriranee.example",
 };
 
 test("hosted builds require a clean HTTPS production origin", () => {
@@ -104,6 +113,46 @@ test("the live-booking switch requires MongoDB and a valid encryption key", () =
     run({
       ...live,
       CMS_PII_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64url"),
+      ...resend,
+    }).status,
+    0,
+  );
+});
+
+test("live public booking requires a complete valid Resend owner email", () => {
+  const live = {
+    ...database,
+    NEXT_PUBLIC_SITE_URL: validOrigin,
+    CMS_PUBLIC_BOOKING_READY: "true",
+    CMS_PII_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64url"),
+  };
+
+  assert.equal(run(live).status, 1);
+  assert.equal(
+    run({ ...live, RESEND_API_KEY: resend.RESEND_API_KEY }).status,
+    1,
+  );
+  assert.equal(
+    run({ ...live, ...resend, RESEND_FROM_EMAIL: "invalid" }).status,
+    1,
+  );
+  assert.equal(run({ ...live, ...resend }).status, 0);
+});
+
+test("partial Resend configuration fails even while public booking is off", () => {
+  assert.equal(
+    run({
+      CMS_MODE: "disabled",
+      NEXT_PUBLIC_SITE_URL: validOrigin,
+      RESEND_API_KEY: resend.RESEND_API_KEY,
+    }).status,
+    1,
+  );
+  assert.equal(
+    run({
+      CMS_MODE: "disabled",
+      NEXT_PUBLIC_SITE_URL: validOrigin,
+      ...resend,
     }).status,
     0,
   );

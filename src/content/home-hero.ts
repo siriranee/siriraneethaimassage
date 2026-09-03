@@ -1,4 +1,11 @@
-import type { CmsPageHeroSlide } from "@/domain/cms/page-hero";
+export type HomeHeroSlide = Readonly<{
+  id: string;
+  imageUrl: string;
+  altText: string;
+  title: string;
+  focalX: number;
+  focalY: number;
+}>;
 
 export const defaultHomeHeroSlides = [
   {
@@ -55,38 +62,4 @@ export const defaultHomeHeroSlides = [
     focalX: 50,
     focalY: 50,
   },
-] as const satisfies readonly CmsPageHeroSlide[];
-
-const legacyHomeHeroImageUrls = new Set([
-  "/images/hero/slide-traditional-thai.webp",
-  "/images/hero/slide-hot-oil.webp",
-  "/images/hero/slide-hot-stone.webp",
-]);
-const previousHomeHeroImageUrls = [
-  "/images/Hero/Home/1.png",
-  "/images/Hero/Home/2.png",
-  "/images/Hero/Home/3.png",
-  "/images/Hero/Home/4.png",
-] as const;
-
-export function migrateLegacyHomeHeroSlides(
-  slides: readonly CmsPageHeroSlide[],
-): readonly CmsPageHeroSlide[] {
-  if (
-    slides.length === legacyHomeHeroImageUrls.size &&
-    slides.every((slide) => legacyHomeHeroImageUrls.has(slide.imageUrl))
-  ) {
-    return defaultHomeHeroSlides.map((slide) => ({ ...slide }));
-  }
-
-  if (
-    slides.length === previousHomeHeroImageUrls.length &&
-    slides.every(
-      (slide, index) => slide.imageUrl === previousHomeHeroImageUrls[index],
-    )
-  ) {
-    return defaultHomeHeroSlides.map((slide) => ({ ...slide }));
-  }
-
-  return slides;
-}
+] as const satisfies readonly HomeHeroSlide[];

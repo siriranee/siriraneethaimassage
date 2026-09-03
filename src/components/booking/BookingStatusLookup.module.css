@@ -1,0 +1,250 @@
+.card {
+  display: grid;
+  gap: 2rem;
+  width: min(100%, 52rem);
+  margin-inline: auto;
+  padding: 2.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-large);
+  background: rgb(var(--color-surface-rgb) / 0.95);
+  box-shadow: var(--shadow-card);
+}
+
+.intro {
+  display: grid;
+  align-items: start;
+  gap: 1rem;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.iconWrap {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  border: 1px solid rgb(var(--color-gold-500-rgb) / 0.38);
+  border-radius: 50%;
+  color: var(--color-purple-800);
+  background: rgb(var(--color-gold-500-rgb) / 0.12);
+  place-items: center;
+}
+
+.iconWrap svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.eyebrow {
+  margin-bottom: 0.35rem;
+  color: var(--color-gold-text);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.intro h2 {
+  margin-bottom: 0.65rem;
+  color: var(--color-purple-950);
+  font-size: var(--fs-3xl);
+}
+
+.intro div > p:last-child {
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+
+.form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.form label {
+  color: var(--color-purple-950);
+  font-weight: 800;
+}
+
+.form label span {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.inputRow {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.inputRow input {
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-medium);
+  color: var(--color-purple-950);
+  background: var(--color-surface);
+  font: inherit;
+}
+
+.inputRow input:focus-visible {
+  border-color: var(--color-purple-700);
+  outline: 3px solid rgb(var(--color-purple-700-rgb) / 0.14);
+}
+
+.inputRow button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 9.5rem;
+  padding: 0.85rem 1.15rem;
+  border: 1px solid var(--color-purple-800);
+  border-radius: var(--radius-medium);
+  color: var(--color-on-brand);
+  background: var(--color-purple-800);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.inputRow button:hover:not(:disabled) {
+  background: var(--color-purple-950);
+}
+
+.inputRow button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.inputRow button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.inputRow button:disabled svg {
+  animation: status-spin 0.9s linear infinite;
+}
+
+.hint,
+.fieldError {
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+.hint {
+  color: var(--color-muted);
+}
+
+.fieldError {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.result,
+.error,
+.idleNotice {
+  border-radius: var(--radius-medium);
+}
+
+.result {
+  display: grid;
+  align-items: start;
+  gap: 0.9rem;
+  padding: 1.25rem;
+  border: 1px solid rgb(var(--color-purple-700-rgb) / 0.18);
+  background: rgb(var(--color-purple-700-rgb) / 0.07);
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.result > svg {
+  width: 1.5rem;
+  color: var(--color-purple-800);
+}
+
+.result p {
+  margin-bottom: 0.15rem;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.result h3 {
+  margin-bottom: 0.4rem;
+  color: var(--color-purple-950);
+  font-size: var(--fs-xl);
+}
+
+.result span {
+  color: var(--color-ink);
+  line-height: 1.6;
+}
+
+.error {
+  padding: 1.1rem 1.2rem;
+  border: 1px solid rgb(153 27 27 / 0.2);
+  color: var(--color-danger);
+  background: var(--color-danger-surface);
+}
+
+.error p {
+  margin-top: 0.3rem;
+  line-height: 1.55;
+}
+
+.idleNotice {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.9rem 1rem;
+  color: var(--color-muted);
+  background: rgb(var(--color-purple-700-rgb) / 0.05);
+}
+
+.idleNotice svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--color-purple-700);
+}
+
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .card {
+    gap: 1.5rem;
+    padding: 1.4rem;
+  }
+
+  .intro {
+    grid-template-columns: 1fr;
+  }
+
+  .inputRow {
+    grid-template-columns: 1fr;
+  }
+
+  .inputRow button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inputRow button:disabled svg {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .card,
+  .result,
+  .error,
+  .inputRow input,
+  .inputRow button {
+    border: 1px solid CanvasText;
+  }
+}

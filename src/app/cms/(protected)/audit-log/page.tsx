@@ -22,7 +22,7 @@ export default async function CmsAuditLogPage() {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/settings" secondary>Back to settings</CmsPrimaryLink>}
-        description="An append-only record of sign-ins, publishing and administrative changes, shown in Dublin time."
+        description="An append-only record of sign-ins, publishing and administrative changes, retained for one year and shown in Dublin time."
         eyebrow="Security & accountability"
         title="Audit log"
       />

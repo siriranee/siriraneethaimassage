@@ -11,7 +11,14 @@ import { appendCmsAudit } from "@/server/cms/audit";
 import { CmsValidationError } from "@/server/cms/content-validation";
 import { getCmsRepository } from "@/server/cms/repositories";
 import { CmsConflictError } from "@/server/cms/repositories/repository";
-import { recordBookingNotificationPlan } from "@/server/cms/notification-service";
+import {
+  deliverOwnerBookingRequestEmail,
+  ensureOwnerBookingRequestEmail,
+  recordBookingNotificationPlan,
+  recordOwnerBookingRequestEmail,
+  shouldRetryOwnerBookingEmail,
+} from "@/server/cms/notification-service";
+import type { OwnerBookingEmailSender } from "@/server/booking/resend-booking-email";
 
 export class PublicBookingRateLimitError extends Error {
   constructor() {
@@ -84,6 +91,7 @@ export async function createPublicBooking(
   input: {
     readonly idempotencyKey: string;
     readonly requestId: string;
+    readonly sendOwnerBookingEmail?: OwnerBookingEmailSender;
   },
 ) {
   const source = value && typeof value === "object"
@@ -170,7 +178,8 @@ export async function createPublicBooking(
             "This booking request identifier was already used for different details.",
           );
         }
-        return existing;
+        await ensureOwnerBookingRequestEmail(transaction, existing);
+        return { booking: existing, created: false as const };
       }
 
       const publication = await transaction.getPublishedContent();
@@ -256,7 +265,16 @@ export async function createPublicBooking(
       };
 
       await transaction.saveBooking(booking);
-      await recordBookingNotificationPlan(transaction, booking, "booking-requested");
+      await recordBookingNotificationPlan(
+        transaction,
+        booking,
+        "booking-requested",
+        { channels: ["dashboard"] },
+      );
+      await recordOwnerBookingRequestEmail(
+        transaction,
+        booking,
+      );
       await appendCmsAudit(transaction, {
         actor: { id: "public-booking", displayName: "Public booking form" },
         action: "booking.requested",
@@ -265,11 +283,40 @@ export async function createPublicBooking(
         summary: `Received website booking request ${booking.reference}.`,
         requestId: input.requestId,
       });
-      return booking;
+      return {
+        booking,
+        created: true as const,
+      };
     });
 
+  const attemptOwnerEmail = async (booking: CmsBooking) => {
+    try {
+      const first = await deliverOwnerBookingRequestEmail(
+        repository,
+        booking,
+        input.sendOwnerBookingEmail,
+      );
+      if (shouldRetryOwnerBookingEmail(first)) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 1_000);
+        });
+        await deliverOwnerBookingRequestEmail(
+          repository,
+          booking,
+          input.sendOwnerBookingEmail,
+        );
+      }
+    } catch {
+      console.error(
+        `Failed to update the owner booking email outbox for booking ${booking.id}.`,
+      );
+    }
+  };
+
   try {
-    return await create();
+    const result = await create();
+    await attemptOwnerEmail(result.booking);
+    return result.booking;
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
 
@@ -280,6 +327,14 @@ export async function createPublicBooking(
       existing &&
       existing.requestFingerprintHash === requestFingerprintHash
     ) {
+      try {
+        await ensureOwnerBookingRequestEmail(repository, existing);
+      } catch {
+        console.error(
+          `Failed to repair the owner booking email outbox for booking ${existing.id}.`,
+        );
+      }
+      await attemptOwnerEmail(existing);
       return existing;
     }
 

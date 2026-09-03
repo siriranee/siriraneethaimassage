@@ -15,6 +15,10 @@ import type {
   CmsSession,
   CmsUser,
 } from "@/domain/cms/types";
+import type {
+  PublicBookingIdentifier,
+  PublicBookingStatusSource,
+} from "@/domain/booking/public-status";
 import type { CmsMode } from "@/server/cms/config";
 
 export class CmsConflictError extends Error {
@@ -40,10 +44,6 @@ export interface CmsRepository {
   savePublication(publication: CmsPublication): Promise<void>;
 
   getMediaAsset(publicId: string): Promise<CmsMediaAsset | null>;
-  listExpiredMediaAssets(
-    nowIso: string,
-    limit?: number,
-  ): Promise<readonly CmsMediaAsset[]>;
   saveMediaAsset(
     asset: CmsMediaAsset,
     expectedVersion?: number,
@@ -92,6 +92,9 @@ export interface CmsRepository {
     to: string,
   ): Promise<readonly CmsBookingOccupancy[]>;
   getBooking(id: string): Promise<CmsBooking | null>;
+  findBookingPublicStatus(
+    identifier: PublicBookingIdentifier,
+  ): Promise<PublicBookingStatusSource | null>;
   findBookingByIdempotencyHash(hash: string): Promise<CmsBooking | null>;
   saveBooking(
     booking: CmsBooking,
@@ -111,7 +114,24 @@ export interface CmsRepository {
   listDashboardNotifications(
     limit?: number,
   ): Promise<readonly CmsBookingNotification[]>;
+  getNotification(id: string): Promise<CmsBookingNotification | null>;
   saveNotification(notification: CmsBookingNotification): Promise<void>;
+  saveNotificationIfAbsent(
+    notification: CmsBookingNotification,
+  ): Promise<CmsBookingNotification>;
+  claimNotificationDelivery(
+    id: string,
+    expectedStatus: CmsBookingNotification["status"],
+    expectedAttemptCount: number,
+    expectedClaimId: string | undefined,
+    claimId: string,
+    attemptedAt: string,
+    firstAttemptedAt: string,
+  ): Promise<CmsBookingNotification | null>;
+  completeNotificationDelivery(
+    notification: CmsBookingNotification,
+    claimId: string,
+  ): Promise<boolean>;
 
   listActiveHolds(nowIso: string): Promise<readonly CmsBookingHold[]>;
   findHoldByTokenHash(tokenHash: string): Promise<CmsBookingHold | null>;

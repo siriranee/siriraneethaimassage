@@ -5,6 +5,9 @@ import {
 } from "node:crypto";
 import { MongoClient } from "mongodb";
 
+const auditRetentionDays = 365;
+const millisecondsPerDay = 24 * 60 * 60 * 1_000;
+
 const uri = process.env.MONGODB_URI?.trim();
 const dbName = process.env.MONGODB_DB?.trim() || "siriranee";
 const username = process.env.CMS_SEED_USERNAME?.trim().toLowerCase();
@@ -105,7 +108,8 @@ try {
   const sessions = db.collection("cmsSessions");
   const audit = db.collection("cmsAuditEvents");
   const existing = await users.findOne({ username });
-  const now = new Date().toISOString();
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
   const id = existing?._id?.toString() || randomUUID();
   const authVersion = Number(existing?.authVersion ?? 0) + 1;
   const version = Number(existing?.version ?? 0) + 1;
@@ -145,6 +149,9 @@ try {
       : "Initial CMS administrator was securely provisioned.",
     requestId: randomUUID(),
     createdAt: now,
+    expiresAtDate: new Date(
+      nowDate.getTime() + auditRetentionDays * millisecondsPerDay,
+    ),
   });
 
   console.log(`CMS user provisioning passed for role ${role} in database ${dbName}.`);

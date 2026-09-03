@@ -6,9 +6,6 @@ import {
   CMS_CONTENT_SCHEMA_VERSION,
   type CmsBookingSettings,
   type CmsContentState,
-  type CmsGalleryRecord,
-  type CmsPageId,
-  type CmsPageRecord,
   type CmsPublication,
   type CmsPromotionRecord,
   type CmsServiceRecord,
@@ -17,8 +14,6 @@ import {
   type CmsUser,
   type CmsVoucherRecord,
 } from "@/domain/cms/types";
-import { migrateLegacyHomeHeroSlides } from "@/content/home-hero";
-import { normaliseStoredPageHeroSlides } from "@/domain/cms/page-hero";
 import { normaliseStoredServiceGalleryImages } from "@/domain/cms/service-gallery";
 import {
   normaliseStoredServiceHero,
@@ -33,9 +28,6 @@ import {
 import {
   CmsValidationError,
   parseBookingSettingsUpdate,
-  parseGalleryCreate,
-  parseGalleryUpdate,
-  parsePageUpdate,
   parsePromotionCreate,
   parsePromotionUpdate,
   parseServiceCreate,
@@ -64,9 +56,7 @@ type CmsPublicationTarget =
   | {
       readonly section:
         | "services"
-        | "pages"
         | "team"
-        | "gallery"
         | "promotions"
         | "vouchers";
       readonly entityId: string;
@@ -128,10 +118,17 @@ function createImmediatePublicationSnapshot(
   content: CmsContentState,
   target: CmsPublicationTarget,
 ) {
+  const clonedPublicBase = structuredClone(publicBase);
   const snapshotBase: CmsContentState = {
-    ...structuredClone(publicBase),
+    id: clonedPublicBase.id,
     schemaVersion: CMS_CONTENT_SCHEMA_VERSION,
     revision: content.revision,
+    services: clonedPublicBase.services,
+    site: clonedPublicBase.site,
+    bookingSettings: clonedPublicBase.bookingSettings,
+    team: clonedPublicBase.team,
+    promotions: clonedPublicBase.promotions,
+    vouchers: clonedPublicBase.vouchers ?? [],
     updatedAt: content.updatedAt,
     updatedBy: content.updatedBy,
   };
@@ -155,16 +152,6 @@ function createImmediatePublicationSnapshot(
         ...snapshotBase,
         bookingSettings: structuredClone(content.bookingSettings),
       };
-    case "pages": {
-      const page = content.pages?.find(
-        (item) => item.id === target.entityId,
-      );
-      if (!page) throw new Error("Page not found after saving.");
-      return {
-        ...snapshotBase,
-        pages: replacePublishedRecord(publicBase.pages ?? [], page),
-      };
-    }
     case "team": {
       const member = content.team.find(
         (item) => item.id === target.entityId,
@@ -173,16 +160,6 @@ function createImmediatePublicationSnapshot(
       return {
         ...snapshotBase,
         team: replacePublishedRecord(publicBase.team, member),
-      };
-    }
-    case "gallery": {
-      const item = content.gallery.find(
-        (record) => record.id === target.entityId,
-      );
-      if (!item) throw new Error("Gallery item not found after saving.");
-      return {
-        ...snapshotBase,
-        gallery: replacePublishedRecord(publicBase.gallery, item),
       };
     }
     case "promotions": {
@@ -296,29 +273,6 @@ function normaliseCmsContent(content: CmsContentState): CmsContentState {
     !content.site.phoneE164.trim();
   const migrateConfirmedWhatsapp =
     storedSchemaVersion < 4 && !content.site.whatsappNumber.trim();
-  const mode = getCmsMode();
-  const fallbackVouchers = mode === "mock" ? defaults.vouchers : [];
-  const defaultPages = defaults.pages ?? [];
-  const storedPages = content.pages ?? [];
-  const pages = defaultPages.map((defaultPage) => {
-    const storedPage = storedPages.find((page) => page.id === defaultPage.id);
-    const page =
-      storedPage && storedPage.version >= defaultPage.version
-        ? storedPage
-        : defaultPage;
-
-    if (page.id !== "home") return page;
-
-    return {
-      ...page,
-      heroSlides: migrateLegacyHomeHeroSlides(
-        normaliseStoredPageHeroSlides(
-          storedPage?.heroSlides,
-          defaultPage.heroSlides ?? [],
-        ),
-      ),
-    };
-  });
   const services = content.services.map((service) => {
     const storedService = service as CmsServiceRecord & {
       readonly galleryImages?: unknown;
@@ -358,10 +312,34 @@ function normaliseCmsContent(content: CmsContentState): CmsContentState {
       updatedAt: service.updatedAt,
     };
   });
+  const vouchers = (content.vouchers ?? []).map((voucher) => {
+    const stored = voucher as CmsVoucherRecord & {
+      readonly imageUrl?: unknown;
+      readonly imageAlt?: unknown;
+    };
+    const imageUrl =
+      typeof stored.imageUrl === "string" ? stored.imageUrl.trim() : "";
+    const imageAlt =
+      typeof stored.imageAlt === "string" && stored.imageAlt.trim()
+        ? stored.imageAlt.trim()
+        : `${stored.title} voucher`;
+
+    return {
+      id: stored.id,
+      title: stored.title,
+      imageUrl,
+      imageAlt,
+      status: stored.status,
+      sortOrder: stored.sortOrder,
+      version: stored.version,
+      updatedAt: stored.updatedAt,
+    };
+  });
 
   return {
-    ...content,
+    id: "siriranee-content",
     schemaVersion: CMS_CONTENT_SCHEMA_VERSION,
+    revision: content.revision,
     services,
     site: {
       ...content.site,
@@ -378,8 +356,12 @@ function normaliseCmsContent(content: CmsContentState): CmsContentState {
         ? defaults.site.whatsappNumber
         : content.site.whatsappNumber,
     },
-    pages,
-    vouchers: content.vouchers ?? fallbackVouchers,
+    bookingSettings: content.bookingSettings,
+    team: content.team,
+    promotions: content.promotions,
+    vouchers,
+    updatedAt: content.updatedAt,
+    updatedBy: content.updatedBy,
   };
 }
 
@@ -448,41 +430,6 @@ export async function createCmsService(
   );
 
   return created!;
-}
-
-export async function updateCmsPage(
-  pageId: CmsPageId,
-  input: unknown,
-  expectedVersion: number,
-  context: MutationContext,
-): Promise<CmsPageRecord> {
-  let updated: CmsPageRecord | null = null;
-
-  await mutateContent(
-    context,
-    "page.updated",
-    "website-page",
-    pageId,
-    `Updated ${pageId} page heading and search metadata.`,
-    (current) => {
-      const pages = current.pages?.length
-        ? current.pages
-        : createDefaultContentState().pages ?? [];
-      const existing = pages.find((page) => page.id === pageId);
-      if (!existing) throw new Error("Website page not found.");
-      if (existing.version !== expectedVersion) throw new CmsConflictError();
-      updated = parsePageUpdate(input, existing);
-      return {
-        ...current,
-        revision: current.revision + 1,
-        pages: pages.map((page) => page.id === pageId ? updated! : page),
-        updatedAt: new Date().toISOString(),
-        updatedBy: context.actor.id,
-      };
-    },
-    { section: "pages", entityId: pageId },
-  );
-  return updated!;
 }
 
 export async function updateCmsService(
@@ -660,70 +607,6 @@ export async function createCmsTeamMember(
   );
 
   return created!;
-}
-
-export async function createCmsGalleryItem(
-  input: unknown,
-  context: MutationContext,
-): Promise<CmsGalleryRecord> {
-  let created: CmsGalleryRecord | null = null;
-  const itemId = randomUUID();
-
-  await mutateContent(
-    context,
-    "gallery.created",
-    "gallery-item",
-    itemId,
-    "Created a gallery image record.",
-    (current) => {
-      created = parseGalleryCreate(input, itemId);
-      return {
-        ...current,
-        revision: current.revision + 1,
-        gallery: [...current.gallery, created],
-        updatedAt: new Date().toISOString(),
-        updatedBy: context.actor.id,
-      };
-    },
-    { section: "gallery", entityId: itemId },
-  );
-
-  return created!;
-}
-
-export async function updateCmsGalleryItem(
-  itemId: string,
-  input: unknown,
-  expectedVersion: number,
-  context: MutationContext,
-): Promise<CmsGalleryRecord> {
-  let updated: CmsGalleryRecord | null = null;
-
-  await mutateContent(
-    context,
-    "gallery.updated",
-    "gallery-item",
-    itemId,
-    "Updated a gallery image record.",
-    (current) => {
-      const existing = current.gallery.find((item) => item.id === itemId);
-      if (!existing) throw new Error("Gallery item not found.");
-      if (existing.version !== expectedVersion) {
-        throw new CmsConflictError();
-      }
-      updated = parseGalleryUpdate(input, existing);
-      return {
-        ...current,
-        revision: current.revision + 1,
-        gallery: current.gallery.map((item) => item.id === itemId ? updated! : item),
-        updatedAt: new Date().toISOString(),
-        updatedBy: context.actor.id,
-      };
-    },
-    { section: "gallery", entityId: itemId },
-  );
-
-  return updated!;
 }
 
 export async function createCmsPromotion(

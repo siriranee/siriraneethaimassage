@@ -8,23 +8,26 @@ Howth, Dublin, Ireland.
 - Responsive public website for mobile, tablet and desktop.
 - Five confirmed massage services, durations and EUR prices.
 - Local SEO for Thai massage in Howth and nearby Dublin areas.
-- Treatment, price, page heading, SEO, business-detail, home-hero, service
-  gallery, promotion and team publishing from immutable CMS publication
-  snapshots. Successful content saves publish immediately.
+- Treatment, price, business-detail, service-gallery, promotion and voucher
+  publishing from immutable CMS publication snapshots. Successful content
+  saves publish immediately.
+- Source-controlled public page headings, SEO, home-hero slides and site gallery.
 - Customer booking flow with service, date and time selection. Customers never
   select a therapist, and bookings do not include staff assignment.
 - Dublin-time availability with capacity, closures, notice period, booking
   horizon, treatment buffers and daylight-saving handling.
-- Secure CMS for bookings, day/week/month calendar views, bounded recurring
-  closures, services and their image galleries, page SEO and home-hero slides,
-  promotions, gallery metadata, site details, hours, team, settings, global
-  search and audit history.
+- Secure CMS for bookings, the operational month calendar, bounded recurring
+  closures, services and their image galleries, vouchers, site details, hours,
+  settings and a one-year audit history.
 - Transactional direct publishing with record validation and immutable
   publication history. A failed content or publication write leaves the live
   website unchanged.
 - URL-based booking filters, per-booking activity timelines, unsaved-change
-  warnings and a metadata-only notification preview queue. No outbound message
-  is sent until a provider and operating process are approved.
+  warnings and metadata-only notification records. A newly stored website
+  request triggers one owner-only Resend email in Thai and English without
+  storing the recipient address or rendered message in MongoDB. Optional
+  customer notes stay in the encrypted CMS record instead of being forwarded
+  through email.
 - MongoDB persistence, username-and-password authentication, role-based access,
   salted scrypt passwords, revocable sessions, source-aware login throttling and AES-256-GCM
   booking-contact encryption.
@@ -33,19 +36,19 @@ Howth, Dublin, Ireland.
 - Safe local mock CMS and fail-closed production readiness gates.
 
 Direct website booking is implemented but remains disabled until the production
-database, owner approvals, privacy notice and notification workflow are ready.
+database, owner approvals, privacy notice and Resend owner-email settings are ready.
 
 ## Local development
 
 ~~~powershell
 npm.cmd install
-npm.cmd run dev -- --port 3107
+npm.cmd run dev
 ~~~
 
 Open:
 
-- Website: http://localhost:3107
-- CMS: http://localhost:3107/cms/login
+- Website: http://localhost:3000
+- CMS: http://localhost:3000/cms/login
 
 With no production environment variables, local development uses the in-memory
 mock CMS. Choose **Open local demo** on the CMS login page. Mock data is
@@ -69,7 +72,7 @@ The check runs:
 - business-content and SEO regression checks
 - a production Next.js build
 
-After starting a built site on port 3107, run:
+After starting a built site on port 3000, run:
 
 ~~~powershell
 npm.cmd run test:rendered
@@ -109,8 +112,13 @@ The normal production sequence is:
    [Security.Cryptography.RandomNumberGenerator]::Fill($mediaSecretBytes)
    [Convert]::ToBase64String($mediaSecretBytes)
    ~~~
-7. Run npm.cmd run cms:indexes.
-8. Temporarily set `CMS_SEED_USERNAME`, `CMS_SEED_PASSWORD`,
+7. Create a Resend API key, verify the sending domain, and set
+   `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and `RESEND_BOOKING_TO_EMAIL` in the
+   deployment secret manager. The recipient must be the owner address that
+   should receive every new website booking request. For testing with Resend's
+   shared domain, the recipient must match the Resend account email.
+8. Run npm.cmd run cms:indexes.
+9. Temporarily set `CMS_SEED_USERNAME`, `CMS_SEED_PASSWORD`,
    `CMS_SEED_DISPLAY_NAME` and `CMS_SEED_ROLE`, then run
    `npm.cmd run cms:seed-admin`. The username is stored in lowercase and must
    contain 4-32 ASCII letters or numbers. The password must contain 12-256
@@ -121,27 +129,36 @@ The normal production sequence is:
    For an existing database, complete this step before switching users to the
    username-only login; legacy email-only accounts cannot authenticate with the
    new form.
-9. Sign in, confirm and save the business information, opening hours and
+10. Sign in, confirm and save the business information, opening hours and
    booking rules. Each successful save publishes its section immediately.
-10. Test image preparation, upload, direct publication and failed-save cleanup, then
+11. Test image preparation, upload, direct publication and failed-save cleanup, then
    set CMS_MEDIA_UPLOAD_READY=true.
-11. Complete the privacy, retention, notification, monitoring and isolated
+12. Send a test booking to the owner address and confirm the Thai section,
+   English section, reply-to address and CMS booking link. Complete the privacy,
+   retention, monitoring and isolated
    recovery-drill operational reviews. These are launch responsibilities, not
    application environment gates.
-12. After end-to-end production testing, set
+13. After end-to-end production testing, set
    CMS_PUBLIC_BOOKING_READY=true and enable public booking in CMS settings.
 
-The runtime also requires MongoDB mode, a valid customer-data encryption key,
-and a published CMS snapshot with confirmed hours, confirmed booking rules and
-public booking enabled. A missing prerequisite keeps direct booking safely off.
+The hosted build and runtime both require complete Resend settings before
+direct booking is available. A temporary Resend failure never rolls back an
+already stored booking. The outbox retries a transient failure once with the
+same provider idempotency key, and records failed or uncertain delivery for
+operator review without storing the recipient or message body.
+
+The runtime requires MongoDB mode, a valid customer-data encryption key,
+complete valid Resend settings, and a published CMS snapshot with confirmed
+hours, confirmed booking rules and public booking enabled. A missing
+prerequisite keeps direct booking safely off.
 
 ## Published content rules
 
 The public site reads the most recent immutable CMS publication. Every
 successful content save publishes the changed section immediately in the same
 MongoDB transaction. There is no separate preview or manual publish step.
-Promotion and voucher status fields, public-profile controls and gallery
-visibility controls still decide whether an individual record renders publicly.
+Promotion and voucher status fields and public-profile controls still decide
+whether an individual record renders publicly.
 
 Local /images/... assets continue to work. CMS editors can also prepare new
 images in the browser; selection validates the real file type, rejects animated
@@ -158,11 +175,18 @@ deleted by rollback. Only versioned HTTPS images inside the configured
 Cloudinary account and owned CMS folder can render publicly; other remote URLs
 fail closed.
 
-Use **Clean expired uploads** in the CMS media library as a bounded maintenance
-action. An early cleanup removes the provider asset immediately, then retains a
-registry tombstone until the signed Cloudinary request has expired; run cleanup
-again later when the result reports that a final safety sweep is pending. This
-prevents a late replay from recreating an untracked image.
+There is no scheduled or batch media-cleanup endpoint. A failed content save
+immediately attempts idempotent rollback through the authenticated upload
+workflow. If a browser or network session ends before that save can run, retain
+the registry evidence and reconcile the incomplete upload with Cloudinary as an
+operator recovery task.
+
+The approved initial voucher artwork can be checked with
+`npm.cmd run cms:migrate-vouchers` and applied once with
+`npm.cmd run cms:migrate-vouchers -- --apply`. The command is deterministic and
+idempotent: it uploads both images before one atomic MongoDB publication, and a
+failed database commit removes only the immutable Cloudinary assets owned by
+that run.
 
 Cloudinary uploads remain disabled unless CMS_MODE=mongodb, the complete
 server-only provider configuration is present, and
@@ -176,12 +200,13 @@ against the live database by default.
 
 ## Current owner inputs
 
-Before public launch, configure the real Cloudinary account and signed upload
-preset, then confirm the opening hours, Eircode or exact map pin, building
-access, cancellation policy, final domain, remaining public contact and social
-channels, team details, approved photography, privacy details, retention
-period, notification process, monitoring ownership, backup schedule and
-hosting/database providers.
+Before public launch, confirm that production hosting uses the already verified
+MongoDB and Cloudinary accounts, signed upload preset and Resend sending domain.
+Confirm the owner recipient address with a real test email. Then confirm the
+Eircode or exact map pin, building access, cancellation policy, final domain,
+remaining public contact and social channels, team details, approved
+photography, privacy details, retention period, notification response process,
+monitoring ownership and backup schedule.
 
 Administrator account management supports creating and disabling accounts,
 resetting passwords and revoking sessions. These security-sensitive actions are

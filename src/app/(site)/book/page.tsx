@@ -1,16 +1,18 @@
+import { SearchCheck } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { BookingPlanner } from "@/components/booking/BookingPlanner";
 import { PageHero } from "@/components/marketing/PageHero";
+import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
 import { getPublicBookingPlannerServices } from "@/server/booking/public-config";
-import { getPublicPageCopy } from "@/server/cms/public-adapter";
 
 import styles from "./page.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPublicPageCopy("book");
+  const page = getPageCopy("book");
   return createMetadata({
     title: page.seoTitle,
     description: page.seoDescription,
@@ -32,10 +34,10 @@ function firstValue(value: string | string[] | undefined) {
 }
 
 export default async function BookPage({ searchParams }: BookPageProps) {
-  const [query, plannerServices, pageCopy] = await Promise.all([
+  const pageCopy = getPageCopy("book");
+  const [query, plannerServices] = await Promise.all([
     searchParams,
     getPublicBookingPlannerServices(),
-    getPublicPageCopy("book"),
   ]);
   const initialServiceSlug = firstValue(query.service);
   const durationValue = firstValue(query.duration);
@@ -56,6 +58,15 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       />
 
       <div className={styles.plannerSection}>
+        <div className={styles.statusShortcut}>
+          <div>
+            <p>Already sent a request?</p>
+            <span>Use your booking ID or reference to see its current status.</span>
+          </div>
+          <Link className={styles.statusAction} href="/book/status">
+            <SearchCheck aria-hidden="true" /> Check booking status
+          </Link>
+        </div>
         <BookingPlanner
           services={plannerServices}
           initialDate={typeof dateValue === "string" ? dateValue : undefined}
