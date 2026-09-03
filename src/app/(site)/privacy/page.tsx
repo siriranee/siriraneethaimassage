@@ -73,18 +73,18 @@ export default async function PrivacyPage() {
             information to manage appointments. MongoDB stores the encrypted
             booking record. After a website request is stored, Resend processes the
             appointment and contact details needed to deliver an operational email
-            notification to the owner. Optional notes remain in the encrypted CMS
-            booking record and are not copied into that email. Hosting and support
-            providers may process limited information only when configured for this
-            service.
+            notification to the owner, including any optional notes supplied with
+            the request. Hosting and support providers may process limited
+            information only when configured for this service.
           </p>
           <p>
-            The owner must set and publish the final retention period before direct
-            booking is enabled. Records will then be kept only for the confirmed
-            operational, legal and accounting period, after which they will be
-            securely deleted or anonymised. The owner must also approve the final
-            provider-retention and international-transfer wording before production
-            booking is enabled.
+            Booking records are retained for two years after the appointment and
+            then deleted automatically. Operational notification records and CMS
+            audit records are retained for one year. A new pending request reserves
+            appointment capacity for 15 minutes unless it is confirmed; after that,
+            it stops blocking the time slot while the booking record follows the
+            two-year retention period. Provider systems may apply their own
+            documented retention periods.
           </p>
         </section>
 

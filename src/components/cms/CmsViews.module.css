@@ -153,6 +153,144 @@
   font-weight: 800;
 }
 
+.bookingGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  padding: 1rem;
+  background: var(--color-purple-50);
+}
+
+.bookingCard {
+  display: grid;
+  min-width: 0;
+  min-height: 20rem;
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.85rem;
+  background: var(--color-surface);
+  box-shadow: 0 0.5rem 1.35rem rgb(var(--color-purple-950-rgb) / 0.055);
+  gap: 0.9rem;
+}
+
+.bookingCardHeader {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.bookingCardHeader > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.bookingCardHeader code {
+  overflow: hidden;
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookingCardHeader small {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.bookingCardPrimary h2 {
+  margin: 0;
+  color: var(--color-purple-950);
+  font-family: var(--font-body);
+  font-size: var(--fs-lg);
+}
+
+.bookingCardPrimary p {
+  margin: 0.22rem 0 0;
+  color: var(--color-purple-600);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.bookingCardDetails {
+  display: grid;
+  align-content: start;
+  gap: 0;
+  margin: 0;
+}
+
+.bookingCardDetails div {
+  display: grid;
+  grid-template-columns: minmax(5rem, 0.7fr) minmax(0, 1.3fr);
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--color-line);
+  font-size: var(--fs-sm);
+}
+
+.bookingCardDetails div:last-child {
+  border-bottom: 0;
+}
+
+.bookingCardDetails dt {
+  color: var(--color-muted);
+}
+
+.bookingCardDetails dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-ink);
+  font-weight: 750;
+  text-align: right;
+}
+
+.bookingCardDetails .bookingCardNotes {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.25rem;
+}
+
+.bookingCardNotes dd {
+  color: var(--color-muted);
+  font-weight: 650;
+  line-height: 1.5;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.bookingCardFooter {
+  display: flex;
+  min-height: 2.65rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--color-line);
+}
+
+.bookingCardFooter > a {
+  display: inline-flex;
+  min-height: 2.55rem;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.6rem;
+  background: var(--color-purple-100);
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+}
+
+.bookingCardFooter > a:hover {
+  background: var(--color-purple-700);
+  color: var(--color-on-brand);
+}
+
 .checklist,
 .activityList,
 .scheduleList {
@@ -318,16 +456,65 @@
   text-align: right;
 }
 
+.searchDisclosure {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.searchDisclosure summary {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  color: var(--color-purple-800);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  gap: 1rem;
+  list-style: none;
+}
+
+.searchDisclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.searchDisclosure summary:hover {
+  background: var(--color-purple-50);
+}
+
+.searchDisclosure summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.searchDisclosure summary svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.searchDisclosure summary small {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.searchDisclosure[open] summary {
+  border-bottom: 1px solid var(--color-line);
+}
+
 .searchForm {
   display: grid;
-  grid-template-columns: repeat(3, minmax(10rem, 1fr));
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
   padding: 1rem;
-  border-bottom: 1px solid var(--color-line);
 }
 
 .searchForm label {
   display: grid;
+  min-width: 0;
   gap: 0.3rem;
   color: var(--color-muted);
   font-size: var(--fs-sm);
@@ -340,7 +527,10 @@
 
 .searchForm input,
 .searchForm select {
+  width: 100%;
+  min-width: 0;
   min-height: 2.75rem;
+  box-sizing: border-box;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--color-line-strong);
   border-radius: 0.6rem;
@@ -373,14 +563,6 @@
   color: var(--color-purple-700);
   font-size: var(--fs-sm);
   font-weight: 800;
-}
-
-.resultSummary {
-  margin: 0;
-  padding: 0.65rem 1rem;
-  border-bottom: 1px solid var(--color-line);
-  color: var(--color-muted);
-  font-size: var(--fs-sm);
 }
 
 .calendarGrid {
@@ -488,6 +670,13 @@
   font-weight: 750;
 }
 
+.details .bookingDetailStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .details div:nth-last-child(-n + 2) {
   border-bottom: 0;
 }
@@ -513,7 +702,11 @@
   }
 
   .searchForm {
-    grid-template-columns: repeat(2, minmax(10rem, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bookingGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .fullSearch {
@@ -542,6 +735,14 @@
 
   .searchForm {
     grid-template-columns: 1fr;
+  }
+
+  .bookingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .bookingCard {
+    min-height: 0;
   }
 
   .desktopTable {

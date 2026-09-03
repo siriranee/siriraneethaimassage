@@ -121,6 +121,32 @@ test("CMS navigation omits retired pages, media, recovery and manual publishing"
   }
 });
 
+test("CMS shell keeps a purple desktop sidebar and a compact mobile drawer", async () => {
+  const [shell, shellStyles] = await Promise.all([
+    source("src/components/cms/CmsShell.tsx"),
+    source("src/components/cms/CmsShell.module.css"),
+  ]);
+
+  assert.doesNotMatch(shell, /BrandMark|topbarTitle|View website|ExternalLink|workspaceLabel/);
+  assert.match(shell, /src="\/siriranee_logo\.svg"/);
+  assert.match(shell, /<span>Siriranee<\/span>[\s\S]*?<strong>CMS<\/strong>/);
+  assert.match(shell, /href="\/"[\s\S]*?<span>Website<\/span>/);
+  assert.match(shellStyles, /\.drawerHeader[\s\S]*justify-items:\s*center/);
+  assert.match(shellStyles, /\.topbar[\s\S]*linear-gradient\(100deg, var\(--color-purple-800\)/);
+  assert.match(shellStyles, /\.sidebar[\s\S]*transform:\s*translateX\(0\);[\s\S]*visibility:\s*visible/);
+  assert.match(shellStyles, /\.workspace[\s\S]*margin-left:\s*var\(--cms-sidebar-width\)/);
+  assert.match(shellStyles, /@media \(max-width: 980px\)[\s\S]*\.sidebar[\s\S]*translateX\(-105%\)/);
+  assert.match(shellStyles, /\.menuButton\s*\{[\s\S]*display:\s*none/);
+});
+
+test("CMS overview omits warning notices without changing booking safeguards", async () => {
+  const dashboard = await source("src/app/cms/(protected)/page.tsx");
+
+  assert.doesNotMatch(dashboard, /CmsNotice|tone="warning"/);
+  assert.match(dashboard, /summary\.pendingCount/);
+  assert.match(dashboard, /<CmsBookingQuickActions/);
+});
+
 test("notification bell loads one safe dashboard feed per CMS page load", async () => {
   const [layout, shell, bell, bellStyles, readService, mockRepository, mongoRepository, indexes] = await Promise.all([
     source("src/app/cms/(protected)/layout.tsx"),

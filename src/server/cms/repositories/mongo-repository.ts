@@ -28,6 +28,12 @@ import {
   type PublicBookingIdentifier,
 } from "@/domain/booking/public-status";
 import { getCmsAuditExpiryDate } from "@/server/cms/audit-retention";
+import {
+  CMS_PUBLICATION_RETENTION_COUNT,
+  getCmsBookingExpiryDate,
+  getCmsDayLockExpiryDate,
+  getCmsNotificationExpiryDate,
+} from "@/server/cms/data-retention";
 import { createDefaultContentState } from "@/server/cms/default-content";
 import { decryptCmsPii, encryptCmsPii } from "@/server/cms/pii";
 import {
@@ -97,6 +103,7 @@ function encodeBooking(value: CmsBooking): CmsMongoDocument {
 function decodeBooking(value: Document | null): CmsBooking | null {
   if (!value) return null;
   const { _id, customerEncrypted, ...rest } = value;
+  delete rest.retentionExpiresAtDate;
 
   if (typeof customerEncrypted !== "string") {
     throw new Error("Booking customer data is not encrypted.");
@@ -108,6 +115,20 @@ function decodeBooking(value: Document | null): CmsBooking | null {
     ...rest,
     customer,
   } as CmsBooking;
+}
+
+function encodeNotification(value: CmsBookingNotification): CmsMongoDocument {
+  return {
+    ...encode(value),
+    expiresAtDate: getCmsNotificationExpiryDate(value.createdAt),
+  };
+}
+
+function decodeNotification(value: Document | null): CmsBookingNotification | null {
+  if (!value) return null;
+  const { _id, ...rest } = value;
+  delete rest.expiresAtDate;
+  return { id: String(_id), ...rest } as CmsBookingNotification;
 }
 
 function bookingIncludesSearch(booking: CmsBooking, search: string) {
@@ -233,9 +254,8 @@ export class MongoCmsRepository implements CmsRepository {
 
   async savePublication(publication: CmsPublication) {
     const db = await this.db();
-    await db
-      .collection<CmsMongoDocument>(collections.publications)
-      .insertOne(encode(publication), this.options());
+    const publications = db.collection<CmsMongoDocument>(collections.publications);
+    await publications.insertOne(encode(publication), this.options());
     await db.collection<CmsMongoDocument>(collections.meta).updateOne(
       { _id: "current-publication" },
       {
@@ -246,6 +266,17 @@ export class MongoCmsRepository implements CmsRepository {
         },
       },
       { ...this.options(), upsert: true },
+    );
+
+    const retained = await publications
+      .find({}, this.options())
+      .sort({ publishedAt: -1, _id: -1 })
+      .limit(CMS_PUBLICATION_RETENTION_COUNT)
+      .project({ _id: 1 })
+      .toArray();
+    await publications.deleteMany(
+      { _id: { $nin: retained.map((item) => String(item._id)) } },
+      this.options(),
     );
   }
 
@@ -676,7 +707,10 @@ export class MongoCmsRepository implements CmsRepository {
 
     const result = await db.collection<CmsMongoDocument>(collections.bookings).replaceOne(
       filter,
-      encodeBooking(booking),
+      {
+        ...encodeBooking(booking),
+        retentionExpiresAtDate: getCmsBookingExpiryDate(booking.startsAt),
+      },
       { ...this.options(), upsert: expectedVersion === undefined },
     );
 
@@ -685,6 +719,23 @@ export class MongoCmsRepository implements CmsRepository {
     }
 
     return booking;
+  }
+
+  async deleteBooking(id: string, expectedVersion: number) {
+    const db = await this.db();
+    const result = await db
+      .collection<CmsMongoDocument>(collections.bookings)
+      .deleteOne({ _id: id, version: expectedVersion }, this.options());
+
+    if (result.deletedCount !== 1) {
+      if (await this.getBooking(id)) throw new CmsConflictError();
+      return false;
+    }
+
+    await db
+      .collection<CmsMongoDocument>(collections.notifications)
+      .deleteMany({ bookingId: id }, this.options());
+    return true;
   }
 
   async listClosures(from?: string, to?: string) {
@@ -732,7 +783,7 @@ export class MongoCmsRepository implements CmsRepository {
       .sort({ createdAt: -1 })
       .limit(Math.max(1, Math.min(limit, 500)))
       .toArray();
-    return rows.map((row) => decode<CmsBookingNotification>(row)!);
+    return rows.map((row) => decodeNotification(row)!);
   }
 
   async listDashboardNotifications(limit = 8) {
@@ -743,12 +794,12 @@ export class MongoCmsRepository implements CmsRepository {
       .sort({ createdAt: -1 })
       .limit(Math.max(1, Math.min(limit, 20)))
       .toArray();
-    return rows.map((row) => decode<CmsBookingNotification>(row)!);
+    return rows.map((row) => decodeNotification(row)!);
   }
 
   async getNotification(id: string) {
     const db = await this.db();
-    return decode<CmsBookingNotification>(
+    return decodeNotification(
       await db
         .collection<CmsMongoDocument>(collections.notifications)
         .findOne({ _id: id }, this.options()),
@@ -759,7 +810,7 @@ export class MongoCmsRepository implements CmsRepository {
     const db = await this.db();
     await db.collection<CmsMongoDocument>(collections.notifications).replaceOne(
       { _id: notification.id },
-      encode(notification),
+      encodeNotification(notification),
       { ...this.options(), upsert: true },
     );
   }
@@ -768,7 +819,7 @@ export class MongoCmsRepository implements CmsRepository {
     const db = await this.db();
     await db.collection<CmsMongoDocument>(collections.notifications).updateOne(
       { _id: notification.id },
-      { $setOnInsert: encode(notification) },
+      { $setOnInsert: encodeNotification(notification) },
       { ...this.options(), upsert: true },
     );
     const stored = await this.getNotification(notification.id);
@@ -808,7 +859,7 @@ export class MongoCmsRepository implements CmsRepository {
         },
         { ...this.options(), returnDocument: "after" },
       );
-    return decode<CmsBookingNotification>(row);
+    return decodeNotification(row);
   }
 
   async completeNotificationDelivery(
@@ -824,7 +875,7 @@ export class MongoCmsRepository implements CmsRepository {
           status: "sending",
           deliveryClaimId: claimId,
         },
-        encode(notification),
+        encodeNotification(notification),
         this.options(),
       );
     return result.matchedCount === 1;
@@ -871,7 +922,10 @@ export class MongoCmsRepository implements CmsRepository {
       { _id: localDate },
       {
         $inc: { version: 1 },
-        $set: { updatedAt: now },
+        $set: {
+          updatedAt: now,
+          expiresAtDate: getCmsDayLockExpiryDate(localDate),
+        },
         $setOnInsert: { createdAt: now },
       },
       { ...this.options(), upsert: true },

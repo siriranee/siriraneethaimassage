@@ -100,6 +100,7 @@ export interface CmsRepository {
     booking: CmsBooking,
     expectedVersion?: number,
   ): Promise<CmsBooking>;
+  deleteBooking(id: string, expectedVersion: number): Promise<boolean>;
 
   listClosures(from?: string, to?: string): Promise<readonly CmsClosure[]>;
   saveClosure(

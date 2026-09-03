@@ -100,7 +100,7 @@ type BookingEmailEnvironment = Readonly<Record<string, string | undefined>>;
 
 function getSiteOrigin(environment: BookingEmailEnvironment) {
   const candidate = clean(
-    environment.CMS_ORIGIN || environment.NEXT_PUBLIC_SITE_URL,
+    environment.NEXT_PUBLIC_SITE_URL || environment.CMS_ORIGIN,
   );
   if (!candidate) return undefined;
 

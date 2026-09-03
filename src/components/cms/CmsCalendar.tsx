@@ -13,6 +13,7 @@ import { useId, useMemo, useState } from "react";
 
 import { CalendarLegend } from "@/components/booking/CalendarLegend";
 import calendarStyles from "@/components/booking/BookingCalendar.module.css";
+import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import {
   buildCalendarMonthCells,
@@ -29,11 +30,14 @@ export type CmsCalendarBooking = {
   readonly id: string;
   readonly reference: string;
   readonly customerName: string;
+  readonly customerPhone: string;
+  readonly customerNotes: string;
   readonly serviceName: string;
   readonly durationMinutes: number;
   readonly localDate: string;
   readonly localTime: string;
   readonly status: BookingStatus;
+  readonly version: number;
   readonly demo: boolean;
 };
 
@@ -53,6 +57,8 @@ type CmsCalendarProps = {
   readonly initialSelectedDate: string;
   readonly bookings: readonly CmsCalendarBooking[];
   readonly closures: readonly CmsCalendarClosure[];
+  readonly canManageBookings: boolean;
+  readonly closedWeekdays: readonly boolean[];
 };
 
 function groupByDate<T extends { readonly localDate: string }>(
@@ -75,16 +81,25 @@ function calendarHref(month: string, date?: string) {
   return `/cms/calendar?${params.toString()}`;
 }
 
+function isRegularDayOff(
+  localDate: string,
+  closedWeekdays: readonly boolean[],
+) {
+  const weekday = new Date(`${localDate}T00:00:00.000Z`).getUTCDay();
+  const mondayFirstIndex = weekday === 0 ? 6 : weekday - 1;
+  return closedWeekdays[mondayFirstIndex] === true;
+}
+
 function dayAriaLabel(
   localDate: string,
   bookings: readonly CmsCalendarBooking[],
   closures: readonly CmsCalendarClosure[],
   selected: boolean,
+  dayOff: boolean,
 ) {
   const pendingCount = bookings.filter(
     (booking) => booking.status === "pending",
   ).length;
-  const allDayClosure = closures.some((closure) => closure.closedAllDay);
   const partialClosureCount = closures.filter(
     (closure) => !closure.closedAllDay,
   ).length;
@@ -97,7 +112,7 @@ function dayAriaLabel(
   if (pendingCount) {
     details.push(`${pendingCount} pending`);
   }
-  if (allDayClosure) {
+  if (dayOff) {
     details.push("Day off");
   } else if (partialClosureCount) {
     details.push(
@@ -115,6 +130,8 @@ export function CmsCalendar({
   initialSelectedDate,
   bookings,
   closures,
+  canManageBookings,
+  closedWeekdays,
 }: CmsCalendarProps) {
   const calendarHeadingId = useId();
   const calendarStatusId = useId();
@@ -145,6 +162,10 @@ export function CmsCalendar({
   const selectedPendingCount = selectedBookings.filter(
     (booking) => booking.status === "pending",
   ).length;
+  const selectedRegularDayOff = isRegularDayOff(
+    selectedDate,
+    closedWeekdays,
+  );
   const previousMonth = shiftCalendarMonth(month, -1);
   const nextMonth = shiftCalendarMonth(month, 1);
   const todayMonth = today.slice(0, 7);
@@ -233,6 +254,11 @@ export function CmsCalendar({
             const allDayClosure = dayClosures.some(
               (closure) => closure.closedAllDay,
             );
+            const regularDayOff = isRegularDayOff(
+              localDate,
+              closedWeekdays,
+            );
+            const dayOff = regularDayOff || allDayClosure;
             const hasPartialClosure = dayClosures.some(
               (closure) => !closure.closedAllDay,
             );
@@ -247,10 +273,11 @@ export function CmsCalendar({
                   dayBookings,
                   dayClosures,
                   selected,
+                  dayOff,
                 )}
                 aria-pressed={selected}
                 className={`${calendarStyles.calendarDay} ${
-                  allDayClosure
+                  dayOff
                     ? calendarStyles.dayOff
                     : calendarStyles.dayAvailable
                 } ${
@@ -276,18 +303,15 @@ export function CmsCalendar({
                   ) : null}
                   {pendingCount ? <i className={styles.pendingDot} /> : null}
                   {hasPartialClosure ? <i className={styles.closureMark} /> : null}
-                  {allDayClosure ? <Ban className={styles.closedIcon} /> : null}
+                  {dayOff ? <Ban className={styles.closedIcon} /> : null}
                 </span>
               </button>
             );
           })}
         </div>
 
-        <CalendarLegend />
-
         <div className={styles.operationalKey}>
-          <strong>CMS indicators</strong>
-          <ul aria-label="CMS calendar indicators">
+          <CalendarLegend>
             <li>
               <i aria-hidden="true" className={styles.indicatorBooking}>1</i>
               Appointments
@@ -300,7 +324,7 @@ export function CmsCalendar({
               <i aria-hidden="true" className={styles.indicatorClosure} />
               Partial closure
             </li>
-          </ul>
+          </CalendarLegend>
         </div>
 
         <div
@@ -313,6 +337,7 @@ export function CmsCalendar({
             {formatCalendarDate(selectedDate)} selected · {selectedBookings.length}{" "}
             appointment{selectedBookings.length === 1 ? "" : "s"}
             {selectedPendingCount ? ` · ${selectedPendingCount} pending` : ""}
+            {selectedRegularDayOff ? " · Day off" : ""}
             {selectedClosures.length
               ? ` · ${selectedClosures.length} active closure${selectedClosures.length === 1 ? "" : "s"}`
               : ""}
@@ -337,6 +362,19 @@ export function CmsCalendar({
         </header>
 
         <div className={styles.agendaBody}>
+          {selectedRegularDayOff ? (
+            <div className={styles.agendaGroup}>
+              <h3>Business hours</h3>
+              <div className={styles.closureItem}>
+                <Ban aria-hidden="true" />
+                <span>
+                  <strong>Day off</strong>
+                  <small>Closed in the weekly business hours.</small>
+                </span>
+              </div>
+            </div>
+          ) : null}
+
           {selectedClosures.length ? (
             <div className={styles.agendaGroup}>
               <h3>Closures</h3>
@@ -374,30 +412,50 @@ export function CmsCalendar({
               <ul>
                 {selectedBookings.map((booking) => (
                   <li key={booking.id}>
-                    <Link
-                      className={styles.bookingItem}
-                      href={`/cms/bookings/${booking.id}`}
-                    >
-                      <time dateTime={`${booking.localDate}T${booking.localTime}`}>
-                        <Clock3 aria-hidden="true" /> {booking.localTime}
-                      </time>
-                      <span>
-                        <strong>{booking.customerName}</strong>
-                        <small>
-                          {booking.serviceName} · {booking.durationMinutes} min ·{" "}
-                          {booking.reference}
-                          {booking.demo ? " · Fictional mock" : ""}
-                        </small>
-                        <CmsBookingStatus status={booking.status} />
-                      </span>
-                    </Link>
+                    <article className={styles.agendaBookingCard}>
+                      <div className={styles.agendaBookingMain}>
+                        <time dateTime={`${booking.localDate}T${booking.localTime}`}>
+                          <Clock3 aria-hidden="true" /> {booking.localTime}
+                        </time>
+                        <div>
+                          <strong>{booking.customerName}</strong>
+                          <small>
+                            {booking.serviceName} · {booking.durationMinutes} min ·{" "}
+                            {booking.reference}
+                            {booking.demo ? " · Fictional mock" : ""}
+                          </small>
+                          <dl className={styles.agendaBookingDetails}>
+                            <div>
+                              <dt>Phone</dt>
+                              <dd>{booking.customerPhone}</dd>
+                            </div>
+                            <div>
+                              <dt>Notes</dt>
+                              <dd>{booking.customerNotes || "No notes provided"}</dd>
+                            </div>
+                          </dl>
+                          <CmsBookingStatus status={booking.status} />
+                        </div>
+                      </div>
+                      <footer className={styles.agendaBookingFooter}>
+                            <Link href={`/cms/bookings/${booking.id}`}>View</Link>
+                        {canManageBookings ? (
+                          <CmsBookingQuickActions
+                            booking={booking}
+                            key={`${booking.id}:${booking.version}`}
+                          />
+                        ) : null}
+                      </footer>
+                    </article>
                   </li>
                 ))}
               </ul>
             </div>
           ) : null}
 
-          {!selectedBookings.length && !selectedClosures.length ? (
+          {!selectedBookings.length &&
+          !selectedClosures.length &&
+          !selectedRegularDayOff ? (
             <div className={styles.emptyAgenda}>
               <CalendarDays aria-hidden="true" />
               <strong>No appointments or closures</strong>

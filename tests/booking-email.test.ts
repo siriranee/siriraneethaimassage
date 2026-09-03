@@ -78,6 +78,7 @@ test("owner booking email renders Thai first and English second with complete op
     "Nok Example",
     "+353 85 123 4567",
     "nok@example.com",
+    "Please call before the appointment.",
     "Traditional Thai Massage",
     "10:00",
     "€65.00",
@@ -89,10 +90,6 @@ test("owner booking email renders Thai first and English second with complete op
   }
   assert.match(message.html, /lang="th"/);
   assert.match(message.html, /lang="en-IE"/);
-  assert.match(message.html, /The customer added notes\. Open the CMS booking to review them securely\./);
-  assert.match(message.text, /The customer added notes\. Review them in the CMS booking record\./);
-  assert.doesNotMatch(message.html, /Please call before the appointment\./);
-  assert.doesNotMatch(message.text, /Please call before the appointment\./);
   assert.match(message.html, /scope="row"/);
   assert.match(message.html, /Open booking in CMS/);
   assert.match(message.text, /Open booking in CMS: https:\/\/siriranee\.example/);
@@ -127,10 +124,11 @@ test("owner booking email escapes HTML and removes control and bidi override cha
 
   assert.doesNotMatch(message.html, /<script>|<img src=x|\u202E/);
   assert.match(message.html, /Nok &lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt; &amp; friend/);
-  assert.doesNotMatch(message.html, /Line one|img src=x|onerror/);
+  assert.match(message.html, /Line one<br>&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(message.html, /<img src=x/);
   assert.doesNotMatch(message.text, /\u202E/);
   assert.match(message.text, /<script>alert\("x"\)<\/script>/);
-  assert.doesNotMatch(message.text, /Line one|img src=x|onerror/);
+  assert.match(message.text, /Line one\n<img src=x onerror=alert\(1\)>/);
 });
 
 test("owner booking email supplies bilingual fallbacks for optional customer fields", async () => {

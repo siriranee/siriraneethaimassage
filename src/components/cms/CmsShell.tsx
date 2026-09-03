@@ -3,8 +3,8 @@
 import {
   CalendarDays,
   ClipboardList,
-  ExternalLink,
   Gift,
+  Globe2,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -13,13 +13,13 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { canCmsRole, getCmsRoleLabel } from "@/domain/cms/permissions";
 import type { CmsNotificationBellItem, CmsRole } from "@/domain/cms/types";
-import { BrandMark } from "@/components/ui/BrandMark";
 import { CmsNotificationBell } from "./CmsNotificationBell";
 
 import styles from "./CmsShell.module.css";
@@ -61,10 +61,6 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
     canCmsRole(user.role, item.permission),
   );
   const canViewNotifications = canCmsRole(user.role, "bookings:view");
-  const currentSection = allowedNavigation.find((item) =>
-    isActivePath(pathname, item.href),
-  )?.label ?? "Admin workspace";
-
   useEffect(() => {
     if (!drawerOpen) return;
     const previousOverflow = document.body.style.overflow;
@@ -83,6 +79,17 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
       document.removeEventListener("keydown", closeFromKeyboard);
     };
   }, [drawerOpen]);
+
+  useEffect(() => {
+    const smallScreen = window.matchMedia("(max-width: 980px)");
+
+    function closeDrawerOnDesktop(event: MediaQueryListEvent) {
+      if (!event.matches) setDrawerPath(null);
+    }
+
+    smallScreen.addEventListener("change", closeDrawerOnDesktop);
+    return () => smallScreen.removeEventListener("change", closeDrawerOnDesktop);
+  }, []);
 
   async function logOut() {
     setLoggingOut(true);
@@ -125,18 +132,8 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
           >
             <Menu aria-hidden="true" />
           </button>
-          <Link aria-label="Siriranee CMS overview" className={styles.topbarBrand} href="/cms">
-            <BrandMark compact />
-          </Link>
-          <div className={styles.topbarTitle}>
-            <span>Siriranee CMS</span>
-            <strong>{currentSection}</strong>
-          </div>
         </div>
         <div className={styles.topbarActions}>
-          <Link aria-label="View website in a new tab" href="/" rel="noreferrer" target="_blank">
-            <ExternalLink aria-hidden="true" />
-          </Link>
           <button
             aria-label={loggingOut ? "Signing out" : "Sign out"}
             disabled={loggingOut}
@@ -168,11 +165,21 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
         className={styles.sidebar}
         data-open={drawerOpen}
         id="cms-navigation-drawer"
-        inert={!drawerOpen}
       >
         <div className={styles.drawerHeader}>
           <Link aria-label="Siriranee CMS overview" className={styles.brand} href="/cms">
-            <BrandMark />
+            <Image
+              alt=""
+              aria-hidden="true"
+              className={styles.logoImage}
+              height={1200}
+              loading="eager"
+              sizes="7rem"
+              src="/siriranee_logo.svg"
+              width={1200}
+            />
+            <span>Siriranee</span>
+            <strong>CMS</strong>
           </Link>
           <button
             aria-label="Close CMS navigation"
@@ -188,11 +195,6 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
           </button>
         </div>
 
-        <div className={styles.workspaceLabel}>
-          <span>Content & bookings</span>
-          <strong>Admin workspace</strong>
-        </div>
-
         <nav aria-label="CMS navigation" className={styles.navigation}>
           {allowedNavigation.map(({ href, icon: Icon, label }) => {
             const active = isActivePath(pathname, href);
@@ -204,6 +206,10 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
               </Link>
             );
           })}
+          <Link href="/" onClick={() => setDrawerPath(null)}>
+            <Globe2 aria-hidden="true" />
+            <span>Website</span>
+          </Link>
         </nav>
 
         <div className={styles.sidebarFooter}>
@@ -221,11 +227,6 @@ export function CmsShell({ children, mode, notifications, user }: CmsShellProps)
               <small>@{user.username} · {getCmsRoleLabel(user.role)}</small>
             </div>
           </div>
-          <Link href="/" rel="noreferrer" target="_blank">
-            <ExternalLink aria-hidden="true" />
-            View website
-            <span className="sr-only"> (opens in a new tab)</span>
-          </Link>
           <button disabled={loggingOut} onClick={logOut} type="button">
             <LogOut aria-hidden="true" />
             {loggingOut ? "Signing out..." : "Sign out"}

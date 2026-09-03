@@ -1,9 +1,11 @@
-import { Plus } from "lucide-react";
+import { Plus, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 
+import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import { CmsEmptyState, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { isPendingCapacityExpired } from "@/domain/booking/status";
+import { canCmsRole } from "@/domain/cms/permissions";
 import { bookingSources, bookingStatuses, type BookingSource, type BookingStatus, type CmsBooking } from "@/domain/cms/types";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
@@ -52,7 +54,8 @@ function BookingStatusCell({ booking }: Readonly<{ booking: CmsBooking }>) {
 }
 
 export default async function CmsBookingsPage({ searchParams }: PageProps) {
-  await requireCmsPageUser("bookings:view");
+  const user = await requireCmsPageUser("bookings:view");
+  const canManageBookings = canCmsRole(user.role, "bookings:write");
   const params = await searchParams;
   const search = single(params.search).trim();
   const statusValue = single(params.status);
@@ -68,6 +71,9 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
     listCmsBookings({ search: search || undefined, status, source, serviceId, attention, from, to }),
     getCmsContent(),
   ]);
+  const hasActiveFilters = Boolean(
+    search || status || source || serviceId || attention || from || to,
+  );
 
   return (
     <>
@@ -79,76 +85,79 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
       />
 
       <CmsPanel>
-        <form className={styles.searchForm}>
-          <label>
-            Search bookings
-            <input defaultValue={search} name="search" placeholder="Reference, guest, phone or treatment" type="search" />
-          </label>
-          <label>
-            Status
-            <select defaultValue={status ?? ""} name="status">
-              <option value="">All statuses</option>
-              {bookingStatuses.map((item) => (
-                <option key={item} value={item}>{item === "no-show" ? "No-show" : item.charAt(0).toUpperCase() + item.slice(1)}</option>
-              ))}
-            </select>
-          </label>
-          <label>Treatment<select defaultValue={serviceId ?? ""} name="serviceId"><option value="">All treatments</option>{content.services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
-          <label>Source<select defaultValue={source ?? ""} name="source"><option value="">All sources</option>{bookingSources.map((item) => <option key={item} value={item}>{item.charAt(0).toUpperCase() + item.slice(1)}</option>)}</select></label>
-          <label>Needs attention<select defaultValue={attention ?? ""} name="attention"><option value="">All bookings</option><option value="expired">Expired pending holds</option></select></label>
-          <label>From date<input defaultValue={from ?? ""} name="from" type="date" /></label>
-          <label>To date<input defaultValue={to ?? ""} name="to" type="date" /></label>
-          <div className={styles.filterActions}><button type="submit">Apply filters</button><Link href="/cms/bookings">Clear</Link></div>
-        </form>
-
-        <p className={styles.resultSummary}>{bookings.length} booking{bookings.length === 1 ? "" : "s"} in this view. Filters stay in the URL so this view can be bookmarked.</p>
+        <details className={styles.searchDisclosure} open={hasActiveFilters || undefined}>
+          <summary>
+            <span>
+              <SlidersHorizontal aria-hidden="true" />
+              Search &amp; filters
+            </span>
+            <small>{hasActiveFilters ? "Filters applied" : "Show filters"}</small>
+          </summary>
+          <form className={styles.searchForm}>
+            <label>
+              Search bookings
+              <input defaultValue={search} name="search" placeholder="Reference, guest, phone or treatment" type="search" />
+            </label>
+            <label>
+              Status
+              <select defaultValue={status ?? ""} name="status">
+                <option value="">All statuses</option>
+                {bookingStatuses.map((item) => (
+                  <option key={item} value={item}>{item === "no-show" ? "No-show" : item.charAt(0).toUpperCase() + item.slice(1)}</option>
+                ))}
+              </select>
+            </label>
+            <label>Treatment<select defaultValue={serviceId ?? ""} name="serviceId"><option value="">All treatments</option>{content.services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
+            <label>Source<select defaultValue={source ?? ""} name="source"><option value="">All sources</option>{bookingSources.map((item) => <option key={item} value={item}>{item.charAt(0).toUpperCase() + item.slice(1)}</option>)}</select></label>
+            <label>Needs attention<select defaultValue={attention ?? ""} name="attention"><option value="">All bookings</option><option value="expired">Expired pending holds</option></select></label>
+            <label>From date<input defaultValue={from ?? ""} name="from" type="date" /></label>
+            <label>To date<input defaultValue={to ?? ""} name="to" type="date" /></label>
+            <div className={styles.filterActions}><button type="submit">Apply filters</button><Link href="/cms/bookings">Clear</Link></div>
+          </form>
+        </details>
 
         {bookings.length ? (
-          <>
-            <div className={`${styles.tableScroll} ${styles.desktopTable}`}>
-              <table className={styles.table}>
-                <caption className="sr-only">Siriranee bookings</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Reference</th>
-                    <th scope="col">Guest</th>
-                    <th scope="col">Appointment</th>
-                    <th scope="col">Treatment</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookings.map((booking) => (
-                    <tr key={booking.id}>
-                      <td><code>{booking.reference}</code>{booking.demo ? <small>Fictional mock</small> : null}</td>
-                      <td><strong>{booking.customer.name}</strong><small>{booking.customer.phone}</small></td>
-                      <td><strong>{formatDate(booking.localDate)}</strong><small>{booking.localTime} · {booking.durationMinutes} min</small></td>
-                      <td>{booking.serviceName}</td>
-                      <td><BookingStatusCell booking={booking} /></td>
-                      <td><Link href={`/cms/bookings/${booking.id}`}>View</Link></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className={styles.mobileRecords}>
-              {bookings.map((booking) => (
-                <article className={styles.recordCard} key={booking.id}>
-                  <div className={styles.recordCardHeader}>
-                    <strong>{booking.reference}</strong>
-                    <BookingStatusCell booking={booking} />
+          <div aria-label="Siriranee bookings" className={styles.bookingGrid}>
+            {bookings.map((booking) => (
+              <article className={styles.bookingCard} key={booking.id}>
+                <header className={styles.bookingCardHeader}>
+                  <div>
+                    <code>{booking.reference}</code>
+                    <small>
+                      {booking.source.charAt(0).toUpperCase() + booking.source.slice(1)}
+                      {booking.demo ? " · Fictional mock" : ""}
+                    </small>
                   </div>
-                  <dl>
-                    <dt>Guest</dt><dd>{booking.customer.name}</dd>
-                    <dt>When</dt><dd>{formatDate(booking.localDate)} · {booking.localTime}</dd>
-                    <dt>Treatment</dt><dd>{booking.serviceName}</dd>
-                  </dl>
-                  <Link href={`/cms/bookings/${booking.id}`}>View booking</Link>
-                </article>
-              ))}
-            </div>
-          </>
+                  <BookingStatusCell booking={booking} />
+                </header>
+
+                <div className={styles.bookingCardPrimary}>
+                  <h2>{booking.customer.name}</h2>
+                  <p>{formatDate(booking.localDate)} · {booking.localTime}</p>
+                </div>
+
+                <dl className={styles.bookingCardDetails}>
+                  <div><dt>Treatment</dt><dd>{booking.serviceName}</dd></div>
+                  <div><dt>Duration</dt><dd>{booking.durationMinutes} min</dd></div>
+                  <div><dt>Phone</dt><dd>{booking.customer.phone}</dd></div>
+                  <div className={styles.bookingCardNotes}>
+                    <dt>Notes</dt>
+                    <dd>{booking.customer.notes || "No notes provided"}</dd>
+                  </div>
+                </dl>
+
+                <footer className={styles.bookingCardFooter}>
+                  <Link href={`/cms/bookings/${booking.id}`}>View</Link>
+                  {canManageBookings ? (
+                    <CmsBookingQuickActions
+                      booking={booking}
+                      key={`${booking.id}:${booking.version}`}
+                    />
+                  ) : null}
+                </footer>
+              </article>
+            ))}
+          </div>
         ) : (
           <CmsEmptyState title="No bookings found">
             Try a different search or status filter, or add a booking received by phone or WhatsApp.

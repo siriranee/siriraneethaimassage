@@ -11,6 +11,8 @@ test("administrator and staff permissions stay separated", () => {
   assert.equal(canCmsRole("administrator", "users:manage"), true);
   assert.equal(canCmsRole("administrator", "content:publish"), true);
   assert.equal(canCmsRole("staff", "bookings:write"), true);
+  assert.equal(canCmsRole("administrator", "bookings:delete"), true);
+  assert.equal(canCmsRole("staff", "bookings:delete"), false);
   assert.equal(canCmsRole("staff", "calendar:write"), true);
   assert.equal(canCmsRole("staff", "users:manage"), false);
   assert.equal(canCmsRole("staff", "content:publish"), false);

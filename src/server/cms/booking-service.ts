@@ -431,6 +431,40 @@ export async function updateAdminBooking(
   });
 }
 
+export async function deleteAdminBooking(
+  bookingId: string,
+  expectedVersion: number,
+  context: MutationContext,
+) {
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    throw new CmsValidationError("The booking version is invalid.");
+  }
+
+  const repository = getCmsRepository();
+  assertPersistenceReady(repository);
+
+  return repository.transaction(async (transaction) => {
+    const current = await transaction.getBooking(bookingId);
+    if (!current) throw new Error("Booking not found.");
+    if (current.version !== expectedVersion) throw new CmsConflictError();
+
+    await transaction.lockBookingDate(current.localDate);
+    const deleted = await transaction.deleteBooking(current.id, current.version);
+    if (!deleted) throw new Error("Booking not found.");
+
+    await appendCmsAudit(transaction, {
+      actor: context.actor,
+      action: "booking.deleted",
+      entityType: "booking",
+      entityId: current.id,
+      summary: `Deleted booking ${current.reference}.`,
+      requestId: context.requestId,
+    });
+
+    return { id: current.id, reference: current.reference } as const;
+  });
+}
+
 type ClosureInput = {
   readonly localDate: string;
   readonly closedAllDay: boolean;

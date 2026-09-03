@@ -4,6 +4,7 @@ export const cmsPermissions = [
   "dashboard:view",
   "bookings:view",
   "bookings:write",
+  "bookings:delete",
   "calendar:view",
   "calendar:write",
   "content:view",

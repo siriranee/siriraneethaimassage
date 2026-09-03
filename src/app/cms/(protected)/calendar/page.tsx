@@ -17,7 +17,7 @@ import {
   normalizeCalendarDate,
   normalizeCalendarMonth,
 } from "@/domain/booking/calendar-month";
-import { isPendingCapacityExpired } from "@/domain/booking/status";
+import { canCmsRole } from "@/domain/cms/permissions";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
 import { listCmsBookings, listCmsClosures } from "@/server/cms/read-service";
@@ -33,7 +33,8 @@ function single(value: string | string[] | undefined) {
 }
 
 export default async function CmsCalendarPage({ searchParams }: PageProps) {
-  await requireCmsPageUser("calendar:view");
+  const user = await requireCmsPageUser("calendar:view");
+  const canManageBookings = canCmsRole(user.role, "bookings:write");
 
   const params = await searchParams;
   const today = currentCalendarDate("Europe/Dublin");
@@ -59,18 +60,20 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
     .filter(
       (booking) =>
         booking.status !== "cancelled" &&
-        booking.status !== "no-show" &&
-        !isPendingCapacityExpired(booking),
+        booking.status !== "no-show",
     )
     .map((booking) => ({
       id: booking.id,
       reference: booking.reference,
       customerName: booking.customer.name,
+      customerPhone: booking.customer.phone,
+      customerNotes: booking.customer.notes,
       serviceName: booking.serviceName,
       durationMinutes: booking.durationMinutes,
       localDate: booking.localDate,
       localTime: booking.localTime,
       status: booking.status,
+      version: booking.version,
       demo: booking.demo,
     }));
   const calendarClosures: readonly CmsCalendarClosure[] = closures
@@ -107,6 +110,8 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
 
       <CmsCalendar
         bookings={calendarBookings}
+        canManageBookings={canManageBookings}
+        closedWeekdays={content.site.weeklyHours.map((hours) => !hours.open)}
         closures={calendarClosures}
         initialSelectedDate={selectedDate}
         key={`${month}:${selectedDate}`}

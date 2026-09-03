@@ -5,12 +5,12 @@
 
 .desktop {
   position: fixed;
-  top: 1.25rem;
-  right: 1.75rem;
+  top: 0.75rem;
+  right: 5.3rem;
 }
 
 .desktop.offsetForBanner {
-  top: 4.5rem;
+  top: 0.75rem;
 }
 
 .mobile {

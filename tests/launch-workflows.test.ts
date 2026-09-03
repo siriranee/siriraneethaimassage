@@ -5,7 +5,7 @@ import test from "node:test";
 
 import { Temporal } from "@js-temporal/polyfill";
 
-import type { CmsServiceRecord } from "@/domain/cms/types";
+import type { CmsBooking, CmsServiceRecord } from "@/domain/cms/types";
 import type { CmsRepository } from "@/server/cms/repositories/repository";
 
 registerHooks({
@@ -83,7 +83,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     { hashCmsSessionToken },
     { loginCmsMockDemo, loginCmsUser },
     { createPublicBooking },
-    { createAdminBooking, updateAdminBooking },
+    { createAdminBooking, deleteAdminBooking, updateAdminBooking },
     { createCmsService, updateCmsService },
     { CmsValidationError },
     { CmsConflictError, getCmsRepository },
@@ -196,7 +196,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     (_, index) => `${String(8 + index).padStart(2, "0")}:00`,
   );
 
-  const bookings = [];
+  const bookings: CmsBooking[] = [];
   for (const [index, localTime] of times.entries()) {
     const service = services[index % services.length];
     bookings.push(
@@ -253,6 +253,33 @@ test("isolated launch verification covers services, ten bookings and administrat
       (notification) => notification.kind === "booking-completed",
     ).length,
     3,
+  );
+
+  await assert.rejects(
+    () =>
+      deleteAdminBooking(
+        bookings[1].id,
+        bookings[1].version + 1,
+        context,
+      ),
+    CmsConflictError,
+  );
+  assert.ok(await repository.getBooking(bookings[1].id));
+
+  const deletedBooking = await deleteAdminBooking(
+    bookings[1].id,
+    bookings[1].version,
+    context,
+  );
+  assert.equal(deletedBooking.id, bookings[1].id);
+  assert.equal(await repository.getBooking(bookings[1].id), null);
+  assert.equal(
+    (await repository.listNotifications(bookings[1].id, 20)).length,
+    0,
+  );
+  assert.equal(
+    (await repository.listBookingOccupancy(localDate, localDate)).length,
+    9,
   );
 
   const demoLogin = await loginCmsMockDemo("isolated-demo-login");
@@ -513,6 +540,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     "service.created",
     "service.updated",
     "booking.updated",
+    "booking.deleted",
     "booking.requested",
     "user.created",
     "user.access-updated",

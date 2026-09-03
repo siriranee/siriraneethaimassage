@@ -1,6 +1,10 @@
 import { MongoClient } from "mongodb";
 
 const auditRetentionDays = 365;
+const notificationRetentionDays = 365;
+const bookingRetentionDays = 2 * 365;
+const dayLockRetentionDays = 30;
+const publicationRetentionCount = 50;
 
 const uri = process.env.MONGODB_URI?.trim();
 const dbName = process.env.MONGODB_DB?.trim() || "siriranee";
@@ -12,14 +16,22 @@ if (!uri) {
 
 const client = new MongoClient(uri, {
   appName: "siriranee-cms-indexes",
+  connectTimeoutMS: 10_000,
   maxPoolSize: 2,
+  serverSelectionTimeoutMS: 10_000,
 });
 
 try {
   await client.connect();
+  console.log("Connected to MongoDB; applying CMS retention policy.");
   const db = client.db(dbName);
   const users = db.collection("cmsUsers");
   const audit = db.collection("cmsAuditEvents");
+  const bookings = db.collection("cmsBookings");
+  const notifications = db.collection("cmsBookingNotifications");
+  const dayLocks = db.collection("cmsBookingDayLocks");
+  const publications = db.collection("cmsPublications");
+  const metadata = db.collection("cmsMeta");
   const usersCollectionExists = await db
     .listCollections({ name: "cmsUsers" }, { nameOnly: true })
     .hasNext();
@@ -97,6 +109,117 @@ try {
     );
   }
 
+  const notificationBackfill = await notifications.updateMany(
+    { expiresAtDate: { $not: { $type: "date" } } },
+    [
+      {
+        $set: {
+          expiresAtDate: {
+            $dateAdd: {
+              startDate: {
+                $convert: {
+                  input: "$createdAt",
+                  to: "date",
+                  onError: "$$NOW",
+                  onNull: "$$NOW",
+                },
+              },
+              unit: "day",
+              amount: notificationRetentionDays,
+            },
+          },
+        },
+      },
+    ],
+  );
+
+  const bookingBackfill = await bookings.updateMany(
+    { retentionExpiresAtDate: { $not: { $type: "date" } } },
+    [
+      {
+        $set: {
+          retentionExpiresAtDate: {
+            $dateAdd: {
+              startDate: {
+                $convert: {
+                  input: "$startsAt",
+                  to: "date",
+                  onError: "$$NOW",
+                  onNull: "$$NOW",
+                },
+              },
+              unit: "day",
+              amount: bookingRetentionDays,
+            },
+          },
+        },
+      },
+    ],
+  );
+
+  const dayLockBackfill = await dayLocks.updateMany(
+    { expiresAtDate: { $not: { $type: "date" } } },
+    [
+      {
+        $set: {
+          expiresAtDate: {
+            $dateAdd: {
+              startDate: {
+                $convert: {
+                  input: { $concat: ["$_id", "T00:00:00.000Z"] },
+                  to: "date",
+                  onError: "$$NOW",
+                  onNull: "$$NOW",
+                },
+              },
+              unit: "day",
+              amount: dayLockRetentionDays,
+            },
+          },
+        },
+      },
+    ],
+  );
+
+  if (notificationBackfill.modifiedCount) {
+    console.log(`Added retention dates to ${notificationBackfill.modifiedCount} booking notification record(s).`);
+  }
+  if (bookingBackfill.modifiedCount) {
+    console.log(`Added retention dates to ${bookingBackfill.modifiedCount} booking record(s).`);
+  }
+  if (dayLockBackfill.modifiedCount) {
+    console.log(`Added retention dates to ${dayLockBackfill.modifiedCount} booking day lock(s).`);
+  }
+
+  const currentPublication = await metadata.findOne(
+    { _id: "current-publication" },
+    { projection: { publicationId: 1 } },
+  );
+  const newestPublications = await publications
+    .find({}, { projection: { _id: 1 } })
+    .sort({ publishedAt: -1, _id: -1 })
+    .limit(publicationRetentionCount)
+    .toArray();
+  const retainedPublicationIds = newestPublications.map((item) => item._id);
+  if (
+    currentPublication?.publicationId &&
+    !retainedPublicationIds.some(
+      (id) => String(id) === String(currentPublication.publicationId),
+    )
+  ) {
+    retainedPublicationIds.splice(
+      Math.max(0, publicationRetentionCount - 1),
+      1,
+      currentPublication.publicationId,
+    );
+  }
+  const publicationCleanup = retainedPublicationIds.length
+    ? await publications.deleteMany({ _id: { $nin: retainedPublicationIds } })
+    : { deletedCount: 0 };
+  if (publicationCleanup.deletedCount) {
+    console.log(`Removed ${publicationCleanup.deletedCount} old publication revision(s).`);
+  }
+
   await Promise.all([
     db.collection("cmsSessions").createIndex(
       { tokenHash: 1 },
@@ -156,6 +279,10 @@ try {
       { assignedStaffId: 1, startsAt: 1 },
       { name: "cms_bookings_staff_starts_at" },
     ),
+    db.collection("cmsBookings").createIndex(
+      { retentionExpiresAtDate: 1 },
+      { name: "cms_bookings_retention_ttl", expireAfterSeconds: 0 },
+    ),
     db.collection("cmsBookingHolds").createIndex(
       { tokenHash: 1 },
       { name: "cms_holds_token_unique", unique: true },
@@ -183,6 +310,18 @@ try {
     db.collection("cmsBookingNotifications").createIndex(
       { channel: 1, createdAt: -1 },
       { name: "cms_notifications_channel_created" },
+    ),
+    db.collection("cmsBookingNotifications").createIndex(
+      { expiresAtDate: 1 },
+      { name: "cms_notifications_retention_ttl", expireAfterSeconds: 0 },
+    ),
+    db.collection("cmsBookingDayLocks").createIndex(
+      { expiresAtDate: 1 },
+      { name: "cms_day_locks_retention_ttl", expireAfterSeconds: 0 },
+    ),
+    db.collection("cmsPublications").createIndex(
+      { publishedAt: -1 },
+      { name: "cms_publications_published_at" },
     ),
     db.collection("cmsMediaAssets").createIndex(
       { providerAssetId: 1 },

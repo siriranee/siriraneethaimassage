@@ -174,6 +174,38 @@ test("owner email is still sent when the customer did not provide an email", asy
   assert.equal("replyTo" in (capturedPayload ?? {}), false);
 });
 
+test("owner email links to the public site when the local CMS origin differs", async () => {
+  const { sendOwnerBookingRequestedEmail } = await import(
+    "@/server/booking/resend-booking-email"
+  );
+  let capturedPayload: Record<string, unknown> | undefined;
+
+  const result = await sendOwnerBookingRequestedEmail(booking(), {
+    environment: {
+      RESEND_API_KEY: configuration.apiKey,
+      RESEND_FROM_EMAIL: configuration.from,
+      RESEND_BOOKING_TO_EMAIL: configuration.to,
+      NEXT_PUBLIC_SITE_URL: "https://siriranee.example",
+      CMS_ORIGIN: "http://localhost:3110",
+    },
+    client: {
+      emails: {
+        async send(payload: CreateEmailOptions): Promise<CreateEmailResponse> {
+          capturedPayload = payload as unknown as Record<string, unknown>;
+          return { data: { id: "owner-email-id" }, error: null, headers: null };
+        },
+      },
+    },
+  });
+
+  assert.equal(result.status, "sent");
+  assert.match(
+    String(capturedPayload?.html),
+    /https:\/\/siriranee\.example\/cms\/bookings\/11111111-2222-4333-8444-555555555555/,
+  );
+  assert.doesNotMatch(String(capturedPayload?.html), /localhost:3110/);
+});
+
 test("configuration and provider failures return safe codes without exposing provider messages", async () => {
   const { getResendBookingEmailReadiness, sendOwnerBookingRequestedEmail } =
     await import("@/server/booking/resend-booking-email");

@@ -154,7 +154,7 @@ export function renderOwnerBookingRequestedEmail(
   const customerName = cleanDisplayText(booking.customer.name);
   const customerPhone = cleanDisplayText(booking.customer.phone);
   const customerEmail = cleanDisplayText(booking.customer.email);
-  const hasCustomerNotes = Boolean(cleanDisplayText(booking.customer.notes, true));
+  const customerNotes = cleanDisplayText(booking.customer.notes, true);
   const serviceName = cleanDisplayText(booking.serviceName);
   const reference = cleanDisplayText(booking.reference);
   const bookingId = cleanDisplayText(booking.id);
@@ -213,14 +213,7 @@ export function renderOwnerBookingRequestedEmail(
       ["ชื่อ", customerName, true],
       ["โทรศัพท์", customerPhone, true],
       ["อีเมล", customerEmail || "ไม่ได้ระบุ", true],
-      [
-        "หมายเหตุ",
-        hasCustomerNotes
-          ? cmsBookingUrl
-            ? "ลูกค้าได้เพิ่มหมายเหตุ กรุณาเปิดดูอย่างปลอดภัยใน CMS"
-            : "ลูกค้าได้เพิ่มหมายเหตุ กรุณาตรวจสอบในรายการจองของ CMS"
-          : "ไม่ได้ระบุ",
-      ],
+      ["หมายเหตุ", customerNotes || "ไม่ได้ระบุ", true],
     ],
     requestHeading: "ข้อมูลคำขอ",
     requestRows: [
@@ -254,14 +247,7 @@ export function renderOwnerBookingRequestedEmail(
       ["Name", customerName, true],
       ["Phone", customerPhone, true],
       ["Email", customerEmail || "Not provided", true],
-      [
-        "Notes",
-        hasCustomerNotes
-          ? cmsBookingUrl
-            ? "The customer added notes. Open the CMS booking to review them securely."
-            : "The customer added notes. Review them in the CMS booking record."
-          : "Not provided",
-      ],
+      ["Notes", customerNotes || "Not provided", true],
     ],
     requestHeading: "Request information",
     requestRows: [
@@ -316,7 +302,7 @@ export function renderOwnerBookingRequestedEmail(
 ชื่อ: ${customerName}
 โทรศัพท์: ${customerPhone}
 อีเมล: ${customerEmail || "ไม่ได้ระบุ"}
-หมายเหตุ: ${hasCustomerNotes ? "ลูกค้าได้เพิ่มหมายเหตุ กรุณาตรวจสอบในรายการจองของ CMS" : "ไม่ได้ระบุ"}
+หมายเหตุ: ${customerNotes || "ไม่ได้ระบุ"}
 
 ข้อมูลคำขอ
 รหัสภายใน: ${bookingId}
@@ -344,7 +330,7 @@ Customer details
 Name: ${customerName}
 Phone: ${customerPhone}
 Email: ${customerEmail || "Not provided"}
-Notes: ${hasCustomerNotes ? "The customer added notes. Review them in the CMS booking record." : "Not provided"}
+Notes: ${customerNotes || "Not provided"}
 
 Request information
 Internal booking ID: ${bookingId}

@@ -2,9 +2,12 @@ import { History, Mail, Phone, UserRound } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { BookingEditorForm } from "@/components/cms/BookingEditorForm";
+import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
+import { CmsDeleteBookingButton } from "@/components/cms/CmsDeleteBookingButton";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { isPendingCapacityExpired } from "@/domain/booking/status";
+import { canCmsRole } from "@/domain/cms/permissions";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsBooking, listCmsBookingTimeline, listCmsNotifications } from "@/server/cms/read-service";
 
@@ -15,7 +18,7 @@ type PageProps = {
 };
 
 export default async function CmsBookingDetailPage({ params }: PageProps) {
-  await requireCmsPageUser("bookings:write");
+  const user = await requireCmsPageUser("bookings:write");
   const { bookingId } = await params;
   const [booking, timeline, notifications] = await Promise.all([
     getCmsBooking(bookingId),
@@ -28,7 +31,18 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
   return (
     <>
       <CmsPageHeader
-        actions={<CmsPrimaryLink href="/cms/bookings" secondary>Back to bookings</CmsPrimaryLink>}
+        actions={
+          <>
+            <CmsPrimaryLink href="/cms/bookings" secondary>Back to bookings</CmsPrimaryLink>
+            {canCmsRole(user.role, "bookings:delete") ? (
+              <CmsDeleteBookingButton
+                bookingId={booking.id}
+                reference={booking.reference}
+                version={booking.version}
+              />
+            ) : null}
+          </>
+        }
         description="Review the appointment snapshot, update its status or reschedule safely."
         eyebrow={booking.reference}
         title={booking.customer.name}
@@ -49,7 +63,13 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
       <div className={styles.detailGrid}>
         <CmsPanel title="Booking summary" description="Treatment and price are preserved from the booking date.">
           <dl className={styles.details}>
-            <div><dt>Status</dt><dd><CmsBookingStatus status={booking.status} /></dd></div>
+            <div>
+              <dt>Status</dt>
+              <dd className={styles.bookingDetailStatus}>
+                <CmsBookingStatus status={booking.status} />
+                <CmsBookingQuickActions booking={booking} />
+              </dd>
+            </div>
             <div><dt>Reference</dt><dd>{booking.reference}</dd></div>
             <div><dt>Treatment</dt><dd>{booking.serviceName}</dd></div>
             <div><dt>Duration & price</dt><dd>{booking.durationMinutes} min · €{(booking.priceCents / 100).toFixed(0)}</dd></div>

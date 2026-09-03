@@ -1,0 +1,86 @@
+.root {
+  position: relative;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--color-danger);
+  border-radius: 0.65rem;
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  gap: 0.45rem;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: var(--color-on-brand);
+}
+
+.button:focus-visible {
+  outline: 3px solid rgb(var(--color-danger-rgb) / 0.28);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.spinner {
+  animation: spin 900ms linear infinite;
+}
+
+.error {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  width: 18rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--color-danger);
+  border-radius: 0.55rem;
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  box-shadow: var(--shadow-card);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 520px) {
+  .error {
+    right: auto;
+    left: 0;
+    width: min(18rem, calc(100vw - 2rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .button,
+  .error {
+    border: 1px solid ButtonText;
+  }
+}

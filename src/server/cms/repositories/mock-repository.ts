@@ -24,6 +24,7 @@ import {
   CmsConflictError,
   type CmsRepository,
 } from "@/server/cms/repositories/repository";
+import { CMS_PUBLICATION_RETENTION_COUNT } from "@/server/cms/data-retention";
 import { cmsContentReferencesMediaAsset } from "@/server/media/references";
 
 type MockState = {
@@ -164,6 +165,9 @@ export class MockCmsRepository implements CmsRepository {
     this.state.publication = clone(publication);
     this.state.publications = this.state.publications.filter((item) => item.id !== publication.id);
     this.state.publications.unshift(clone(publication));
+    this.state.publications = this.state.publications
+      .sort((first, second) => second.publishedAt.localeCompare(first.publishedAt))
+      .slice(0, CMS_PUBLICATION_RETENTION_COUNT);
   }
 
   async getMediaAsset(publicId: string) {
@@ -445,6 +449,20 @@ export class MockCmsRepository implements CmsRepository {
     else this.state.bookings.push(clone(booking));
 
     return clone(booking);
+  }
+
+  async deleteBooking(id: string, expectedVersion: number) {
+    const index = this.state.bookings.findIndex((booking) => booking.id === id);
+    if (index < 0) return false;
+    if (this.state.bookings[index].version !== expectedVersion) {
+      throw new CmsConflictError();
+    }
+
+    this.state.bookings.splice(index, 1);
+    this.state.notifications = this.state.notifications.filter(
+      (notification) => notification.bookingId !== id,
+    );
+    return true;
   }
 
   async listClosures(from?: string, to?: string) {

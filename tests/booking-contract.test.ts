@@ -56,6 +56,78 @@ test("booking management surfaces do not offer staff assignment", async () => {
   assert.doesNotMatch(managementSource, /unassigned/i);
 });
 
+test("CMS booking views use cards with accessible icon-only status actions", async () => {
+  const [bookingsPage, bookingDetailPage, dashboardPage, calendarPage, calendar, quickActions, viewStyles] =
+    await Promise.all([
+      source("src/app/cms/(protected)/bookings/page.tsx"),
+      source("src/app/cms/(protected)/bookings/[bookingId]/page.tsx"),
+      source("src/app/cms/(protected)/page.tsx"),
+      source("src/app/cms/(protected)/calendar/page.tsx"),
+      source("src/components/cms/CmsCalendar.tsx"),
+      source("src/components/cms/CmsBookingQuickActions.tsx"),
+      source("src/components/cms/CmsViews.module.css"),
+    ]);
+
+  assert.doesNotMatch(bookingsPage, /<table|desktopTable|mobileRecords/);
+  assert.match(bookingsPage, /className=\{styles\.bookingGrid\}/);
+  assert.doesNotMatch(dashboardPage, /<table|desktopTable|mobileRecords/);
+  assert.match(dashboardPage, /className=\{styles\.bookingGrid\}/);
+  assert.match(dashboardPage, /<CmsBookingQuickActions/);
+  assert.match(bookingsPage, /<CmsBookingQuickActions/);
+  assert.match(bookingDetailPage, /<dt>Status<\/dt>[\s\S]*?<CmsBookingStatus[\s\S]*?<CmsBookingQuickActions/);
+  assert.match(bookingDetailPage, /className=\{styles\.bookingDetailStatus\}/);
+  assert.match(bookingsPage, /booking\.customer\.phone/);
+  assert.match(bookingsPage, /booking\.customer\.notes \|\| "No notes provided"/);
+  assert.match(bookingsPage, /canCmsRole\(user\.role, "bookings:write"\)/);
+  assert.match(viewStyles, /\.bookingGrid[\s\S]*grid-template-columns:\s*repeat\(3/);
+  assert.match(viewStyles, /\.details \.bookingDetailStatus[\s\S]*display:\s*flex/);
+
+  assert.match(calendarPage, /canManageBookings=\{canManageBookings\}/);
+  assert.match(calendar, /className=\{styles\.agendaBookingCard\}/);
+  assert.match(calendar, /<CmsBookingQuickActions/);
+  assert.match(calendar, /booking\.customerPhone/);
+  assert.match(calendar, /booking\.customerNotes \|\| "No notes provided"/);
+  assert.match(quickActions, /aria-label=\{`Confirm booking \$\{booking\.reference\}`\}/);
+  assert.match(quickActions, /aria-label=\{`Cancel booking \$\{booking\.reference\}`\}/);
+  assert.match(quickActions, /<Check aria-hidden="true"/);
+  assert.match(quickActions, /<X aria-hidden="true"/);
+  assert.match(quickActions, /window\.confirm/);
+  assert.match(quickActions, /method: "PATCH"/);
+  assert.match(quickActions, /changeReason: "other-operational"/);
+});
+
+test("booking filters fold safely and administrators can permanently delete a booking", async () => {
+  const [bookingsPage, detailPage, deleteButton, route, service, repository, viewStyles] =
+    await Promise.all([
+      source("src/app/cms/(protected)/bookings/page.tsx"),
+      source("src/app/cms/(protected)/bookings/[bookingId]/page.tsx"),
+      source("src/components/cms/CmsDeleteBookingButton.tsx"),
+      source("src/app/api/cms/bookings/[bookingId]/route.ts"),
+      source("src/server/cms/booking-service.ts"),
+      source("src/server/cms/repositories/repository.ts"),
+      source("src/components/cms/CmsViews.module.css"),
+    ]);
+
+  assert.match(bookingsPage, /<details className=\{styles\.searchDisclosure\}/);
+  assert.match(bookingsPage, /open=\{hasActiveFilters \|\| undefined\}/);
+  assert.match(viewStyles, /\.searchForm[\s\S]*?width:\s*100%/);
+  assert.match(viewStyles, /\.searchForm input,[\s\S]*?width:\s*100%/);
+  assert.match(viewStyles, /\.searchForm input,[\s\S]*?min-width:\s*0/);
+  assert.match(viewStyles, /\.searchForm input,[\s\S]*?box-sizing:\s*border-box/);
+  assert.match(viewStyles, /grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
+
+  assert.match(detailPage, /canCmsRole\(user\.role, "bookings:delete"\)/);
+  assert.match(detailPage, /<CmsDeleteBookingButton/);
+  assert.match(deleteButton, /window\.confirm/);
+  assert.match(deleteButton, /method:\s*"DELETE"/);
+  assert.match(deleteButton, /expectedVersion:\s*version/);
+  assert.match(route, /requireCmsApiUser\("bookings:delete"\)/);
+  assert.match(route, /isSameOriginMutation\(request\)/);
+  assert.match(service, /export async function deleteAdminBooking/);
+  assert.match(service, /action:\s*"booking\.deleted"/);
+  assert.match(repository, /deleteBooking\(id: string, expectedVersion: number\)/);
+});
+
 test("public team profiles remain informational and have no assignment control", async () => {
   const teamPage = await source("src/app/(site)/therapists/page.tsx");
 
@@ -133,6 +205,7 @@ test("booking page uses the custom month calendar and visual time choices", asyn
   assert.match(calendar, /aria-current=\{today \? "date"/);
   assert.match(calendar, /today \? styles\.dayToday/);
   assert.match(calendarStyles, /\.dayToday\.dayAvailable:not\(\.daySelected\)/);
+  assert.match(calendarStyles, /\.dayToday\.dayOff:not\(\.daySelected\)/);
   assert.match(calendarStyles, /var\(--color-success-surface\)/);
   assert.match(calendarStyles, /grid-template-columns:\s*repeat\(7/);
   assert.match(
@@ -163,12 +236,19 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
   assert.match(page, /listCmsClosures\(range\.from, range\.to\)/);
   assert.match(page, /booking\.status !== "cancelled"/);
   assert.match(page, /booking\.status !== "no-show"/);
-  assert.match(page, /isPendingCapacityExpired\(booking\)/);
+  assert.doesNotMatch(page, /isPendingCapacityExpired\(booking\)/);
+  assert.match(page, /closedWeekdays=\{content\.site\.weeklyHours\.map/);
   assert.match(page, /<CmsCalendar/);
   assert.match(page, /key=\{`\$\{month\}:\$\{selectedDate\}`\}/);
   assert.doesNotMatch(page, /Calendar view|value="week"/);
 
-  assert.match(calendar, /<CalendarLegend \/>/);
+  assert.match(calendar, /<CalendarLegend>/);
+  assert.match(
+    calendar,
+    /className=\{styles\.operationalKey\}>[\s\S]*?<CalendarLegend>[\s\S]*?Appointments[\s\S]*?Pending[\s\S]*?Partial closure[\s\S]*?<\/CalendarLegend>/,
+  );
+  assert.doesNotMatch(calendar, /<strong>CMS indicators<\/strong>/);
+  assert.doesNotMatch(calendar, /aria-label="CMS calendar indicators"/);
   assert.match(calendar, /BookingCalendar\.module\.css/);
   assert.match(calendarLegend, /aria-label="Calendar legend"/);
   assert.match(calendarLegend, /Available/);
@@ -182,10 +262,19 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
   assert.match(calendar, /window\.history\.replaceState/);
   assert.match(calendar, /onClick=\{\(\) => selectDate\(today\)\}/);
   assert.match(calendar, /Block this day/);
-  assert.match(calendar, /aria-label="CMS calendar indicators"/);
   assert.match(calendar, /Appointments/);
   assert.match(calendar, /Pending/);
   assert.match(calendar, /Partial closure/);
+  assert.match(calendar, /isRegularDayOff/);
+  assert.match(calendar, /Closed in the weekly business hours\./);
+  assert.match(
+    calendarStyles,
+    /\.agendaBookingMain\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/,
+  );
+  assert.equal(
+    (calendarStyles.match(/\.agendaBookingMain\s*\{/g) ?? []).length,
+    1,
+  );
   assert.match(calendar, /\/cms\/bookings\/new\?date=\$\{selectedDate\}/);
   assert.match(calendar, /\/cms\/calendar\/closures\/\$\{closure\.id\}\/edit/);
   assert.doesNotMatch(calendarStyles, /\.legend(?:\s|\{)/);

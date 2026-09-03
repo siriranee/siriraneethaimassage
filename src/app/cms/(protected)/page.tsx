@@ -1,21 +1,20 @@
 import {
-  AlertTriangle,
   CalendarClock,
   CalendarDays,
-  CheckCircle2,
   ClipboardList,
-  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 
+import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import {
-  CmsNotice,
+  CmsEmptyState,
   CmsPageHeader,
   CmsPanel,
   CmsPrimaryLink,
   CmsStatCard,
 } from "@/components/cms/CmsUi";
+import { canCmsRole } from "@/domain/cms/permissions";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsDashboardData } from "@/server/cms/read-service";
 
@@ -31,30 +30,18 @@ function formatDate(value: string) {
 }
 
 export default async function CmsDashboardPage() {
-  await requireCmsPageUser("dashboard:view");
-  const { content, summary, upcoming } = await getCmsDashboardData();
+  const user = await requireCmsPageUser("dashboard:view");
+  const canManageBookings = canCmsRole(user.role, "bookings:write");
+  const { summary, upcoming } = await getCmsDashboardData();
 
   return (
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/bookings/new">Add booking</CmsPrimaryLink>}
-        description="Review upcoming appointments, content health and the remaining setup work from one calm overview."
+        description="Review upcoming appointments from one calm overview."
         eyebrow="Workspace overview"
         title="Good to see you."
       />
-
-      {!content.bookingSettings.rulesConfirmed || !content.site.openingHoursConfirmed ? (
-        <CmsNotice tone="warning" title="Public date and time booking remains safely off">
-          Opening hours and booking rules are still mock values. The contact-led
-          booking journey stays active until the owner confirms them.
-        </CmsNotice>
-      ) : null}
-
-      {summary.expiredPendingCount ? (
-        <CmsNotice tone="warning" title="Expired public booking holds need review">
-          {summary.expiredPendingCount} pending request{summary.expiredPendingCount === 1 ? " has" : "s have"} released its temporary capacity. Review the booking before confirming it; confirmation rechecks the slot against current availability.
-        </CmsNotice>
-      ) : null}
 
       <div className={styles.statGrid}>
         <CmsStatCard detail="Appointments on the Dublin calendar" icon={CalendarDays} label="Today" tone="purple" value={summary.todayCount} />
@@ -62,76 +49,55 @@ export default async function CmsDashboardPage() {
         <CmsStatCard detail="Future active appointments" icon={CalendarClock} label="Upcoming" tone="green" value={summary.upcomingCount} />
       </div>
 
-      <div className={styles.twoColumn}>
-        <CmsPanel title="Upcoming appointments" description="Times are shown in Europe/Dublin.">
-          {upcoming.length ? (
-            <>
-              <div className={`${styles.tableScroll} ${styles.desktopTable}`}>
-                <table className={styles.table}>
-                  <caption className="sr-only">Upcoming Siriranee appointments</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Booking</th>
-                      <th scope="col">Date and time</th>
-                      <th scope="col">Treatment</th>
-                      <th scope="col">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {upcoming.map((booking) => (
-                      <tr key={booking.id}>
-                        <td><Link href={`/cms/bookings/${booking.id}`}><code>{booking.reference}</code></Link><small>{booking.customer.name}</small></td>
-                        <td><strong>{formatDate(booking.localDate)}</strong><small>{booking.localTime}</small></td>
-                        <td><strong>{booking.serviceName}</strong><small>{booking.durationMinutes} min · €{(booking.priceCents / 100).toFixed(0)}</small></td>
-                        <td><CmsBookingStatus status={booking.status} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className={styles.mobileRecords}>
-                {upcoming.map((booking) => (
-                  <article className={styles.recordCard} key={booking.id}>
-                    <div className={styles.recordCardHeader}>
-                      <strong>{booking.reference}</strong>
-                      <CmsBookingStatus status={booking.status} />
-                    </div>
-                    <dl>
-                      <dt>Guest</dt><dd>{booking.customer.name}</dd>
-                      <dt>When</dt><dd>{formatDate(booking.localDate)} · {booking.localTime}</dd>
-                      <dt>Treatment</dt><dd>{booking.serviceName}</dd>
-                    </dl>
-                    <Link href={`/cms/bookings/${booking.id}`}>View booking</Link>
-                  </article>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className={styles.recordCard}>No upcoming appointments.</div>
-          )}
-        </CmsPanel>
+      <CmsPanel title="Upcoming appointments" description="Times are shown in Europe/Dublin.">
+        {upcoming.length ? (
+          <div aria-label="Upcoming Siriranee appointments" className={styles.bookingGrid}>
+            {upcoming.map((booking) => (
+              <article className={styles.bookingCard} key={booking.id}>
+                <header className={styles.bookingCardHeader}>
+                  <div>
+                    <code>{booking.reference}</code>
+                    <small>
+                      {booking.source.charAt(0).toUpperCase() + booking.source.slice(1)}
+                      {booking.demo ? " · Fictional mock" : ""}
+                    </small>
+                  </div>
+                  <CmsBookingStatus status={booking.status} />
+                </header>
 
-        <CmsPanel title="Production readiness" description="Owner decisions and provider setup still required.">
-          <ul className={styles.checklist}>
-            <li>
-              <CheckCircle2 aria-hidden="true" />
-              <div><strong>{summary.activeServiceCount} published treatments</strong><span>Current prices and durations are loaded.</span></div>
-            </li>
-            <li>
-              {content.site.openingHoursConfirmed ? <CheckCircle2 aria-hidden="true" /> : <AlertTriangle aria-hidden="true" />}
-              <div><strong>Opening hours</strong><span>{content.site.openingHoursConfirmed ? "Confirmed by the owner." : "Mock hours need owner confirmation."}</span></div>
-            </li>
-            <li>
-              {content.bookingSettings.rulesConfirmed ? <CheckCircle2 aria-hidden="true" /> : <AlertTriangle aria-hidden="true" />}
-              <div><strong>Booking rules</strong><span>{content.bookingSettings.rulesConfirmed ? "Capacity and notice rules confirmed." : "Capacity, notice and cancellation rules are provisional."}</span></div>
-            </li>
-            <li>
-              <Sparkles aria-hidden="true" />
-              <div><strong>Customer experience</strong><span>Customers choose a treatment, date and time.</span></div>
-            </li>
-          </ul>
-        </CmsPanel>
-      </div>
+                <div className={styles.bookingCardPrimary}>
+                  <h2>{booking.customer.name}</h2>
+                  <p>{formatDate(booking.localDate)} · {booking.localTime}</p>
+                </div>
+
+                <dl className={styles.bookingCardDetails}>
+                  <div><dt>Treatment</dt><dd>{booking.serviceName}</dd></div>
+                  <div><dt>Duration</dt><dd>{booking.durationMinutes} min</dd></div>
+                  <div><dt>Phone</dt><dd>{booking.customer.phone}</dd></div>
+                  <div className={styles.bookingCardNotes}>
+                    <dt>Notes</dt>
+                    <dd>{booking.customer.notes || "No notes provided"}</dd>
+                  </div>
+                </dl>
+
+                <footer className={styles.bookingCardFooter}>
+                  <Link href={`/cms/bookings/${booking.id}`}>View</Link>
+                  {canManageBookings ? (
+                    <CmsBookingQuickActions
+                      booking={booking}
+                      key={`${booking.id}:${booking.version}`}
+                    />
+                  ) : null}
+                </footer>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <CmsEmptyState title="No upcoming appointments">
+            New confirmed and pending appointments will appear here.
+          </CmsEmptyState>
+        )}
+      </CmsPanel>
     </>
   );
 }
