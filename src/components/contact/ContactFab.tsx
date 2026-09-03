@@ -25,7 +25,12 @@ export function ContactFab({ site }: Readonly<{ site: PublicSiteData }>) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const phone = site.contact.phone;
-  const whatsappUrl = site.contact.whatsapp.url;
+  const whatsappNumber = phone?.e164.replace(/\D/g, "") ?? "";
+  const whatsappUrl = whatsappNumber
+    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+        `Hello ${site.alternateName}, I have a question about booking a massage.`,
+      )}`
+    : null;
   const email = site.contact.email;
   const instagram = site.social.instagram;
 
@@ -43,7 +48,7 @@ export function ContactFab({ site }: Readonly<{ site: PublicSiteData }>) {
     ...(whatsappUrl
       ? ([
           {
-            detail: "Message the team",
+            detail: phone?.internationalDisplay ?? "Message the team",
             external: true,
             href: whatsappUrl,
             iconSrc: "/icons/Whatsapp.svg",

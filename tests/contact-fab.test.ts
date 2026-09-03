@@ -17,7 +17,9 @@ test("contact FAB uses live site channels and accessible disclosure behavior", a
   assert.doesNotMatch(shell, /MobileBookingBar/);
   assert.match(component, /const phone = site\.contact\.phone/);
   assert.match(component, /phone\s*\?[\s\S]*?phone\.href/);
-  assert.match(component, /site\.contact\.whatsapp\.url/);
+  assert.match(component, /phone\?\.e164\.replace\(\/\\D\/g, ""\)/);
+  assert.match(component, /https:\/\/wa\.me\/\$\{whatsappNumber\}/);
+  assert.match(component, /phone\?\.internationalDisplay/);
   assert.match(component, /label: "Call Siriranee"/);
   assert.match(component, /label: "WhatsApp"/);
   assert.match(component, /site\.address\.directionsUrl/);
