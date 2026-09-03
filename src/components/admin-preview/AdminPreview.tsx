@@ -1,7 +1,6 @@
 import {
   Bell,
   CalendarDays,
-  Check,
   ChevronRight,
   CircleDashed,
   Clock3,
@@ -23,7 +22,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { services } from "@/content/services";
 import { siteConfig } from "@/content/site";
 import { teamMembers } from "@/content/team";
 import { BrandMark } from "@/components/ui/BrandMark";
@@ -43,21 +41,21 @@ const demoBookings = [
   {
     reference: "DEMO-001",
     guest: "Demo guest A",
-    service: services[0].name,
+    service: "Example treatment",
     time: "Example · 10:00",
     status: "Confirmed",
   },
   {
     reference: "DEMO-002",
     guest: "Demo guest B",
-    service: services[2].name,
+    service: "Example treatment",
     time: "Example · 12:00",
     status: "Pending",
   },
   {
     reference: "DEMO-003",
     guest: "Demo guest C",
-    service: services[4].name,
+    service: "Example treatment",
     time: "Example · 15:00",
     status: "Confirmed",
   },
@@ -70,15 +68,6 @@ const sampleTimeRows = [
   { time: "13:00", states: ["Available", "Available", "Available", "Available"] },
   { time: "14:00", states: ["Available", "Available", "Demo booking", "Available"] },
 ] as const;
-
-function formatPrice(service: (typeof services)[number]) {
-  const firstPrice = service.pricing[0];
-  if (!firstPrice) {
-    return "Live price not stored";
-  }
-
-  return `From €${firstPrice.priceEur}`;
-}
 
 function PrototypeAction({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -191,8 +180,8 @@ export function AdminPreview() {
                   <Sparkles aria-hidden="true" />
                 </div>
                 <span>Services in website content</span>
-                <strong>{services.length}</strong>
-                <small>Read from the current service catalogue</small>
+                <strong>—</strong>
+                <small>Managed in the live CMS</small>
               </article>
               <article className={styles.statCard}>
                 <div className={`${styles.statIcon} ${styles.statIconGreen}`}>
@@ -348,7 +337,7 @@ export function AdminPreview() {
               <div>
                 <span className={styles.kicker}>Service editor mockup</span>
                 <h2>Treatments and prices</h2>
-                <p>These cards reflect the website catalogue; editing remains disabled.</p>
+                <p>Live treatment data is managed in the CMS and is not embedded in this prototype.</p>
               </div>
               <PrototypeAction>
                 <Plus aria-hidden="true" /> Add service
@@ -356,36 +345,10 @@ export function AdminPreview() {
             </div>
 
             <div className={styles.serviceGrid}>
-              {services.map((service) => (
-                <article className={styles.serviceCard} key={service.slug}>
-                  <div className={styles.serviceCardTop}>
-                    <span>{service.category.replaceAll("-", " ")}</span>
-                    <span className={styles.publishedBadge}>
-                      <Check aria-hidden="true" /> In website content
-                    </span>
-                  </div>
-                  <h3>{service.name}</h3>
-                  <p>{service.shortDescription}</p>
-                  <dl>
-                    <div>
-                      <dt>Duration</dt>
-                      <dd>{service.durations.join(" / ")}</dd>
-                    </div>
-                    <div>
-                      <dt>Price</dt>
-                      <dd>{formatPrice(service)}</dd>
-                    </div>
-                  </dl>
-                  <div className={styles.cardFooter}>
-                    <Link href={`/services/${service.slug}`}>
-                      <Eye aria-hidden="true" /> View page
-                    </Link>
-                    <span aria-label="Editing unavailable">
-                      <Pencil aria-hidden="true" /> Edit mockup
-                    </span>
-                  </div>
-                </article>
-              ))}
+              <article className={styles.serviceCard}>
+                <h3>No local treatment catalogue</h3>
+                <p>Connect to the CMS to review published treatments and prices.</p>
+              </article>
             </div>
           </section>
 

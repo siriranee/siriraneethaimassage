@@ -1,19 +1,16 @@
 import { AdminBookingForm } from "@/components/cms/AdminBookingForm";
 import { CmsNotice, CmsPageHeader, CmsPrimaryLink } from "@/components/cms/CmsUi";
+import {
+  currentCalendarDate,
+  normalizeCalendarDate,
+  shiftCalendarDate,
+} from "@/domain/booking/calendar-month";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsMode } from "@/server/cms/config";
 import { getCmsContent } from "@/server/cms/content-service";
 
 function nextDublinDate() {
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const parts = new Intl.DateTimeFormat("en-IE", {
-    timeZone: "Europe/Dublin",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(tomorrow);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  return shiftCalendarDate(currentCalendarDate("Europe/Dublin"), 1);
 }
 
 type PageProps = { readonly searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -21,13 +18,15 @@ type PageProps = { readonly searchParams: Promise<Record<string, string | string
 export default async function CmsNewBookingPage({ searchParams }: PageProps) {
   await requireCmsPageUser("bookings:write");
   const params = await searchParams;
-  const requestedDate = typeof params.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : "";
+  const requestedDate = normalizeCalendarDate(
+    typeof params.date === "string" ? params.date : "",
+  );
   const [content, mode] = await Promise.all([
     getCmsContent(),
     Promise.resolve(getCmsMode()),
   ]);
   const variants = content.services
-    .filter((service) => service.status === "published")
+    .filter((service) => service.prices.some((price) => price.active))
     .flatMap((service) =>
       service.prices
         .filter((price) => price.active)
@@ -52,7 +51,7 @@ export default async function CmsNewBookingPage({ searchParams }: PageProps) {
           resets when the local server restarts.
         </CmsNotice>
       ) : null}
-      <AdminBookingForm defaultDate={requestedDate || nextDublinDate()} isMock={mode === "mock"} variants={variants} />
+      <AdminBookingForm defaultDate={requestedDate ?? nextDublinDate()} isMock={mode === "mock"} variants={variants} />
     </>
   );
 }

@@ -9,7 +9,7 @@ import type { Metadata } from "next";
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
-import { getServicePageHero } from "@/content/page-heroes";
+import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
 import {
   getPublicPageCopy,
@@ -68,7 +68,7 @@ export default async function TherapistsPage() {
   return (
     <div>
       <PageHero
-        {...getServicePageHero("traditional-thai-massage")}
+        {...pageHeroImages.about}
         eyebrow={pageCopy.eyebrow}
         title={pageCopy.title}
         description={pageCopy.description}

@@ -153,6 +153,16 @@ export function collectCmsScopedMediaReferences(
     if (typeof service.imageUrl === "string" && service.imageUrl) {
       references.push({ scope: "service-cover", secureUrl: service.imageUrl });
     }
+    if (
+      typeof service.hero?.imageUrl === "string" &&
+      service.hero.imageUrl &&
+      service.hero.imageUrl !== service.imageUrl
+    ) {
+      references.push({
+        scope: "service-cover",
+        secureUrl: service.hero.imageUrl,
+      });
+    }
     for (const image of service.galleryImages ?? []) {
       if (typeof image.imageUrl === "string" && image.imageUrl) {
         references.push({

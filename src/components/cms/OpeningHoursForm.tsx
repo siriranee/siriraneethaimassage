@@ -69,7 +69,7 @@ export function OpeningHoursForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
       }
 
       setVersion(result.site.version);
-      setFeedback({ tone: "success", text: "Opening hours saved to the draft." });
+      setFeedback({ tone: "success", text: "Opening hours saved and published." });
       router.refresh();
     } catch {
       setFeedback({ tone: "error", text: "The CMS could not be reached. Please try again." });
@@ -102,8 +102,8 @@ export function OpeningHoursForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
       </section>
 
       <div className={styles.saveBar}>
-        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Draft version ${version}`}</span>
-        <button disabled={saving} type="submit">{saving ? "Saving..." : "Save opening hours"}</button>
+        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Published version ${version}`}</span>
+        <button disabled={saving} type="submit">{saving ? "Saving and publishing..." : "Save and publish opening hours"}</button>
       </div>
     </form>
   );

@@ -302,9 +302,6 @@ export function ServiceImageSlider({
                       quality={90}
                       sizes="(max-width: 290px) calc(100vw - 2rem), (max-width: 1963px) 89vw, calc(100vw - 13.5rem)"
                       src={slide.src}
-                      style={{
-                        objectPosition: `${slide.focalX}% ${slide.focalY}%`,
-                      }}
                     />
                     <figcaption className={styles.caption}>
                       {slide.caption}
@@ -402,9 +399,6 @@ export function ServiceImageSlider({
                         fill
                         sizes="(max-width: 620px) 5rem, 7rem"
                         src={slide.src}
-                        style={{
-                          objectPosition: `${slide.focalX}% ${slide.focalY}%`,
-                        }}
                       />
                     </button>
                   );

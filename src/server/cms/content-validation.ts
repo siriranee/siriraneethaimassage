@@ -10,18 +10,36 @@ import {
   parseCmsServiceGalleryImages,
   type CmsServiceGalleryImage,
 } from "@/domain/cms/service-gallery";
-import type {
-  CmsBookingSettings,
-  CmsGalleryRecord,
-  CmsPageRecord,
-  CmsPromotionRecord,
-  CmsServicePrice,
-  CmsServiceRecord,
-  CmsSiteSettings,
-  CmsTeamRecord,
-  CmsVoucherRecord,
+import {
+  CmsServiceHeroValidationError,
+  parseCmsServiceHero,
+  type CmsServiceHero,
+} from "@/domain/cms/service-hero";
+import {
+  type CmsBookingSettings,
+  type CmsGalleryRecord,
+  type CmsPageRecord,
+  type CmsPromotionRecord,
+  type CmsServicePrice,
+  type CmsServiceRecord,
+  type CmsSiteSettings,
+  type CmsTeamRecord,
+  type CmsVoucherRecord,
 } from "@/domain/cms/types";
 
+export const RESERVED_LEGACY_SERVICE_SLUGS = [
+  "back-neck-shoulder-massage",
+  "full-body-massage",
+  "couples-massage",
+  "head-massage",
+  "foot-massage-reflexology",
+  "cupping-therapy",
+  "sports-massage",
+] as const;
+
+const reservedLegacyServiceSlugs = new Set<string>(
+  RESERVED_LEGACY_SERVICE_SLUGS,
+);
 export class CmsValidationError extends Error {
   constructor(
     message: string,
@@ -113,6 +131,13 @@ function safeSlug(value: unknown, field = "slug") {
     });
   }
 
+  if (reservedLegacyServiceSlugs.has(result)) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      [field]:
+        "This URL is reserved so an existing website redirect keeps working.",
+    });
+  }
+
   return result;
 }
 
@@ -126,15 +151,39 @@ function optionalDate(value: unknown, field: string) {
   return result;
 }
 
-function stringList(value: unknown, maximumItems: number, maximumLength: number) {
+function stringList(
+  value: unknown,
+  field: string,
+  maximumItems: number,
+  maximumLength: number,
+) {
   if (!Array.isArray(value)) return [];
 
-  return value
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, maximumItems)
-    .map((item) => item.slice(0, maximumLength));
+  const items = value.map((item, index) => {
+    if (typeof item !== "string") {
+      throw new CmsValidationError("Please check the highlighted fields.", {
+        [`${field}.${index}`]: "Use text for each list item.",
+      });
+    }
+
+    const result = item.trim();
+    if (result.length > maximumLength) {
+      throw new CmsValidationError("Please check the highlighted fields.", {
+        [`${field}.${index}`]:
+          `Keep each item to ${maximumLength} characters or fewer.`,
+      });
+    }
+
+    return result;
+  }).filter(Boolean);
+
+  if (items.length > maximumItems) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      [field]: `Use no more than ${maximumItems} items.`,
+    });
+  }
+
+  return items;
 }
 
 function prices(value: unknown, serviceId: string): readonly CmsServicePrice[] {
@@ -166,11 +215,17 @@ function prices(value: unknown, serviceId: string): readonly CmsServicePrice[] {
       throw new CmsValidationError("Durations must use five-minute increments.");
     }
 
+    const suppliedId =
+      typeof source.id === "string" ? source.id.trim() : "";
+    if (suppliedId.length > 120) {
+      throw new CmsValidationError("Please check the highlighted fields.", {
+        [`prices.${index}.id`]:
+          "Duration option IDs cannot exceed 120 characters.",
+      });
+    }
+
     return {
-      id:
-        typeof source.id === "string" && source.id.trim()
-          ? source.id.trim().slice(0, 120)
-          : `${serviceId}-${durationMinutes}`,
+      id: suppliedId || `${serviceId}-${durationMinutes}`,
       durationMinutes,
       priceCents,
       active: source.active !== false,
@@ -180,10 +235,30 @@ function prices(value: unknown, serviceId: string): readonly CmsServicePrice[] {
   if (new Set(options.map((option) => option.durationMinutes)).size !== options.length) {
     throw new CmsValidationError("Each service duration must be unique.");
   }
+  if (
+    new Set(options.map((option) => option.id.toLocaleLowerCase("en-IE"))).size !==
+    options.length
+  ) {
+    throw new CmsValidationError("Each duration option ID must be unique.", {
+      prices: "Remove or rename duplicate duration option IDs.",
+    });
+  }
 
   return options.sort(
     (first, second) => first.durationMinutes - second.durationMinutes,
   );
+}
+
+function serviceHero(value: unknown): CmsServiceHero {
+  try {
+    return parseCmsServiceHero(value);
+  } catch (error) {
+    if (error instanceof CmsServiceHeroValidationError) {
+      throw new CmsValidationError(error.message, error.fields);
+    }
+
+    throw error;
+  }
 }
 
 function serviceGalleryImages(
@@ -233,7 +308,6 @@ export function parseServiceUpdate(
   return {
     ...current,
     name: text(source.name, "name", 2, 100),
-    category: text(source.category, "category", 2, 80),
     shortDescription: text(
       source.shortDescription,
       "shortDescription",
@@ -252,20 +326,17 @@ export function parseServiceUpdate(
         ? source.imageUrl.trim()
         : validUrl(source.imageUrl, "imageUrl", false),
     imageAlt: text(source.imageAlt, "imageAlt", 8, 180),
+    hero: serviceHero(source.hero),
     galleryImages: serviceGalleryImages(
       source.galleryImages,
       current.galleryImages,
     ),
     prices: prices(source.prices, current.id),
-    idealFor: stringList(source.idealFor, 8, 160),
-    highlights: stringList(source.highlights, 8, 160),
-    bookingNotice: optionalText(source.bookingNotice, 500),
+    idealFor: stringList(source.idealFor, "idealFor", 8, 160),
+    highlights: stringList(source.highlights, "highlights", 8, 160),
+    priceNote: optionalText(source.priceNote, 300),
     seoTitle: text(source.seoTitle, "seoTitle", 10, 70),
     seoDescription: text(source.seoDescription, "seoDescription", 40, 170),
-    status: ["draft", "published", "archived"].includes(String(source.status))
-      ? (String(source.status) as CmsServiceRecord["status"])
-      : current.status,
-    sortOrder: integer(source.sortOrder, "sortOrder", 0, 1000),
     version: current.version + 1,
     updatedAt: now,
   };
@@ -284,20 +355,21 @@ export function parseServiceCreate(
     id,
     slug: safeSlug(source.slug),
     name: "",
-    category: "thai-massage",
     shortDescription: "",
     longDescription: "",
     imageUrl: "",
     imageAlt: "",
+    hero: {
+      imageUrl: "",
+      altText: "",
+    },
     galleryImages: [],
     prices: [],
     idealFor: [],
     highlights: [],
-    bookingNotice: "",
+    priceNote: "",
     seoTitle: "",
     seoDescription: "",
-    status: "draft",
-    sortOrder: 0,
     version: 0,
     createdAt: now,
     updatedAt: now,
@@ -384,7 +456,7 @@ export function parseSiteSettingsUpdate(
     instagramUrl: validUrl(source.instagramUrl, "instagramUrl"),
     booksyUrl: validUrl(source.booksyUrl, "booksyUrl"),
     googleReviewUrl: validUrl(source.googleReviewUrl, "googleReviewUrl"),
-    serviceAreas: stringList(source.serviceAreas, 20, 80),
+    serviceAreas: stringList(source.serviceAreas, "serviceAreas", 20, 80),
     arrivalGuidance: text(source.arrivalGuidance, "arrivalGuidance", 20, 500),
     arrivalAssistance: text(source.arrivalAssistance, "arrivalAssistance", 20, 500),
     weeklyHours,

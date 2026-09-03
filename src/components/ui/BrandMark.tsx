@@ -4,9 +4,10 @@ import styles from "./BrandMark.module.css";
 
 type BrandMarkProps = {
   compact?: boolean;
+  eager?: boolean;
 };
 
-export function BrandMark({ compact = false }: BrandMarkProps) {
+export function BrandMark({ compact = false, eager = false }: BrandMarkProps) {
   return (
     <span className={`${styles.brand} ${compact ? styles.compact : ""}`}>
       <Image
@@ -14,6 +15,7 @@ export function BrandMark({ compact = false }: BrandMarkProps) {
         aria-hidden="true"
         className={styles.logoImage}
         height={1200}
+        loading={eager ? "eager" : "lazy"}
         sizes={
           compact
             ? "(max-width: 380px) 2.75rem, 3.2rem"

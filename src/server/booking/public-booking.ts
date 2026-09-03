@@ -6,6 +6,7 @@ import { getAvailabilitySlots } from "@/domain/booking/availability";
 import type { CmsBooking } from "@/domain/cms/types";
 import { bookingPrivacyNotice } from "@/domain/privacy";
 import { assertLivePublicBookingReady } from "@/server/booking/readiness";
+import { readTransactionalAvailability } from "@/server/booking/transactional-availability";
 import { appendCmsAudit } from "@/server/cms/audit";
 import { CmsValidationError } from "@/server/cms/content-validation";
 import { getCmsRepository } from "@/server/cms/repositories";
@@ -179,7 +180,7 @@ export async function createPublicBooking(
       await transaction.lockBookingDate(localDate);
 
       const service = content.services.find(
-        (item) => item.id === serviceId && item.status === "published",
+        (item) => item.id === serviceId,
       );
       const price = service?.prices.find(
         (item) => item.durationMinutes === durationMinutes && item.active,
@@ -188,11 +189,12 @@ export async function createPublicBooking(
         throw new CmsValidationError("Choose an available treatment and duration.");
       }
 
-      const [bookings, holds, closures] = await Promise.all([
-        transaction.listBookingOccupancy(localDate, localDate),
-        transaction.listActiveHolds(new Date().toISOString()),
-        transaction.listClosures(localDate, localDate),
-      ]);
+      const { bookings, holds, closures } =
+        await readTransactionalAvailability(
+          transaction,
+          localDate,
+          new Date().toISOString(),
+        );
       const slot = getAvailabilitySlots({
         localDate,
         durationMinutes,

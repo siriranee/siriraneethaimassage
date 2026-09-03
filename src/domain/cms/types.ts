@@ -1,14 +1,15 @@
 import type { CmsPageHeroSlide } from "@/domain/cms/page-hero";
 import type { CmsServiceGalleryImage } from "@/domain/cms/service-gallery";
+import type { CmsServiceHero } from "@/domain/cms/service-hero";
 
 export type { CmsServiceGalleryImage } from "@/domain/cms/service-gallery";
 export type { CmsPageHeroSlide } from "@/domain/cms/page-hero";
+export type { CmsServiceHero } from "@/domain/cms/service-hero";
+
+export const CMS_CONTENT_SCHEMA_VERSION = 6 as const;
 
 export const cmsRoles = ["administrator", "staff"] as const;
 export type CmsRole = (typeof cmsRoles)[number];
-
-export const cmsServiceStatuses = ["draft", "published", "archived"] as const;
-export type CmsServiceStatus = (typeof cmsServiceStatuses)[number];
 
 export const cmsMediaScopes = [
   "service-cover",
@@ -87,20 +88,18 @@ export type CmsServiceRecord = {
   readonly id: string;
   readonly slug: string;
   readonly name: string;
-  readonly category: string;
   readonly shortDescription: string;
   readonly longDescription: string;
   readonly imageUrl: string;
   readonly imageAlt: string;
+  readonly hero: CmsServiceHero;
   readonly galleryImages: readonly CmsServiceGalleryImage[];
   readonly prices: readonly CmsServicePrice[];
   readonly idealFor: readonly string[];
   readonly highlights: readonly string[];
-  readonly bookingNotice: string;
+  readonly priceNote: string;
   readonly seoTitle: string;
   readonly seoDescription: string;
-  readonly status: CmsServiceStatus;
-  readonly sortOrder: number;
   readonly version: number;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -241,7 +240,7 @@ export type CmsPageRecord = {
 
 export type CmsContentState = {
   readonly id: "siriranee-content";
-  readonly schemaVersion: 1 | 2 | 3 | 4;
+  readonly schemaVersion: 1 | 2 | 3 | 4 | 5 | 6;
   readonly revision: number;
   readonly services: readonly CmsServiceRecord[];
   readonly site: CmsSiteSettings;
@@ -265,19 +264,33 @@ export type CmsPublication = {
 
 export type CmsUser = {
   readonly id: string;
-  readonly email: string;
+  readonly username: string;
+  readonly email?: string;
   readonly displayName: string;
   readonly passwordHash: string;
   readonly role: CmsRole;
   readonly active: boolean;
   readonly authVersion: number;
-  readonly failedLoginCount: number;
-  readonly lockedUntil: string;
+  readonly version: number;
   readonly lastLoginAt: string;
   readonly passwordChangedAt: string;
   readonly createdAt: string;
   readonly updatedAt: string;
 };
+
+export type CmsUserSummary = Pick<
+  CmsUser,
+  | "id"
+  | "username"
+  | "email"
+  | "displayName"
+  | "role"
+  | "active"
+  | "version"
+  | "lastLoginAt"
+  | "createdAt"
+  | "updatedAt"
+>;
 
 export type CmsSession = {
   readonly id: string;
@@ -409,6 +422,14 @@ export type CmsBookingNotification = {
   readonly lastError: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+};
+
+export type CmsNotificationBellItem = {
+  readonly id: string;
+  readonly bookingId: string;
+  readonly bookingReference: string;
+  readonly kind: CmsNotificationKind;
+  readonly createdAt: string;
 };
 
 export type CmsBookingQuery = {

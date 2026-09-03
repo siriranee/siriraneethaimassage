@@ -2,6 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { classifyAvailabilityCalendarDay } from "@/domain/booking/calendar";
+import {
+  buildCalendarMonthCells,
+  calendarMonthRange,
+  monthFromCalendarDate,
+  normalizeCalendarDate,
+  normalizeCalendarMonth,
+  shiftCalendarDate,
+  shiftCalendarMonth,
+} from "@/domain/booking/calendar-month";
 import { getAvailabilitySlots } from "@/domain/booking/availability";
 import type {
   CmsBookingSettings,
@@ -18,6 +27,32 @@ const days: readonly CmsWeeklyHours["day"][] = [
   "Saturday",
   "Sunday",
 ];
+
+test("calendar month helpers reject invalid dates and build a Monday-first grid", () => {
+  assert.equal(normalizeCalendarMonth("2024-02"), "2024-02");
+  assert.equal(normalizeCalendarMonth("2024-13"), null);
+  assert.equal(normalizeCalendarMonth("2024-2"), null);
+  assert.equal(normalizeCalendarDate("2024-02-29"), "2024-02-29");
+  assert.equal(normalizeCalendarDate("2023-02-29"), null);
+  assert.equal(monthFromCalendarDate("2024-02-29"), "2024-02");
+  assert.equal(monthFromCalendarDate("2024-02-30"), "");
+  assert.equal(shiftCalendarDate("2026-10-25", 1), "2026-10-26");
+  assert.equal(shiftCalendarDate("2024-02-28", 1), "2024-02-29");
+  assert.equal(shiftCalendarDate("2024-02-30", 1), "2024-02-30");
+  assert.equal(shiftCalendarMonth("2024-01", -1), "2023-12");
+  assert.deepEqual(calendarMonthRange("2024-02"), {
+    from: "2024-02-01",
+    to: "2024-02-29",
+  });
+
+  const cells = buildCalendarMonthCells("2024-02");
+  assert.equal(cells.length, 42);
+  assert.equal(cells[0], null);
+  assert.equal(cells[2], null);
+  assert.equal(cells[3], "2024-02-01");
+  assert.equal(cells[31], "2024-02-29");
+  assert.equal(cells[32], null);
+});
 
 function settings(
   overrides: Partial<CmsBookingSettings> = {},

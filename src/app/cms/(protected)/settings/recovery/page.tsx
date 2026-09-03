@@ -1,4 +1,4 @@
-import { DatabaseBackup, HeartPulse, KeyRound, ShieldCheck } from "lucide-react";
+import { DatabaseBackup, KeyRound } from "lucide-react";
 
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink, CmsStatusBadge } from "@/components/cms/CmsUi";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
@@ -21,16 +21,14 @@ export default async function CmsRecoveryStatusPage() {
           ? "Reserved values are present; automation still requires explicit approval and implementation"
           : "No approved automation or private destination is configured",
     },
-    { icon: ShieldCheck, label: "Isolated restore drill", ready: process.env.CMS_RECOVERY_DRILL_VERIFIED === "true", detail: process.env.CMS_RECOVERY_DRILL_VERIFIED === "true" ? "Explicitly marked verified" : "No verified drill recorded" },
-    { icon: HeartPulse, label: "Production monitoring", ready: process.env.CMS_MONITORING_READY === "true", detail: process.env.CMS_MONITORING_READY === "true" ? "Operational monitoring marked ready" : "Provider and alert recipient required" },
   ];
   return (
     <>
-      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/settings" secondary>Back to settings</CmsPrimaryLink>} description="Review fail-closed production gates without displaying credentials or recovery keys." eyebrow="Operations" title="Recovery & monitoring" />
+      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/settings" secondary>Back to settings</CmsPrimaryLink>} description="Review production persistence and recovery-key safeguards without displaying credentials." eyebrow="Operations" title="Recovery safeguards" />
       <CmsNotice tone="warning" title="A green screen does not replace a restore drill">
         Test every backup against a newly named isolated database. Never restore over production by default.
       </CmsNotice>
-      <CmsPanel title="Operational readiness" description="Environment values are reported only as present or missing.">
+      <CmsPanel title="Technical safeguards" description="Environment values are reported only as present or missing.">
         <ul className={styles.activityList}>
           {checks.map(({ detail, icon: Icon, label, ready }) => (
             <li key={label}><Icon aria-hidden="true" /><div><strong>{label} <CmsStatusBadge label={ready ? "Ready" : "Not ready"} tone={ready ? "success" : "warning"} /></strong><span>{detail}</span></div></li>
@@ -38,7 +36,7 @@ export default async function CmsRecoveryStatusPage() {
         </ul>
       </CmsPanel>
       <CmsPanel title="Runbook" description="No backup or restore is triggered from the browser.">
-        <p>Use the repository recovery runbook and trusted command line from a protected workstation. Public booking stays disabled until monitoring and the isolated drill are both verified.</p>
+        <p>Use the repository recovery runbook and trusted command line from a protected workstation. Keep CMS_PUBLIC_BOOKING_READY=false in every staging or recovery deployment.</p>
       </CmsPanel>
     </>
   );

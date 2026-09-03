@@ -46,6 +46,7 @@ test("booking management surfaces do not offer staff assignment", async () => {
     source("src/app/cms/(protected)/bookings/page.tsx"),
     source("src/app/cms/(protected)/bookings/[bookingId]/page.tsx"),
     source("src/app/cms/(protected)/calendar/page.tsx"),
+    source("src/components/cms/CmsCalendar.tsx"),
     source("src/app/cms/(protected)/page.tsx"),
   ]);
   const managementSource = files.join("\n");
@@ -55,15 +56,12 @@ test("booking management surfaces do not offer staff assignment", async () => {
   assert.doesNotMatch(managementSource, /unassigned/i);
 });
 
-test("team profiles remain informational and have no assignment control", async () => {
-  const [editor, listing] = await Promise.all([
-    source("src/components/cms/TeamEditorForm.tsx"),
-    source("src/app/cms/(protected)/team/page.tsx"),
-  ]);
+test("public team profiles remain informational and have no assignment control", async () => {
+  const teamPage = await source("src/app/(site)/therapists/page.tsx");
 
-  assert.doesNotMatch(editor, /name="operationalActive"/);
-  assert.doesNotMatch(listing, /member\.operationalActive/);
-  assert.match(editor, /operationalActive:\s*member\.operationalActive/);
+  assert.match(teamPage, /getPublicTeam/);
+  assert.doesNotMatch(teamPage, /assignedStaffId|operationalActive/);
+  assert.doesNotMatch(teamPage, /name=["']therapist["']|therapist[ -]preference/i);
 });
 
 test("booking settings use the API response contract and gate public enablement", async () => {
@@ -81,15 +79,16 @@ test("booking settings use the API response contract and gate public enablement"
   assert.doesNotMatch(form, /name="holdMinutes"/);
   assert.doesNotMatch(form, /name="cancellationCutoffMinutes"/);
   assert.match(validation, /publicBookingEnabled[\s\S]*?!rulesConfirmed \|\| !openingHoursConfirmed/);
-  for (const gate of [
-    "CMS_PUBLIC_BOOKING_READY",
-    "CMS_PRIVACY_NOTICE_APPROVED",
-    "CMS_BOOKING_NOTIFICATION_READY",
-    "CMS_MONITORING_READY",
-    "CMS_RECOVERY_DRILL_VERIFIED",
-  ]) {
-    assert.match(readiness, new RegExp(gate));
-  }
+  assert.match(readiness, /getCmsMode\(\) === "mongodb"/);
+  assert.match(readiness, /content\.site\.openingHoursConfirmed/);
+  assert.match(readiness, /content\.bookingSettings\.rulesConfirmed/);
+  assert.match(readiness, /content\.bookingSettings\.publicBookingEnabled/);
+  assert.match(readiness, /CMS_PUBLIC_BOOKING_READY/);
+  assert.match(readiness, /hasCmsPiiEncryptionKey\(\)/);
+  assert.doesNotMatch(
+    readiness,
+    /CMS_(?:PRIVACY_NOTICE_APPROVED|BOOKING_NOTIFICATION_READY|MONITORING_READY|RECOVERY_DRILL_VERIFIED)/,
+  );
 });
 
 test("booking mutations reject assignment fields and unsafe initial statuses", async () => {
@@ -109,25 +108,31 @@ test("contact handoff resolves service and price from the published snapshot", a
   const resolver = await source("src/server/booking/contact-preference.ts");
 
   assert.match(resolver, /getPublishedCmsContent/);
-  assert.match(resolver, /candidate\.status === "published"/);
+  assert.match(resolver, /candidate\.slug === input\.serviceSlug/);
+  assert.doesNotMatch(resolver, /candidate\.status/);
   assert.match(resolver, /candidate\.active/);
 });
 
 test("booking page uses the custom month calendar and visual time choices", async () => {
-  const [planner, calendar, calendarStyles] = await Promise.all([
+  const [planner, calendar, calendarStyles, calendarLegend] = await Promise.all([
     source("src/components/booking/BookingPlanner.tsx"),
     source("src/components/booking/BookingCalendar.tsx"),
     source("src/components/booking/BookingCalendar.module.css"),
+    source("src/components/booking/CalendarLegend.tsx"),
   ]);
 
   assert.doesNotMatch(planner, /type=["']date["']/i);
   assert.match(planner, /<BookingCalendar/);
   assert.match(planner, /name="preferredTime"/);
   assert.match(calendar, /\/api\/public\/availability\/calendar/);
-  assert.match(calendar, /aria-label="Calendar legend"/);
-  assert.match(calendar, /Fully booked/);
-  assert.match(calendar, /Day off/);
+  assert.match(calendar, /<CalendarLegend \/>/);
+  assert.match(calendarLegend, /aria-label="Calendar legend"/);
+  assert.match(calendarLegend, /Fully booked/);
+  assert.match(calendarLegend, /Day off/);
   assert.match(calendar, /aria-current=\{today \? "date"/);
+  assert.match(calendar, /today \? styles\.dayToday/);
+  assert.match(calendarStyles, /\.dayToday\.dayAvailable:not\(\.daySelected\)/);
+  assert.match(calendarStyles, /var\(--color-success-surface\)/);
   assert.match(calendarStyles, /grid-template-columns:\s*repeat\(7/);
   assert.match(
     calendarStyles,
@@ -136,6 +141,66 @@ test("booking page uses the custom month calendar and visual time choices", asyn
   assert.equal((calendarStyles.match(/\.calendarHeader\s*\{/g) ?? []).length, 1);
   assert.match(calendarStyles, /@media \(max-width: 390px\)/);
   assert.match(calendarStyles, /@media \(forced-colors: active\)/);
+});
+
+test("CMS calendar mirrors the month picker with operational booking data", async () => {
+  const [page, calendar, calendarStyles, closuresPage, newBookingPage, calendarLegend] =
+    await Promise.all([
+      source("src/app/cms/(protected)/calendar/page.tsx"),
+      source("src/components/cms/CmsCalendar.tsx"),
+      source("src/components/cms/CmsCalendar.module.css"),
+      source("src/app/cms/(protected)/calendar/closures/page.tsx"),
+      source("src/app/cms/(protected)/bookings/new/page.tsx"),
+      source("src/components/booking/CalendarLegend.tsx"),
+    ]);
+
+  assert.match(page, /requireCmsPageUser\("calendar:view"\)/);
+  assert.match(
+    page,
+    /listCmsBookings\(\{\s*from:\s*range\.from,\s*to:\s*range\.to\s*\}\)/,
+  );
+  assert.match(page, /listCmsClosures\(range\.from, range\.to\)/);
+  assert.match(page, /booking\.status !== "cancelled"/);
+  assert.match(page, /booking\.status !== "no-show"/);
+  assert.match(page, /isPendingCapacityExpired\(booking\)/);
+  assert.match(page, /<CmsCalendar/);
+  assert.match(page, /key=\{`\$\{month\}:\$\{selectedDate\}`\}/);
+  assert.doesNotMatch(page, /Calendar view|value="week"/);
+
+  assert.match(calendar, /<CalendarLegend \/>/);
+  assert.match(calendar, /BookingCalendar\.module\.css/);
+  assert.match(calendarLegend, /aria-label="Calendar legend"/);
+  assert.match(calendarLegend, /Available/);
+  assert.match(calendarLegend, /Selected/);
+  assert.match(calendarLegend, /Fully booked/);
+  assert.match(calendarLegend, /Day off/);
+  assert.match(calendar, /aria-live="polite"/);
+  assert.match(calendar, /aria-current=\{isToday \? "date"/);
+  assert.match(calendar, /isToday \? calendarStyles\.dayToday/);
+  assert.match(calendar, /aria-pressed=\{selected\}/);
+  assert.match(calendar, /window\.history\.replaceState/);
+  assert.match(calendar, /onClick=\{\(\) => selectDate\(today\)\}/);
+  assert.match(calendar, /Block this day/);
+  assert.match(calendar, /aria-label="CMS calendar indicators"/);
+  assert.match(calendar, /Appointments/);
+  assert.match(calendar, /Pending/);
+  assert.match(calendar, /Partial closure/);
+  assert.match(calendar, /\/cms\/bookings\/new\?date=\$\{selectedDate\}/);
+  assert.match(calendar, /\/cms\/calendar\/closures\/\$\{closure\.id\}\/edit/);
+  assert.doesNotMatch(calendarStyles, /\.legend(?:\s|\{)/);
+  assert.match(calendarStyles, /@media \(max-width: 390px\)/);
+  assert.match(calendarStyles, /@media \(forced-colors: active\)/);
+  assert.match(closuresPage, /normalizeCalendarDate/);
+  assert.match(closuresPage, /href=\{calendarHref\}/);
+  assert.match(
+    closuresPage,
+    /defaultDate=\{requestedDate \?\? tomorrowInDublin\(\)\}/,
+  );
+  assert.match(newBookingPage, /normalizeCalendarDate/);
+  assert.match(
+    newBookingPage,
+    /defaultDate=\{requestedDate \?\? nextDublinDate\(\)\}/,
+  );
 });
 
 test("booking page keeps customer instructions concise", async () => {

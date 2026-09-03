@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import sharp from "sharp";
 
 import {
   getServiceGalleryImages,
   limitServiceGallerySlides,
   MAX_SERVICE_GALLERY_IMAGES,
 } from "../src/content/service-galleries";
-import { services } from "../src/content/services";
 
 const root = process.cwd();
 
@@ -17,37 +15,31 @@ async function source(relativePath: string) {
   return readFile(path.join(root, relativePath), "utf8");
 }
 
-test("known services receive three unique local gallery images", async () => {
-  for (const service of services) {
-    const slides = getServiceGalleryImages(service);
-    assert.equal(slides.length, 3, `${service.slug} should have three gallery slides`);
-    assert.equal(new Set(slides.map((slide) => slide.src)).size, slides.length);
+test("service galleries use only CMS-provided slides and remove duplicate URLs", () => {
+  const first = {
+    src: "https://res.cloudinary.com/demo/image/upload/v1/gallery-01.webp",
+    alt: "A prepared massage treatment room",
+    caption: "A calm room prepared for treatment.",
+  };
+  const second = {
+    src: "https://res.cloudinary.com/demo/image/upload/v1/gallery-02.webp",
+    alt: "A therapist preparing towels for treatment",
+    caption: "Thoughtful preparation before an appointment.",
+  };
+  const slides = getServiceGalleryImages({
+    name: "CMS Created Service",
+    image: {
+      src: "https://res.cloudinary.com/demo/image/upload/v1/cover.webp",
+      alt: "A CMS-managed treatment cover",
+    },
+    gallery: [first, { ...first, caption: "Duplicate URL" }, second],
+  });
 
-    for (const [index, slide] of slides.entries()) {
-      assert.equal(
-        slide.src,
-        `/images/services/${service.slug}/gallery-0${index + 1}.webp`,
-      );
-      assert.ok(slide.alt.length >= 8);
-      assert.ok(slide.caption.length >= 8);
-      const absolutePath = path.join(root, "public", slide.src.replace(/^\//, ""));
-      const file = await stat(absolutePath);
-      assert.ok(file.size > 50_000, `${slide.src} should be a substantial image`);
-      const metadata = await sharp(absolutePath).metadata();
-      assert.equal(metadata.format, "webp");
-      assert.ok((metadata.width ?? 0) >= 1_600);
-      assert.ok((metadata.height ?? 0) >= 900);
-      assert.ok(
-        Math.abs((metadata.width ?? 0) / (metadata.height ?? 1) - 16 / 9) < 0.01,
-        `${slide.src} should use a 16:9 composition`,
-      );
-    }
-  }
+  assert.deepEqual(slides, [first, second]);
 });
 
-test("unknown CMS services keep only their own image", () => {
+test("services without a CMS gallery keep only their own image", () => {
   const slides = getServiceGalleryImages({
-    slug: "cms-created-service",
     name: "CMS Created Service",
     image: {
       src: "/images/spa/spa-still-life.webp",
@@ -64,8 +56,6 @@ test("long service galleries are limited to a practical image count", () => {
     src: `/images/mock-${index + 1}.webp`,
     alt: `Mock service gallery image ${index + 1}`,
     caption: `Mock gallery caption ${index + 1}`,
-    focalX: 50,
-    focalY: 50,
   }));
 
   assert.equal(MAX_SERVICE_GALLERY_IMAGES, 10);
@@ -74,10 +64,11 @@ test("long service galleries are limited to a practical image count", () => {
 });
 
 test("service gallery is manual, accessible and placed after treatment options", async () => {
-  const [component, styles, servicePage] = await Promise.all([
+  const [component, styles, servicePage, galleryHelper] = await Promise.all([
     source("src/components/services/ServiceImageSlider.tsx"),
     source("src/components/services/ServiceImageSlider.module.css"),
     source("src/app/(site)/services/[slug]/page.tsx"),
+    source("src/content/service-galleries.ts"),
   ]);
 
   assert.match(component, /aria-roledescription=\{hasMultipleSlides \? "carousel"/);
@@ -124,4 +115,5 @@ test("service gallery is manual, accessible and placed after treatment options",
   assert.ok(optionsIndex >= 0 && optionsIndex < galleryIndex);
   assert.ok(galleryIndex < contentIndex);
   assert.match(servicePage, /<ServiceImageSlider[\s\S]*?key=\{service\.slug\}/);
+  assert.doesNotMatch(galleryHelper, /serviceGallerySlides|\/images\/services\//);
 });

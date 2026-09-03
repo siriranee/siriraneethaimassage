@@ -7,19 +7,30 @@ import { MongoClient } from "mongodb";
 
 const uri = process.env.MONGODB_URI?.trim();
 const dbName = process.env.MONGODB_DB?.trim() || "siriranee";
-const email = process.env.CMS_SEED_EMAIL?.trim().toLowerCase();
+const username = process.env.CMS_SEED_USERNAME?.trim().toLowerCase();
 const password = process.env.CMS_SEED_PASSWORD ?? "";
 const displayName = process.env.CMS_SEED_DISPLAY_NAME?.trim();
 const role = process.env.CMS_SEED_ROLE?.trim() || "administrator";
+
+function validateUsername(value) {
+  if (value.length < 4 || value.length > 32) {
+    return "CMS_SEED_USERNAME must contain 4 to 32 characters.";
+  }
+
+  if (!/^[a-z0-9]+$/.test(value)) {
+    return "CMS_SEED_USERNAME may contain letters and numbers only.";
+  }
+
+  return "";
+}
 
 function validatePassword(value) {
   const errors = [];
   if (value.length < 12) errors.push("at least 12 characters");
   if (value.length > 256) errors.push("at most 256 characters");
-  if (!/[a-z]/.test(value)) errors.push("a lowercase letter");
-  if (!/[A-Z]/.test(value)) errors.push("an uppercase letter");
-  if (!/\d/.test(value)) errors.push("a number");
-  if (!/[^A-Za-z0-9]/.test(value)) errors.push("a symbol");
+  if (value && !/^[A-Za-z0-9]+$/.test(value)) {
+    errors.push("letters and numbers only");
+  }
   return errors;
 }
 
@@ -43,15 +54,21 @@ function derive(value, salt) {
   });
 }
 
-if (!uri || !email || !displayName || !password) {
+if (!uri || !username || !displayName || !password) {
   console.error(
-    "MONGODB_URI, CMS_SEED_EMAIL, CMS_SEED_PASSWORD and CMS_SEED_DISPLAY_NAME are required.",
+    "MONGODB_URI, CMS_SEED_USERNAME, CMS_SEED_PASSWORD and CMS_SEED_DISPLAY_NAME are required.",
   );
   process.exit(1);
 }
 
-if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-  console.error("CMS_SEED_EMAIL must be a valid email address.");
+const usernameError = validateUsername(username);
+if (usernameError) {
+  console.error(usernameError);
+  process.exit(1);
+}
+
+if (displayName.length < 2 || displayName.length > 80) {
+  console.error("CMS_SEED_DISPLAY_NAME must contain 2 to 80 characters.");
   process.exit(1);
 }
 
@@ -87,23 +104,23 @@ try {
   const users = db.collection("cmsUsers");
   const sessions = db.collection("cmsSessions");
   const audit = db.collection("cmsAuditEvents");
-  const existing = await users.findOne({ email });
+  const existing = await users.findOne({ username });
   const now = new Date().toISOString();
   const id = existing?._id?.toString() || randomUUID();
   const authVersion = Number(existing?.authVersion ?? 0) + 1;
+  const version = Number(existing?.version ?? 0) + 1;
 
   await users.updateOne(
-    { email },
+    { username },
     {
       $set: {
-        email,
+        username,
         displayName,
         passwordHash,
         role,
         active: true,
         authVersion,
-        failedLoginCount: 0,
-        lockedUntil: "",
+        version,
         passwordChangedAt: now,
         updatedAt: now,
       },
@@ -130,9 +147,7 @@ try {
     createdAt: now,
   });
 
-  console.log(
-    `CMS administrator provisioning passed for role ${role} in database ${dbName}.`,
-  );
+  console.log(`CMS user provisioning passed for role ${role} in database ${dbName}.`);
 } finally {
   await client.close();
 }

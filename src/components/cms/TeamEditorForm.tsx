@@ -45,7 +45,7 @@ export function TeamEditorForm({ member, isNew = false }: Readonly<{ member: Cms
 
       setVersion(result.member.version);
       markSaved();
-      setFeedback({ tone: "success", text: isNew ? "Team profile draft created." : "Team profile saved to the draft." });
+      setFeedback({ tone: "success", text: isNew ? "Team profile created and website updated." : "Team profile saved and website updated." });
       if (isNew) router.push(`/cms/team/${result.member.id}/edit`);
       router.refresh();
     } catch {
@@ -64,7 +64,7 @@ export function TeamEditorForm({ member, isNew = false }: Readonly<{ member: Cms
           <label className={styles.field}>Full name<input defaultValue={member.fullName} maxLength={120} minLength={2} name="fullName" required /></label>
           <label className={styles.fullField}>Public role<input defaultValue={member.publicRole} maxLength={120} minLength={2} name="publicRole" required /></label>
           <label className={styles.field}>Display order<input defaultValue={member.sortOrder} max={1000} min={0} name="sortOrder" required type="number" /></label>
-          <label className={styles.checkbox}><input defaultChecked={member.publicProfile} name="publicProfile" type="checkbox" /><span>Show public profile<small>Controls whether this person is included in the published team section.</small></span></label>
+          <label className={styles.checkbox}><input defaultChecked={member.publicProfile} name="publicProfile" type="checkbox" /><span>Show public profile<small>Controls whether this person appears on the website after saving.</small></span></label>
         </div>
       </section>
 
@@ -77,8 +77,8 @@ export function TeamEditorForm({ member, isNew = false }: Readonly<{ member: Cms
       </section>
 
       <div className={styles.saveBar}>
-        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Draft version ${version}${dirty ? " · unsaved changes" : ""}`}</span>
-        <button disabled={saving} type="submit">{saving ? "Saving..." : isNew ? "Create profile draft" : "Save team profile"}</button>
+        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Current version ${version}${dirty ? " · unsaved changes" : ""}`}</span>
+        <button disabled={saving} type="submit">{saving ? "Saving and publishing..." : isNew ? "Create profile" : "Save website changes"}</button>
       </div>
     </form>
   );

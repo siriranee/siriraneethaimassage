@@ -1,6 +1,6 @@
 # Siriranee Thai Massage implementation status
 
-Updated: 1 September 2026
+Updated: 2 September 2026
 
 ## Complete and validated
 
@@ -20,8 +20,9 @@ Updated: 1 September 2026
   robots rules, redirects and social previews.
 - Click-to-load Google Maps, telephone links, and optional owner-configured
   email, WhatsApp, Instagram, Booksy and Google Review links.
-- Secure CMS authentication, administrator/staff permissions, session
-  revocation, login lockout and audit history.
+- Secure username-and-password CMS authentication, administrator/staff
+  permissions, session revocation, credential-pair/address throttling,
+  account-abuse alerts and audit history.
 - Create/edit/archive workflows for services and team profiles, plus editable
   site information, hours, booking rules, public page headings and SEO.
 - CMS-managed home-hero slides and per-service image galleries with ordering,
@@ -33,10 +34,10 @@ Updated: 1 September 2026
   conservative rollback and bounded expired-stage cleanup.
 - Promotion and local gallery-metadata management with draft, published and
   archived states.
-- Public pages read the immutable published CMS snapshot; drafts remain private.
-- Review-first publishing with grouped changes, readiness errors/warnings,
-  immutable publication history and restore-to-draft that preserves current
-  operational booking settings.
+- Public pages read immutable CMS publication snapshots; successful content
+  saves publish the changed section immediately.
+- Transactional direct publishing with record validation and immutable
+  publication history; failed saves do not replace the live snapshot.
 - Booking dashboard, global CMS search, URL-based booking filters, booking
   detail, controlled change reasons, per-booking audit timeline, status updates,
   rescheduling, bounded recurring closures and day/week/month calendar.
@@ -60,8 +61,9 @@ Updated: 1 September 2026
 - Production CMS is disabled without MongoDB configuration.
 - Cloudinary uploads require MongoDB, complete server-only credentials and an
   independent CMS_MEDIA_UPLOAD_READY gate.
-- Direct public booking requires independent code, database, owner/privacy,
-  notification, monitoring and verified-recovery readiness gates.
+- Direct public booking requires MongoDB, confirmed hours and booking rules,
+  a valid customer-data encryption key, the CMS booking control and one
+  deployment-level booking switch.
 - Customer details are encrypted with AES-256-GCM before MongoDB storage.
 - CMS and API responses containing private data are no-store.
 - CMS routes are blocked from indexing.
@@ -93,12 +95,13 @@ following are true:
 1. MongoDB production persistence and indexes are configured.
 2. The PII encryption key is stored in both deployment and protected recovery
    systems.
-3. The owner has confirmed and published opening hours and booking rules.
+3. The owner has confirmed and saved opening hours and booking rules.
 4. Public booking is enabled in CMS settings.
-5. The privacy notice and operational retention process are approved.
-6. Staff notification or verified dashboard-monitoring coverage is ready.
-7. Recovery has been tested in an isolated database.
-8. All final environment gates are enabled and the production smoke test passes.
+5. CMS_PUBLIC_BOOKING_READY is enabled after the production smoke test passes.
+
+Privacy approval, staff notification coverage, monitoring and isolated recovery
+testing remain production responsibilities, but no longer use separate runtime
+environment flags.
 
 ## Remaining launch work
 
@@ -109,19 +112,19 @@ following are true:
 3. Approve the final privacy notice and retention schedule.
 4. Establish booking notification, response-time and expired-request procedures.
 5. Configure automated encrypted backups and complete an isolated restore drill.
-6. Provision production administrators without retaining plaintext credentials.
+6. Provision production administrators with unique usernames without retaining
+   plaintext credentials.
 7. Run the complete validation and rendered HTTP suite against production.
 8. Enable direct booking only after the owner signs off the workflow.
 
-## Sensitive work awaiting explicit authorization
+## Sensitive operations
 
-- Persistent account administration beyond the one-time seed flow: creating or
-  disabling administrators, resetting passwords and revoking their sessions.
+- CMS account creation, disabling, role changes, password resets and session
+  revocation require administrator permission and are recorded in audit history.
 - Project-integrated backup and isolated-restore commands that can read or write
-  production database archives.
+  production database archives remain intentionally unimplemented.
 
-The CMS user directory therefore remains read-only, and backup/recovery remains
-an operator-run, approval-gated procedure documented in CMS_RECOVERY.md. No
-sensitive booking CSV export has been added.
+Backup and recovery remain an operator-run, approval-gated procedure documented
+in CMS_RECOVERY.md. No sensitive booking CSV export has been added.
 
 No production deployment or provider account changes have been made.

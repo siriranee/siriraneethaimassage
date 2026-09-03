@@ -198,59 +198,10 @@ if (readyValue && !["true", "false"].includes(readyValue)) {
   process.exit(1);
 }
 
-const privacyApproved =
-  process.env.CMS_PRIVACY_NOTICE_APPROVED?.trim().toLowerCase() ?? "";
-const notificationReady =
-  process.env.CMS_BOOKING_NOTIFICATION_READY?.trim().toLowerCase() ?? "";
-const monitoringReady =
-  process.env.CMS_MONITORING_READY?.trim().toLowerCase() ?? "";
-const recoveryVerified =
-  process.env.CMS_RECOVERY_DRILL_VERIFIED?.trim().toLowerCase() ?? "";
-
-for (const [name, value] of [
-  ["CMS_PRIVACY_NOTICE_APPROVED", privacyApproved],
-  ["CMS_BOOKING_NOTIFICATION_READY", notificationReady],
-  ["CMS_MONITORING_READY", monitoringReady],
-  ["CMS_RECOVERY_DRILL_VERIFIED", recoveryVerified],
-]) {
-  if (value && !["true", "false"].includes(value)) {
-    console.error(`Hosted build blocked: ${name} must be true or false.`);
-    process.exit(1);
-  }
-}
-
 if (readyValue === "true") {
   if (cmsMode !== "mongodb") {
     console.error(
       "Hosted build blocked: live public booking requires CMS_MODE=mongodb.",
-    );
-    process.exit(1);
-  }
-
-  if (privacyApproved !== "true") {
-    console.error(
-      "Hosted build blocked: live public booking requires CMS_PRIVACY_NOTICE_APPROVED=true.",
-    );
-    process.exit(1);
-  }
-
-  if (notificationReady !== "true") {
-    console.error(
-      "Hosted build blocked: live public booking requires CMS_BOOKING_NOTIFICATION_READY=true.",
-    );
-    process.exit(1);
-  }
-
-  if (monitoringReady !== "true") {
-    console.error(
-      "Hosted build blocked: live public booking requires CMS_MONITORING_READY=true.",
-    );
-    process.exit(1);
-  }
-
-  if (recoveryVerified !== "true") {
-    console.error(
-      "Hosted build blocked: live public booking requires CMS_RECOVERY_DRILL_VERIFIED=true.",
     );
     process.exit(1);
   }

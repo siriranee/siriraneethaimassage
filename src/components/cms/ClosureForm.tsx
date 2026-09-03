@@ -59,7 +59,7 @@ export function ClosureForm({ defaultDate, closure }: Readonly<{ defaultDate: st
         <header className={styles.sectionHeader}><h2>{closure ? "Edit closure or blocked time" : "Add closure or blocked time"}</h2><p>Conflicting active bookings must be resolved before an active closure can be saved.</p></header>
         <div className={styles.grid}>
           <label className={styles.field}>Date<input defaultValue={closure?.localDate ?? defaultDate} name="localDate" required type="date" /></label>
-          <label className={styles.checkbox}><input checked={closedAllDay} onChange={(event) => setClosedAllDay(event.target.checked)} type="checkbox" /><span>Closed all day<small>Clear this for a partial blocked period.</small></span></label>
+          <label className={styles.checkbox}><input checked={closedAllDay} onChange={(event) => setClosedAllDay(event.target.checked)} type="checkbox" /><span>Day off<small>Clear this to block only part of the day.</small></span></label>
           <label className={styles.field}>Starts<input defaultValue={closure?.startsAtLocal || "12:00"} disabled={closedAllDay} name="startsAtLocal" required={!closedAllDay} type="time" /></label>
           <label className={styles.field}>Ends<input defaultValue={closure?.endsAtLocal || "13:00"} disabled={closedAllDay} name="endsAtLocal" required={!closedAllDay} type="time" /></label>
           {!closure ? <label className={styles.field}>Repeat weekly<input defaultValue={1} max={12} min={1} name="repeatWeeklyCount" required type="number" /><small>Creates 1–12 weekly closures atomically after every date passes conflict checks.</small></label> : null}

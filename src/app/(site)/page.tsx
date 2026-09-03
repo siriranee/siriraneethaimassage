@@ -44,13 +44,6 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-const featuredSlugs = [
-  "traditional-thai-massage",
-  "hot-oil-massage",
-  "deep-tissue-massage",
-  "hot-stone-massage",
-] as const;
-
 const reassuranceItems = [
   {
     icon: HeartHandshake,
@@ -115,10 +108,7 @@ export default async function HomePage() {
     getPublicPageCopy("home"),
     getPublicVouchers(),
   ]);
-  const featuredServices = featuredSlugs.flatMap((slug) => {
-    const service = services.find((item) => item.slug === slug);
-    return service ? [service] : [];
-  });
+  const featuredServices = services.slice(0, 4);
   const faqs = buildFaqs(site.address.formatted, vouchers.length > 0);
 
   return (
@@ -163,8 +153,8 @@ export default async function HomePage() {
             <span className="eyebrow">Massage treatments</span>
             <h2>Find your moment of calm</h2>
             <p className="lead">
-              Choose from traditional Thai, hot oil, deep tissue, hot stone and
-              focused upper-body massage, with clear durations and prices.
+              Browse the current massage treatments, with clear durations and
+              prices published directly by the Siriranee team.
             </p>
           </header>
 

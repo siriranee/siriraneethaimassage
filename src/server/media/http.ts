@@ -11,19 +11,22 @@ import {
 } from "@/server/media/cloudinary-service";
 import { CmsMediaValidationError } from "@/server/media/policy";
 
-export function cmsMediaErrorResponse(error: unknown) {
+export function cmsMediaErrorResponse(
+  error: unknown,
+  details: Readonly<Record<string, unknown>> = {},
+) {
   if (error instanceof CmsMediaValidationError) {
-    return cmsNoStoreJson({ error: error.message }, { status: 422 });
+    return cmsNoStoreJson({ ...details, error: error.message }, { status: 422 });
   }
   if (error instanceof CmsMediaStateError || error instanceof CmsConflictError) {
-    return cmsNoStoreJson({ error: error.message }, { status: 409 });
+    return cmsNoStoreJson({ ...details, error: error.message }, { status: 409 });
   }
   if (error instanceof CmsMediaConfigurationError) {
-    return cmsNoStoreJson({ error: error.message }, { status: 503 });
+    return cmsNoStoreJson({ ...details, error: error.message }, { status: 503 });
   }
   if (error instanceof CmsMediaProviderError) {
-    return cmsNoStoreJson({ error: error.message }, { status: 502 });
+    return cmsNoStoreJson({ ...details, error: error.message }, { status: 502 });
   }
 
-  return cmsErrorResponse(error);
+  return cmsErrorResponse(error, details);
 }

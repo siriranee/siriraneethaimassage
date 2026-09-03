@@ -1,7 +1,11 @@
 import "server-only";
 
 import { isPendingCapacityExpired } from "@/domain/booking/status";
-import type { CmsBookingQuery } from "@/domain/cms/types";
+import type {
+  CmsBookingQuery,
+  CmsNotificationBellItem,
+  CmsUserSummary,
+} from "@/domain/cms/types";
 import { getCmsRepository } from "@/server/cms/repositories";
 
 function dublinDate(date = new Date()) {
@@ -48,7 +52,7 @@ export async function getCmsDashboardData() {
       expiredPendingCount: expiredPending.length,
       upcomingCount: upcoming.length,
       activeServiceCount: content.services.filter(
-        (service) => service.status === "published",
+        (service) => service.prices.some((price) => price.active),
       ).length,
     },
     upcoming: upcoming.slice(0, 6),
@@ -71,12 +75,58 @@ export async function listCmsNotifications(bookingId?: string, limit = 200) {
   return getCmsRepository().listNotifications(bookingId, limit);
 }
 
+export async function listCmsNotificationBellItems(
+  limit = 8,
+): Promise<readonly CmsNotificationBellItem[]> {
+  const notifications = await getCmsRepository().listDashboardNotifications(limit);
+  return notifications.map((notification) => ({
+    id: notification.id,
+    bookingId: notification.bookingId,
+    bookingReference: notification.bookingReference,
+    kind: notification.kind,
+    createdAt: notification.createdAt,
+  }));
+}
+
 export async function listCmsClosures(from?: string, to?: string) {
   return getCmsRepository().listClosures(from, to);
 }
 
-export async function listCmsUsers() {
-  return getCmsRepository().listUsers();
+export async function listCmsUsers(): Promise<readonly CmsUserSummary[]> {
+  const users = await getCmsRepository().listUsers();
+
+  return users.map((user) => ({
+    id: user.id,
+    username: user.username,
+    ...(user.email ? { email: user.email } : {}),
+    displayName: user.displayName,
+    role: user.role,
+    active: user.active,
+    version:
+      Number.isInteger(user.version) && user.version >= 0 ? user.version : 0,
+    lastLoginAt: user.lastLoginAt,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  }));
+}
+
+export async function getCmsUserSummary(id: string): Promise<CmsUserSummary | null> {
+  const user = await getCmsRepository().findUserById(id);
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    username: user.username,
+    ...(user.email ? { email: user.email } : {}),
+    displayName: user.displayName,
+    role: user.role,
+    active: user.active,
+    version:
+      Number.isInteger(user.version) && user.version >= 0 ? user.version : 0,
+    lastLoginAt: user.lastLoginAt,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
 }
 
 export async function listCmsAudit(limit = 100) {

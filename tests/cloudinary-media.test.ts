@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -20,10 +21,15 @@ import {
   isOwnedCmsCloudinaryImageUrl,
   parseCmsCloudinarySecureUrl,
 } from "../src/server/media/references";
+import { verifyCloudinaryUploadResponseSignature } from "../src/server/media/response-signature";
 import {
+  issueCmsMediaCleanupGrant,
   issueCmsMediaStagedToken,
   issueCmsMediaUploadToken,
+  verifyCmsMediaCleanupGrant,
+  verifyCmsMediaStagedCleanupCapability,
   verifyCmsMediaStagedToken,
+  verifyCmsMediaUploadCleanupCapability,
   verifyCmsMediaUploadToken,
 } from "../src/server/media/tokens";
 
@@ -39,6 +45,57 @@ const baseClaims = {
   publicId:
     "siriranee/cms/assets/0123456789abcdef/submission-123/asset-123",
 };
+
+test("Cloudinary upload response signatures accept valid SHA-1 and SHA-256 digests", () => {
+  const publicId = baseClaims.publicId;
+  const version = 1_725_000_123;
+
+  for (const algorithm of ["sha1", "sha256"] as const) {
+    const signature = createHash(algorithm)
+      .update(`public_id=${publicId}&version=${version}${secret}`, "utf8")
+      .digest("hex");
+
+    assert.equal(
+      verifyCloudinaryUploadResponseSignature({
+        apiSecret: secret,
+        publicId,
+        version,
+        signature,
+      }),
+      true,
+    );
+  }
+});
+
+test("Cloudinary upload response signature verification rejects tampering", () => {
+  const version = 1_725_000_123;
+  const signature = createHash("sha1")
+    .update(
+      `public_id=${baseClaims.publicId}&version=${version}${secret}`,
+      "utf8",
+    )
+    .digest("hex");
+  const tamperedLastCharacter = signature.endsWith("0") ? "1" : "0";
+
+  assert.equal(
+    verifyCloudinaryUploadResponseSignature({
+      apiSecret: secret,
+      publicId: baseClaims.publicId,
+      version,
+      signature: `${signature.slice(0, -1)}${tamperedLastCharacter}`,
+    }),
+    false,
+  );
+  assert.equal(
+    verifyCloudinaryUploadResponseSignature({
+      apiSecret: secret,
+      publicId: baseClaims.publicId,
+      version,
+      signature: "a".repeat(48),
+    }),
+    false,
+  );
+});
 
 test("media policy only accepts compressed image types and bounded dimensions", () => {
   assert.equal(parseCmsMediaContentType("image/webp"), "image/webp");
@@ -131,6 +188,99 @@ test("staged tokens bind the exact URL and immutable provider identity", () => {
         { ...baseClaims, secureUrl: `${secureUrl}?changed=1` },
         secret,
         20_100,
+      ),
+    CmsMediaValidationError,
+  );
+});
+
+test("cleanup capabilities stay short-lived and bind the exact signed asset owner", () => {
+  const upload = issueCmsMediaUploadToken(baseClaims, secret, 30_000);
+  const uploadCapability = verifyCmsMediaUploadCleanupCapability(
+    upload.token,
+    {
+      submissionId: baseClaims.submissionId,
+      scope: baseClaims.scope,
+      publicId: baseClaims.publicId,
+    },
+    secret,
+    30_100,
+  );
+  assert.equal(uploadCapability.userId, baseClaims.userId);
+  assert.throws(
+    () =>
+      verifyCmsMediaUploadCleanupCapability(
+        upload.token,
+        {
+          submissionId: "another-submission",
+          scope: baseClaims.scope,
+          publicId: baseClaims.publicId,
+        },
+        secret,
+        30_100,
+      ),
+    CmsMediaValidationError,
+  );
+
+  const secureUrl =
+    "https://res.cloudinary.com/siriranee/image/upload/v123/siriranee/cms/assets/0123456789abcdef/submission-123/asset-123.webp";
+  const staged = issueCmsMediaStagedToken(
+    {
+      ...baseClaims,
+      secureUrl,
+      providerAssetId: "provider_asset_123",
+      assetVersion: 123,
+      format: "webp",
+      bytes: 150_000,
+      width: 1_600,
+      height: 900,
+    },
+    secret,
+    30_000,
+  );
+  const stagedCapability = verifyCmsMediaStagedCleanupCapability(
+    staged.token,
+    {
+      submissionId: baseClaims.submissionId,
+      scope: baseClaims.scope,
+      publicId: baseClaims.publicId,
+      secureUrl,
+    },
+    secret,
+    30_100,
+  );
+  assert.equal(stagedCapability.userId, baseClaims.userId);
+  assert.equal(stagedCapability.providerAssetId, "provider_asset_123");
+  assert.throws(
+    () =>
+      verifyCmsMediaStagedCleanupCapability(
+        staged.token,
+        {
+          submissionId: baseClaims.submissionId,
+          scope: baseClaims.scope,
+          publicId: baseClaims.publicId,
+          secureUrl: `${secureUrl}?changed=1`,
+        },
+        secret,
+        30_100,
+      ),
+    CmsMediaValidationError,
+  );
+
+  const grant = issueCmsMediaCleanupGrant(baseClaims.userId, secret, 30_000);
+  assert.equal(
+    verifyCmsMediaCleanupGrant(grant.token, secret, 30_100).userId,
+    baseClaims.userId,
+  );
+  assert.throws(
+    () => verifyCmsMediaCleanupGrant(grant.token, secret, 31_801),
+    CmsMediaValidationError,
+  );
+  assert.throws(
+    () =>
+      verifyCmsMediaCleanupGrant(
+        `${grant.token.slice(0, -1)}${grant.token.endsWith("x") ? "y" : "x"}`,
+        secret,
+        30_100,
       ),
     CmsMediaValidationError,
   );
@@ -315,7 +465,8 @@ test("Cloudinary routes and persistence enforce the authenticated staged workflo
   }
   assert.match(service, /status: "authorized"/);
   assert.match(service, /providerSignatureExpiresAt/);
-  assert.match(service, /verify_api_response_signature/);
+  assert.match(service, /verifyCloudinaryUploadResponseSignature/);
+  assert.doesNotMatch(service, /verify_api_response_signature/);
   assert.match(service, /provider\.getResource/);
   assert.match(service, /providerAssetId/);
   assert.match(service, /status: "staged"/);
@@ -330,9 +481,10 @@ test("Cloudinary routes and persistence enforce the authenticated staged workflo
 });
 
 test("content writes commit media in the same repository transaction", async () => {
-  const [contentService, submission, routes] = await Promise.all([
+  const [contentService, submission, cloudinaryService, routes] = await Promise.all([
     source("src/server/cms/content-service.ts"),
     source("src/server/media/submission.ts"),
+    source("src/server/media/cloudinary-service.ts"),
     Promise.all([
       source("src/app/api/cms/services/route.ts"),
       source("src/app/api/cms/services/[serviceId]/route.ts"),
@@ -351,10 +503,75 @@ test("content writes commit media in the same repository transaction", async () 
   assert.match(submission, /assertCmsContentImageReferencesApproved/);
   assert.match(submission, /collectNewCmsScopedMediaReferences/);
   assert.match(submission, /claims\.providerAssetId !== record\.providerAssetId/);
+  assert.match(cloudinaryService, /export async function rollbackCmsMediaSubmission/);
+  assert.match(cloudinaryService, /error\.code === "committed"/);
+  assert.match(cloudinaryService, /error\.code === "referenced"/);
+  assert.match(cloudinaryService, /item\.outcome !== "failed" && !item\.pendingFinalSweep/);
   for (const route of routes) {
     assert.match(route, /removeCmsMediaSubmissionEnvelope/);
     assert.match(route, /mediaSubmission: submission/);
   }
+  for (const route of routes.slice(0, 2)) {
+    assert.match(route, /rollbackCmsMediaSubmission\(/);
+    assert.match(route, /rollbackCmsMediaSubmissionWithCapability\(/);
+    assert.match(route, /isMongoCommitResultIndeterminate\(error\)/);
+    assert.match(route, /!commitIndeterminate && submission\?\.assets\.length/);
+    assert.match(route, /mediaCommitState: "indeterminate"/);
+    assert.match(route, /mediaRollback \? \{ mediaRollback \} : \{\}/);
+  }
+});
+
+test("service auth failures and media DELETE retain bounded dual-capability cleanup", async () => {
+  const [createRoute, updateRoute, uploadRoute, cloudinaryService, cleanupGrant] =
+    await Promise.all([
+      source("src/app/api/cms/services/route.ts"),
+      source("src/app/api/cms/services/[serviceId]/route.ts"),
+      source("src/app/api/cms/media-upload/route.ts"),
+      source("src/server/media/cloudinary-service.ts"),
+      source("src/server/media/cleanup-grant.ts"),
+    ]);
+
+  for (const route of [createRoute, updateRoute]) {
+    const handler = route.slice(route.indexOf("export async function"));
+    const originIndex = handler.indexOf("isSameOriginMutation(request)");
+    const parseIndex = handler.indexOf("readCmsJsonObject(request)");
+    const authIndex = handler.indexOf('requireCmsApiUser("content:write")');
+    assert.ok(originIndex >= 0 && originIndex < parseIndex);
+    assert.ok(parseIndex >= 0 && parseIndex < authIndex);
+    assert.match(handler, /rollbackCmsMediaSubmissionWithCapability/);
+    assert.match(handler, /if \(response \|\| !user\)/);
+  }
+
+  const deleteHandler = uploadRoute.slice(
+    uploadRoute.indexOf("export async function DELETE"),
+  );
+  assert.match(deleteHandler, /isSameOriginMutation\(request\)/);
+  assert.match(deleteHandler, /readCmsJsonObject\(request, 32_000\)/);
+  assert.match(deleteHandler, /requireCmsApiUser\("content:write"\)/);
+  assert.match(deleteHandler, /getCmsMediaCleanupGrantUserId\(\)/);
+  assert.match(deleteHandler, /cleanupCmsMediaUploadWithCapability/);
+
+  assert.match(cleanupGrant, /httpOnly: true/);
+  assert.match(cleanupGrant, /sameSite: "strict"/);
+  assert.match(cleanupGrant, /secure: shouldUseSecureCookie\(\)/);
+  assert.match(cleanupGrant, /CMS_MEDIA_STAGED_TOKEN_TTL_SECONDS/);
+  assert.match(cloudinaryService, /capabilityUserId !== signedUserId/);
+  for (const field of [
+    "providerAssetId",
+    "cloudinaryVersion",
+    "format",
+    "bytes",
+    "width",
+    "height",
+  ]) {
+    const claimField = field === "cloudinaryVersion" ? "assetVersion" : field;
+    assert.match(
+      cloudinaryService,
+      new RegExp(`record\\.${field} !== stagedClaims\\.${claimField}`),
+    );
+  }
+  assert.match(cloudinaryService, /record\.status === "committed"/);
+  assert.match(cloudinaryService, /isMediaAssetReferenced/);
 });
 
 test("CMS image forms defer uploads until valid final save and roll back failures", async () => {
@@ -377,7 +594,10 @@ test("CMS image forms defer uploads until valid final save and roll back failure
     assert.match(form, /createCmsMediaSubmissionId\(\)/);
     assert.match(form, /createCmsMediaSubmissionEnvelope\(/);
     assert.match(form, /mediaSubmission:/);
-    assert.match(form, /rollbackStagedCmsMediaAssets\(submissionId, stagedAssets\)/);
+    assert.match(
+      form,
+      /rollbackStagedCmsMediaAssets\(\s*submissionId,\s*(?:stagedAssets|retryAssets)/,
+    );
     assert.match(form, /saveLockRef\.current/);
     assert.match(form, /<fieldset className=\{styles\.formFields\} disabled=\{locked\}>/);
     assert.match(form, /cache: "no-store"/);
@@ -388,13 +608,18 @@ test("CMS image forms defer uploads until valid final save and roll back failure
   assert.match(galleryForm, /setPreparedImage\(null\)/);
 
   assert.match(serviceForm, /scope: "service-cover"/);
+  assert.match(serviceForm, /key: "service-hero", scope: "service-cover"/);
   assert.match(serviceForm, /scope: "service-gallery"/);
   assert.match(serviceForm, /for \(const image of galleryImages\)/);
-  assert.match(serviceForm, /required=\{!preparedCover\}/);
+  assert.match(serviceForm, /required=\{!imageUrl && !preparedCover\}/);
+  assert.match(serviceForm, /required=\{!heroImageUrl && !preparedHero\}/);
   assert.match(serviceForm, /preparedImages=\{preparedGalleryImages\}/);
   assert.match(serviceForm, /setPreparedCover\(null\)/);
+  assert.match(serviceForm, /setPreparedHero\(null\)/);
   assert.match(serviceForm, /setPreparedGalleryImages\(\{\}\)/);
-  assert.match(serviceGallery, /required=\{!preparedImages\[image\.id\]\}/);
+  assert.match(serviceGallery, /required=\{!image\.imageUrl && !preparedImages\[image\.id\]\}/);
+  assert.doesNotMatch(serviceGallery, /Image path or approved HTTPS URL/);
+  assert.doesNotMatch(serviceGallery, /placeholderPath|serviceSlug/);
 
   assert.match(pageForm, /scope: "home-hero"/);
   assert.match(pageForm, /for \(const slide of heroSlides\)/);

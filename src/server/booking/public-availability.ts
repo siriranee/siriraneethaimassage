@@ -46,7 +46,7 @@ export async function getPublicAvailability(input: {
   const repository = getCmsRepository();
   const content = await getPublishedCmsContent();
   const service = content.services.find(
-    (item) => item.id === input.serviceId && item.status === "published",
+    (item) => item.id === input.serviceId,
   );
   const price = service?.prices.find(
     (item) =>
@@ -133,7 +133,7 @@ export async function getPublicAvailabilityCalendar(input: {
   const repository = getCmsRepository();
   const content = await getPublishedCmsContent();
   const service = content.services.find(
-    (item) => item.id === input.serviceId && item.status === "published",
+    (item) => item.id === input.serviceId,
   );
   const price = service?.prices.find(
     (item) =>

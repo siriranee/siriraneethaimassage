@@ -7,24 +7,16 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
+import {
+  CMS_PASSWORD_MAX_LENGTH,
+  validateCmsPasswordValue,
+} from "@/domain/cms/account-policy";
+
 const keyLength = 64;
 const saltLength = 16;
 const cost = 16384;
 const blockSize = 8;
 const parallelization = 1;
-const maxPasswordLength = 256;
-
-const weakPasswords = new Set([
-  "password",
-  "password123",
-  "admin123",
-  "administrator",
-  "siriranee",
-  "letmein",
-  "qwerty123",
-  "123456789012",
-]);
-
 function derive(
   password: string,
   salt: string,
@@ -69,19 +61,7 @@ const dummyHash = [
 ].join("$");
 
 export function validateCmsPassword(password: string) {
-  const errors: string[] = [];
-
-  if (password.length < 12) errors.push("Use at least 12 characters.");
-  if (password.length > maxPasswordLength) errors.push("Password is too long.");
-  if (!/[a-z]/.test(password)) errors.push("Add a lowercase letter.");
-  if (!/[A-Z]/.test(password)) errors.push("Add an uppercase letter.");
-  if (!/\d/.test(password)) errors.push("Add a number.");
-  if (!/[^A-Za-z0-9]/.test(password)) errors.push("Add a symbol.");
-  if (weakPasswords.has(password.toLowerCase())) {
-    errors.push("Choose a less common password.");
-  }
-
-  return errors;
+  return validateCmsPasswordValue(password);
 }
 
 export async function hashCmsPassword(password: string) {
@@ -128,16 +108,21 @@ export async function verifyCmsPassword(
     parsedParallelization < 1 ||
     parsedParallelization > 4 ||
     stored.length !== keyLength ||
-    password.length > maxPasswordLength
+    password.length > CMS_PASSWORD_MAX_LENGTH
   ) {
     return false;
   }
 
-  const candidate = await derive(password, salt, {
-    cost: parsedCost,
-    blockSize: parsedBlockSize,
-    parallelization: parsedParallelization,
-  });
+  let candidate: Buffer;
+  try {
+    candidate = await derive(password, salt, {
+      cost: parsedCost,
+      blockSize: parsedBlockSize,
+      parallelization: parsedParallelization,
+    });
+  } catch {
+    return false;
+  }
 
   return timingSafeEqual(stored, candidate);
 }

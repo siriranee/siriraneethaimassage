@@ -45,7 +45,7 @@ export default async function CmsVouchersPage() {
           ))}
         </div>
       ) : (
-        <CmsEmptyState title="No vouchers recorded">Create a draft with an owner-confirmed value and customer-facing details.</CmsEmptyState>
+        <CmsEmptyState title="No vouchers recorded">Create a voucher with an owner-confirmed value and customer-facing details.</CmsEmptyState>
       )}
     </>
   );

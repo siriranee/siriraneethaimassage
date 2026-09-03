@@ -14,7 +14,7 @@ export default function GlobalError({
   retry: () => void;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body className={styles.body}>
         <title>Siriranee is temporarily unavailable</title>
         <main className={styles.main}>

@@ -10,6 +10,7 @@ import {
   canTransitionBookingStatus,
   isTerminalBookingStatus,
 } from "@/domain/booking/status";
+import { readTransactionalAvailability } from "@/server/booking/transactional-availability";
 import {
   bookingSources,
   bookingChangeReasons,
@@ -152,14 +153,14 @@ async function findSlot(
 ) {
   const content = await repository.getContent();
   const service = content.services.find(
-    (item) => item.id === input.serviceId && item.status === "published",
+    (item) => item.id === input.serviceId,
   );
   const price = service?.prices.find(
     (item) => item.durationMinutes === input.durationMinutes && item.active,
   );
 
   if (!service || !price) {
-    throw new CmsValidationError("Choose a published treatment and active duration.");
+    throw new CmsValidationError("Choose a treatment and active duration.");
   }
   if (
     repository.mode === "mongodb" &&
@@ -170,11 +171,12 @@ async function findSlot(
     );
   }
 
-  const [bookings, holds, closures] = await Promise.all([
-    repository.listBookingOccupancy(input.localDate, input.localDate),
-    repository.listActiveHolds(new Date().toISOString()),
-    repository.listClosures(input.localDate, input.localDate),
-  ]);
+  const { bookings, holds, closures } =
+    await readTransactionalAvailability(
+      repository,
+      input.localDate,
+      new Date().toISOString(),
+    );
   const slots = getAvailabilitySlots({
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
@@ -214,13 +216,13 @@ export async function getAdminAvailability(input: {
   const repository = getCmsRepository();
   const content = await repository.getContent();
   const service = content.services.find(
-    (item) => item.id === input.serviceId && item.status === "published",
+    (item) => item.id === input.serviceId,
   );
   const price = service?.prices.find(
     (item) => item.durationMinutes === input.durationMinutes && item.active,
   );
   if (!service || !price) {
-    throw new CmsValidationError("Choose a published treatment and active duration.");
+    throw new CmsValidationError("Choose a treatment and active duration.");
   }
 
   const [bookings, holds, closures] = await Promise.all([

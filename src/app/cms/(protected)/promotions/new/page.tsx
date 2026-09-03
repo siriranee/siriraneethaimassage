@@ -9,7 +9,7 @@ export default async function CmsNewPromotionPage() {
   await requireCmsPageUser("content:write");
   return (
     <>
-      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/promotions" secondary>Back to promotions</CmsPrimaryLink>} description="Create an owner-approved offer as a draft before publishing." eyebrow="Website content" title="Add promotion" />
+      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/promotions" secondary>Back to promotions</CmsPrimaryLink>} description="Create an owner-approved offer and choose whether it is visible immediately." eyebrow="Website content" title="Add promotion" />
       <CmsNotice title="No placeholder discounts">Leave the public promotions page unchanged until the offer, dates and terms are genuine and confirmed.</CmsNotice>
       <PromotionEditorForm isNew promotion={blankPromotion} />
     </>

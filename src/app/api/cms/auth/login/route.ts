@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     return json({ error: "Invalid request origin." }, { status: 403 });
   }
 
-  let body: { demo?: boolean; email?: string; password?: string };
+  let body: { demo?: boolean; username?: string; password?: string };
 
   try {
     body = (await readJsonBody(request, 16_000)) as typeof body;
@@ -51,20 +51,27 @@ export async function POST(request: Request) {
   const result = body.demo
     ? await loginCmsMockDemo(requestId)
     : await loginCmsUser({
-        email: typeof body.email === "string" ? body.email : "",
+        username: typeof body.username === "string" ? body.username : "",
         password: typeof body.password === "string" ? body.password : "",
         address: getRequestAddress(request),
         requestId,
       });
 
   if ("error" in result) {
-    return json({ error: result.error }, { status: 401 });
+    const rateLimited = result.code === "rate_limited";
+    return json(
+      { error: result.error },
+      {
+        status: rateLimited ? 429 : 401,
+        ...(rateLimited ? { headers: { "Retry-After": "900" } } : {}),
+      },
+    );
   }
 
   const response = json({
     user: {
       displayName: result.user.displayName,
-      email: result.user.email,
+      username: result.user.username,
       role: result.user.role,
     },
   });

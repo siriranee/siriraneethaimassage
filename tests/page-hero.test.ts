@@ -47,12 +47,12 @@ test("inner-page hero mirrors the home hero without carousel chrome", async () =
   assert.doesNotMatch(styles, /^\s{2,}max-width\s*:|font-size\s*:\s*clamp\(/m);
 });
 
-test("every named inner-page hero points to a supplied wide image", async () => {
+test("every shared inner-page hero points to a supplied wide image", async () => {
   const uniqueImages = new Map(
     allNamedPageHeroImages.map((hero) => [hero.image, hero]),
   );
 
-  assert.equal(uniqueImages.size, 10);
+  assert.equal(uniqueImages.size, 5);
 
   for (const [imagePath, hero] of uniqueImages) {
     assert.ok(imagePath.startsWith("/images/Hero/"));
@@ -77,4 +77,15 @@ test("every named inner-page hero points to a supplied wide image", async () => 
       `${imagePath} should retain the supplied 3:1 composition`,
     );
   }
+});
+
+test("page hero content has no service-specific local fallback map", async () => {
+  const [heroes, therapistsPage] = await Promise.all([
+    source("src/content/page-heroes.ts"),
+    source("src/app/(site)/therapists/page.tsx"),
+  ]);
+
+  assert.doesNotMatch(heroes, /serviceHeroImages|getServicePageHero/);
+  assert.match(therapistsPage, /\.\.\.pageHeroImages\.about/);
+  assert.doesNotMatch(therapistsPage, /traditional-thai-massage/);
 });

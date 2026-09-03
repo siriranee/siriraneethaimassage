@@ -42,7 +42,7 @@ const experienceNotes = [
 ];
 
 export default async function ServicesPage() {
-  const [{ categories, services }, pageCopy] = await Promise.all([
+  const [{ services }, pageCopy] = await Promise.all([
     getPublicServicesSnapshot(),
     getPublicPageCopy("services"),
   ]);
@@ -62,7 +62,7 @@ export default async function ServicesPage() {
             title="All Treatments"
             headingId="services-heading"
           />
-          <ServiceExplorer services={services} categories={categories} />
+          <ServiceExplorer services={services} />
         </div>
       </section>
 

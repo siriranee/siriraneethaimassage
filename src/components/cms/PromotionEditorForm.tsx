@@ -39,7 +39,7 @@ export function PromotionEditorForm({ promotion, isNew = false }: Readonly<{ pro
       }
       setVersion(result.promotion.version);
       markSaved();
-      setFeedback({ tone: "success", text: isNew ? "Promotion draft created." : "Promotion draft saved." });
+      setFeedback({ tone: "success", text: isNew ? "Promotion created and website updated." : "Promotion saved and website updated." });
       if (isNew) router.push(`/cms/promotions/${result.promotion.id}/edit`);
       router.refresh();
     } catch {
@@ -56,15 +56,15 @@ export function PromotionEditorForm({ promotion, isNew = false }: Readonly<{ pro
         <div className={styles.grid}>
           <label className={styles.fullField}>Title<input defaultValue={promotion.title} maxLength={120} minLength={2} name="title" required /></label>
           <label className={styles.fullField}>Description<textarea defaultValue={promotion.description} maxLength={1000} minLength={10} name="description" required /></label>
-          <label className={styles.field}>Status<select defaultValue={promotion.status} name="status"><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select></label>
+          <label className={styles.field}>Status<select defaultValue={promotion.status} name="status"><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select><small>Changes save immediately; only Published offers appear on the website.</small></label>
           <span />
           <label className={styles.field}>Start date, optional<input defaultValue={promotion.startsOn} name="startsOn" type="date" /></label>
           <label className={styles.field}>End date, optional<input defaultValue={promotion.endsOn} name="endsOn" type="date" /></label>
         </div>
       </section>
       <div className={styles.saveBar}>
-        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Draft version ${version}${dirty ? " · unsaved changes" : ""}`}</span>
-        <button disabled={saving} type="submit">{saving ? "Saving..." : isNew ? "Create promotion draft" : "Save promotion"}</button>
+        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Current version ${version}${dirty ? " · unsaved changes" : ""}`}</span>
+        <button disabled={saving} type="submit">{saving ? "Saving and publishing..." : isNew ? "Create promotion" : "Save website changes"}</button>
       </div>
     </form>
   );

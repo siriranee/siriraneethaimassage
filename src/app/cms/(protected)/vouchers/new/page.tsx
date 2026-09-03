@@ -20,8 +20,8 @@ export default async function CmsNewVoucherPage() {
   await requireCmsPageUser("content:write");
   return (
     <>
-      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/vouchers" secondary>Back to vouchers</CmsPrimaryLink>} description="Add voucher information as a draft before publishing it to the website." eyebrow="Website content" title="Add gift voucher" />
-      <CmsNotice title="Information only">This website does not sell vouchers online. Confirm the value, redemption wording and any expiry or delivery details with the owner before publishing.</CmsNotice>
+      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/vouchers" secondary>Back to vouchers</CmsPrimaryLink>} description="Add voucher information and choose whether it is visible immediately." eyebrow="Website content" title="Add gift voucher" />
+      <CmsNotice title="Information only">This website does not sell vouchers online. Confirm the value, redemption wording and any expiry or delivery details with the owner before selecting Published.</CmsNotice>
       <VoucherEditorForm isNew voucher={blankVoucher} />
     </>
   );

@@ -16,10 +16,6 @@ const relevantKeys = [
   "CMS_ORIGIN",
   "CMS_COOKIE_SECURE",
   "CMS_PUBLIC_BOOKING_READY",
-  "CMS_PRIVACY_NOTICE_APPROVED",
-  "CMS_BOOKING_NOTIFICATION_READY",
-  "CMS_MONITORING_READY",
-  "CMS_RECOVERY_DRILL_VERIFIED",
   "CMS_PII_ENCRYPTION_KEY",
   "CMS_MEDIA_UPLOAD_READY",
   "CLOUDINARY_CLOUD_NAME",
@@ -89,7 +85,7 @@ test("hosted builds reject mock mode and mismatched CMS origin", () => {
   );
 });
 
-test("live booking requires privacy, notification, monitoring, recovery and encryption gates", () => {
+test("the live-booking switch requires MongoDB and a valid encryption key", () => {
   const live = {
     ...database,
     NEXT_PUBLIC_SITE_URL: validOrigin,
@@ -100,10 +96,6 @@ test("live booking requires privacy, notification, monitoring, recovery and encr
   assert.equal(
     run({
       ...live,
-      CMS_PRIVACY_NOTICE_APPROVED: "true",
-      CMS_BOOKING_NOTIFICATION_READY: "true",
-      CMS_MONITORING_READY: "true",
-      CMS_RECOVERY_DRILL_VERIFIED: "true",
       CMS_PII_ENCRYPTION_KEY: "invalid",
     }).status,
     1,
@@ -111,10 +103,6 @@ test("live booking requires privacy, notification, monitoring, recovery and encr
   assert.equal(
     run({
       ...live,
-      CMS_PRIVACY_NOTICE_APPROVED: "true",
-      CMS_BOOKING_NOTIFICATION_READY: "true",
-      CMS_MONITORING_READY: "true",
-      CMS_RECOVERY_DRILL_VERIFIED: "true",
       CMS_PII_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64url"),
     }).status,
     0,

@@ -33,7 +33,8 @@ store and test access to it.
 - Never use --drop against the production database as a routine restore step.
 - Keep all public-booking readiness flags false during a restore drill.
 - Do not place database archives, keys or plaintext credentials in Git.
-- Use a separate restore-only administrator when validating an isolated copy.
+- Use a separate, unique restore-only administrator username when validating an
+  isolated copy.
 - Record who ran the backup/restore, when it ran, the source revision and the
   verification result.
 
@@ -61,7 +62,7 @@ permanent history of expired records.
 
 The cmsMediaAssets collection deliberately has no TTL index. Expired staged
 records retain the ownership evidence needed for safe, idempotent provider
-cleanup. Committed records also protect assets referenced by current drafts and
+cleanup. Committed records also protect assets referenced by current content and
 immutable publication history.
 
 Cleanup is intentionally two-phase while a signed Cloudinary upload request can
@@ -123,10 +124,6 @@ Point a local or staging deployment at the isolated database:
 $env:CMS_MODE = "mongodb"
 $env:MONGODB_DB = $restoreDatabase
 $env:CMS_PUBLIC_BOOKING_READY = "false"
-$env:CMS_PRIVACY_NOTICE_APPROVED = "false"
-$env:CMS_BOOKING_NOTIFICATION_READY = "false"
-$env:CMS_MONITORING_READY = "false"
-$env:CMS_RECOVERY_DRILL_VERIFIED = "false"
 $env:CMS_MEDIA_UPLOAD_READY = "false"
 ~~~
 
@@ -138,14 +135,18 @@ npm.cmd run cms:indexes
 ~~~
 
 Provision a temporary restore-only administrator in the isolated database using
-the CMS_SEED_* environment variables and:
+`CMS_SEED_USERNAME`, `CMS_SEED_PASSWORD`, `CMS_SEED_DISPLAY_NAME` and
+`CMS_SEED_ROLE`. Usernames contain 4-32 characters and passwords contain
+12-256 characters; apply the complete rules documented in `.env.example`. Then
+run:
 
 ~~~powershell
 npm.cmd run cms:seed-admin
 ~~~
 
 Remove the temporary seed values from the shell after provisioning. Do not
-record or retain the plaintext password.
+record or retain the plaintext password. The restore-only username must not
+collide with a restored account.
 
 ## Verification checklist
 
@@ -153,7 +154,7 @@ record or retain the plaintext password.
 2. Confirm the restored database name is isolated.
 3. Compare collection counts with the backup manifest.
 4. Confirm cmsMeta/current-publication points to an existing publication.
-5. Sign in with the restore-only administrator.
+5. Sign in with the restore-only administrator username and password.
 6. Open the dashboard, services, page SEO, promotions, media, settings,
    bookings, calendar, notification preview and audit pages.
 7. Verify at least one encrypted booking can be opened with the recovered key.

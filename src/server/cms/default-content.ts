@@ -1,66 +1,21 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-
-import type {
-  CmsBooking,
-  CmsBookingSettings,
-  CmsContentState,
-  CmsPageRecord,
-  CmsServiceRecord,
-  CmsSiteSettings,
-  CmsTeamRecord,
-  CmsUser,
-  CmsVoucherRecord,
+import {
+  CMS_CONTENT_SCHEMA_VERSION,
+  type CmsBooking,
+  type CmsBookingSettings,
+  type CmsContentState,
+  type CmsPageRecord,
+  type CmsSiteSettings,
+  type CmsTeamRecord,
+  type CmsUser,
+  type CmsVoucherRecord,
 } from "@/domain/cms/types";
 import { defaultHomeHeroSlides } from "@/content/home-hero";
-import { getServiceGalleryImages } from "@/content/service-galleries";
-import { services } from "@/content/services";
 import { openingHours, siteConfig } from "@/content/site";
 import { teamMembers } from "@/content/team";
-import { CMS_CONTENT_SCHEMA_VERSION } from "@/domain/cms/service-gallery";
 
 const seededAt = "2026-08-27T00:00:00.000Z";
-
-function mapService(
-  service: (typeof services)[number],
-  index: number,
-): CmsServiceRecord {
-  return {
-    id: service.slug,
-    slug: service.slug,
-    name: service.name,
-    category: service.category,
-    shortDescription: service.shortDescription,
-    longDescription: service.longDescription,
-    imageUrl: service.image.src,
-    imageAlt: service.image.alt,
-    galleryImages: getServiceGalleryImages(service).map((image, imageIndex) => ({
-      id: `${service.slug}-gallery-${String(imageIndex + 1).padStart(2, "0")}`,
-      imageUrl: image.src,
-      altText: image.alt,
-      caption: image.caption,
-      focalX: image.focalX,
-      focalY: image.focalY,
-    })),
-    prices: service.pricing.map((price) => ({
-      id: `${service.slug}-${price.durationMinutes}`,
-      durationMinutes: price.durationMinutes,
-      priceCents: price.priceEur * 100,
-      active: true,
-    })),
-    idealFor: [...service.idealFor],
-    highlights: [...service.highlights],
-    bookingNotice: service.bookingNotice ?? "",
-    seoTitle: service.seo.title,
-    seoDescription: service.seo.description,
-    status: "published",
-    sortOrder: index,
-    version: 1,
-    createdAt: seededAt,
-    updatedAt: seededAt,
-  };
-}
 
 const siteSettings: CmsSiteSettings = {
   name: siteConfig.name,
@@ -188,7 +143,7 @@ export function createDefaultContentState(): CmsContentState {
     id: "siriranee-content",
     schemaVersion: CMS_CONTENT_SCHEMA_VERSION,
     revision: 1,
-    services: services.map(mapService),
+    services: [],
     site: siteSettings,
     bookingSettings,
     team,
@@ -204,13 +159,14 @@ export function createDefaultContentState(): CmsContentState {
 /**
  * Public content used before production persistence and a first publication
  * exist. It retains the owner-confirmed address and contact number while
- * excluding every unconfirmed schedule, profile and offer.
+ * excluding treatments and every unconfirmed schedule, profile and offer.
  */
 export function createSafePublicContentState(): CmsContentState {
   const content = createDefaultContentState();
 
   return {
     ...content,
+    services: [],
     site: {
       ...content.site,
       openingHoursConfirmed: false,
@@ -231,14 +187,13 @@ export function createSafePublicContentState(): CmsContentState {
 export function createMockAdministrator(): CmsUser {
   return {
     id: "mock-administrator",
-    email: "demo@siriranee.local",
+    username: "demoadmin",
     displayName: "Siriranee Demo Administrator",
     passwordHash: "",
     role: "administrator",
     active: true,
     authVersion: 1,
-    failedLoginCount: 0,
-    lockedUntil: "",
+    version: 1,
     lastLoginAt: "",
     passwordChangedAt: "",
     createdAt: seededAt,
@@ -247,77 +202,5 @@ export function createMockAdministrator(): CmsUser {
 }
 
 export function createMockBookings(): readonly CmsBooking[] {
-  const base = [
-    {
-      reference: "DEMO-001",
-      service: services[0],
-      durationMinutes: 60,
-      priceCents: 6500,
-      localDate: "2026-09-01",
-      localTime: "10:00",
-      status: "confirmed" as const,
-    },
-    {
-      reference: "DEMO-002",
-      service: services[2],
-      durationMinutes: 30,
-      priceCents: 4000,
-      localDate: "2026-09-01",
-      localTime: "12:00",
-      status: "pending" as const,
-    },
-    {
-      reference: "DEMO-003",
-      service: services[4],
-      durationMinutes: 90,
-      priceCents: 9500,
-      localDate: "2026-09-02",
-      localTime: "15:00",
-      status: "confirmed" as const,
-    },
-  ];
-
-  return base.map((item, index) => {
-    const startsAt = new Date(`${item.localDate}T${item.localTime}:00.000Z`);
-    const endsAt = new Date(
-      startsAt.getTime() + item.durationMinutes * 60_000,
-    );
-
-    return {
-      id: `mock-booking-${index + 1}`,
-      reference: item.reference,
-      customer: {
-        name: `Demo guest ${String.fromCharCode(65 + index)}`,
-        phone: "+353000000000",
-        email: "",
-        notes: "",
-      },
-      serviceId: item.service.slug,
-      serviceSlug: item.service.slug,
-      serviceName: item.service.name,
-      durationMinutes: item.durationMinutes,
-      priceCents: item.priceCents,
-      currency: "EUR",
-      startsAt: startsAt.toISOString(),
-      endsAt: endsAt.toISOString(),
-      localDate: item.localDate,
-      localTime: item.localTime,
-      timezone: "Europe/Dublin",
-      status: item.status,
-      source: "administrator",
-      capacityExpiresAt: "",
-      assignedStaffId: "",
-      internalNotes: "Fictional local mock booking.",
-      privacyAcceptedAt: "",
-      privacyNoticeVersion: "mock",
-      holdTokenHash: "",
-      idempotencyKeyHash: randomUUID(),
-      requestFingerprintHash: "",
-      demo: true,
-      version: 1,
-      createdAt: seededAt,
-      updatedAt: seededAt,
-      updatedBy: "system-seed",
-    };
-  });
+  return [];
 }

@@ -9,8 +9,8 @@ Howth, Dublin, Ireland.
 - Five confirmed massage services, durations and EUR prices.
 - Local SEO for Thai massage in Howth and nearby Dublin areas.
 - Treatment, price, page heading, SEO, business-detail, home-hero, service
-  gallery, promotion and team publishing from an immutable CMS publication
-  snapshot. Draft edits do not leak onto public pages.
+  gallery, promotion and team publishing from immutable CMS publication
+  snapshots. Successful content saves publish immediately.
 - Customer booking flow with service, date and time selection. Customers never
   select a therapist, and bookings do not include staff assignment.
 - Dublin-time availability with capacity, closures, notice period, booking
@@ -19,14 +19,15 @@ Howth, Dublin, Ireland.
   closures, services and their image galleries, page SEO and home-hero slides,
   promotions, gallery metadata, site details, hours, team, settings, global
   search and audit history.
-- Review-first publishing with grouped changes, readiness feedback, immutable
-  publication history and safe restore-to-draft. Restoring an older snapshot
-  never silently changes live content or current booking rules.
+- Transactional direct publishing with record validation and immutable
+  publication history. A failed content or publication write leaves the live
+  website unchanged.
 - URL-based booking filters, per-booking activity timelines, unsaved-change
   warnings and a metadata-only notification preview queue. No outbound message
   is sent until a provider and operating process are approved.
-- MongoDB persistence, role-based access, salted scrypt passwords, revocable
-  sessions, login lockout and AES-256-GCM booking-contact encryption.
+- MongoDB persistence, username-and-password authentication, role-based access,
+  salted scrypt passwords, revocable sessions, source-aware login throttling and AES-256-GCM
+  booking-contact encryption.
 - Client-side JPEG, PNG and WebP validation, resizing and compression, followed
   by signed direct Cloudinary uploads and a durable CMS media registry.
 - Safe local mock CMS and fail-closed production readiness gates.
@@ -109,30 +110,38 @@ The normal production sequence is:
    [Convert]::ToBase64String($mediaSecretBytes)
    ~~~
 7. Run npm.cmd run cms:indexes.
-8. Temporarily set the CMS_SEED_* values and run
-   npm.cmd run cms:seed-admin, then remove the seed values.
-9. Sign in, confirm the business information, publish the content snapshot,
-   and confirm opening hours and booking rules.
-10. Test image preparation, upload, publication and failed-save cleanup, then
+8. Temporarily set `CMS_SEED_USERNAME`, `CMS_SEED_PASSWORD`,
+   `CMS_SEED_DISPLAY_NAME` and `CMS_SEED_ROLE`, then run
+   `npm.cmd run cms:seed-admin`. The username is stored in lowercase and must
+   contain 4-32 ASCII letters or numbers. The password must contain 12-256
+   ASCII letters or numbers. Neither field requires a particular starting or
+   ending character or a mixture of letters and numbers. The display name must
+   contain 2-80 characters. Remove all seed values immediately after
+   provisioning.
+   For an existing database, complete this step before switching users to the
+   username-only login; legacy email-only accounts cannot authenticate with the
+   new form.
+9. Sign in, confirm and save the business information, opening hours and
+   booking rules. Each successful save publishes its section immediately.
+10. Test image preparation, upload, direct publication and failed-save cleanup, then
    set CMS_MEDIA_UPLOAD_READY=true.
 11. Complete the privacy, retention, notification, monitoring and isolated
-   recovery-drill operational reviews.
-12. Enable the five booking gates only after end-to-end production testing:
-   CMS_PUBLIC_BOOKING_READY=true,
-   CMS_PRIVACY_NOTICE_APPROVED=true, and
-   CMS_BOOKING_NOTIFICATION_READY=true,
-   CMS_MONITORING_READY=true, and
-   CMS_RECOVERY_DRILL_VERIFIED=true.
+   recovery-drill operational reviews. These are launch responsibilities, not
+   application environment gates.
+12. After end-to-end production testing, set
+   CMS_PUBLIC_BOOKING_READY=true and enable public booking in CMS settings.
 
-The runtime also requires the published CMS snapshot to have confirmed hours,
-confirmed booking rules and public booking enabled. A missing prerequisite keeps
-direct booking safely off.
+The runtime also requires MongoDB mode, a valid customer-data encryption key,
+and a published CMS snapshot with confirmed hours, confirmed booking rules and
+public booking enabled. A missing prerequisite keeps direct booking safely off.
 
 ## Published content rules
 
-The public site reads the most recent immutable CMS publication. Editors can
-save drafts without changing the public site, then deliberately publish a
-complete snapshot.
+The public site reads the most recent immutable CMS publication. Every
+successful content save publishes the changed section immediately in the same
+MongoDB transaction. There is no separate preview or manual publish step.
+Promotion and voucher status fields, public-profile controls and gallery
+visibility controls still decide whether an individual record renders publicly.
 
 Local /images/... assets continue to work. CMS editors can also prepare new
 images in the browser; selection validates the real file type, rejects animated
@@ -174,8 +183,9 @@ channels, team details, approved photography, privacy details, retention
 period, notification process, monitoring ownership, backup schedule and
 hosting/database providers.
 
-Persistent administrator-account management and project-integrated
-backup/restore automation are intentionally not included without explicit
-authorization for those sensitive operations. The existing account directory
-is read-only, initial provisioning uses the one-time seed command, and the
-manual recovery runbook remains the approved reference.
+Administrator account management supports creating and disabling accounts,
+resetting passwords and revoking sessions. These security-sensitive actions are
+restricted to administrators and recorded in the audit history. Initial and
+recovery-only administrator provisioning still uses the one-time seed command.
+Project-integrated backup/restore automation remains intentionally separate;
+the manual recovery runbook is the approved reference.

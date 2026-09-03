@@ -17,7 +17,7 @@ export default async function CmsPageEditPage({ params }: PageProps) {
   if (!page) notFound();
   return (
     <>
-      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/pages" secondary>Back to pages</CmsPrimaryLink>} description="Changes remain private until the complete website snapshot is reviewed and published." eyebrow="Website content" title={`${page.title} · editor`} />
+      <CmsPageHeader actions={<CmsPrimaryLink href="/cms/pages" secondary>Back to pages</CmsPrimaryLink>} description="A successful save publishes these page changes immediately." eyebrow="Website content" title={`${page.title} · editor`} />
       {page.id === "privacy" ? <CmsNotice tone="warning" title="Legal body copy remains protected">This editor changes the hero and search metadata only. Privacy obligations and retention wording still require owner or legal approval.</CmsNotice> : null}
       <PageEditorForm
         cloudinaryOwnership={cloudinaryOwnership}

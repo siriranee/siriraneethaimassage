@@ -9,6 +9,17 @@ import {
   useState,
 } from "react";
 
+import {
+  buildCalendarMonthCells,
+  calendarWeekdayLabels,
+  formatCalendarDate,
+  formatCalendarMonth,
+  monthFromCalendarDate,
+  shiftCalendarMonth,
+} from "@/domain/booking/calendar-month";
+
+import { CalendarLegend } from "./CalendarLegend";
+
 import styles from "./BookingCalendar.module.css";
 
 type CalendarDayState =
@@ -44,7 +55,6 @@ type BookingCalendarProps = {
   readonly onSelectDate: (localDate: string) => void;
 };
 
-const weekdayLabels = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const validDayStates = new Set<CalendarDayState>([
   "available",
   "fully-booked",
@@ -52,83 +62,6 @@ const validDayStates = new Set<CalendarDayState>([
   "unavailable",
   "outside-window",
 ]);
-
-const monthFormatter = new Intl.DateTimeFormat("en-IE", {
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-const fullDateFormatter = new Intl.DateTimeFormat("en-IE", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-function parseMonth(value: string) {
-  const match = /^(\d{4})-(\d{2})$/.exec(value);
-  if (!match) return null;
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  if (year < 1 || month < 1 || month > 12) return null;
-
-  return { year, month };
-}
-
-function monthFromDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(0, 7) : "";
-}
-
-function formatMonth(value: string) {
-  const parsed = parseMonth(value);
-  if (!parsed) return value;
-
-  return monthFormatter.format(
-    new Date(Date.UTC(parsed.year, parsed.month - 1, 1, 12)),
-  );
-}
-
-function shiftMonth(value: string, amount: number) {
-  const parsed = parseMonth(value);
-  if (!parsed) return value;
-
-  const shifted = new Date(
-    Date.UTC(parsed.year, parsed.month - 1 + amount, 1, 12),
-  );
-  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-function formatLocalDate(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return value;
-
-  return fullDateFormatter.format(
-    new Date(
-      Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12),
-    ),
-  );
-}
-
-function buildMonthCells(value: string) {
-  const parsed = parseMonth(value);
-  if (!parsed) return [];
-
-  const firstDate = new Date(Date.UTC(parsed.year, parsed.month - 1, 1, 12));
-  const leadingDays = (firstDate.getUTCDay() + 6) % 7;
-  const numberOfDays = new Date(
-    Date.UTC(parsed.year, parsed.month, 0, 12),
-  ).getUTCDate();
-
-  return Array.from({ length: 42 }, (_, index) => {
-    const day = index - leadingDays + 1;
-    if (day < 1 || day > numberOfDays) return null;
-
-    return `${parsed.year}-${String(parsed.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  });
-}
 
 function isCalendarDay(value: unknown): value is CalendarDay {
   if (!value || typeof value !== "object") return false;
@@ -170,7 +103,8 @@ export function BookingCalendar({
 }: BookingCalendarProps) {
   const headingId = useId();
   const statusId = useId();
-  const initialMonth = monthFromDate(selectedDate) || monthFromDate(minimumDate);
+  const initialMonth =
+    monthFromCalendarDate(selectedDate) || monthFromCalendarDate(minimumDate);
   const [viewMonth, setViewMonth] = useState(initialMonth);
   const [calendarDays, setCalendarDays] = useState<readonly CalendarDay[]>([]);
   const [calendarState, setCalendarState] = useState<
@@ -226,8 +160,8 @@ export function BookingCalendar({
           /^\d{4}-\d{2}-\d{2}$/.test(result.maximumDate)
             ? result.maximumDate
             : nextEarliestDate;
-        const earliestMonth = monthFromDate(nextEarliestDate);
-        const latestMonth = monthFromDate(nextLatestDate);
+        const earliestMonth = monthFromCalendarDate(nextEarliestDate);
+        const latestMonth = monthFromCalendarDate(nextLatestDate);
 
         setEarliestDate(nextEarliestDate);
         setLatestDate(nextLatestDate);
@@ -257,7 +191,7 @@ export function BookingCalendar({
         setResolvedRequestKey(requestKey);
 
         const currentSelection = selectedDateRef.current;
-        if (monthFromDate(currentSelection) === viewMonth) {
+        if (monthFromCalendarDate(currentSelection) === viewMonth) {
           const selectedDay = nextDays.find(
             (day) => day.localDate === currentSelection,
           );
@@ -297,11 +231,14 @@ export function BookingCalendar({
       ),
     [calendarDays, requestKey, resolvedRequestKey],
   );
-  const cells = useMemo(() => buildMonthCells(viewMonth), [viewMonth]);
-  const earliestMonth = monthFromDate(earliestDate);
-  const latestMonth = monthFromDate(latestDate);
-  const previousMonth = shiftMonth(viewMonth, -1);
-  const nextMonth = shiftMonth(viewMonth, 1);
+  const cells = useMemo(
+    () => buildCalendarMonthCells(viewMonth),
+    [viewMonth],
+  );
+  const earliestMonth = monthFromCalendarDate(earliestDate);
+  const latestMonth = monthFromCalendarDate(latestDate);
+  const previousMonth = shiftCalendarMonth(viewMonth, -1);
+  const nextMonth = shiftCalendarMonth(viewMonth, 1);
   const previousDisabled = Boolean(
     disabled || (earliestMonth && previousMonth < earliestMonth),
   );
@@ -323,13 +260,13 @@ export function BookingCalendar({
           </span>
           <div>
             <span>Choose a day</span>
-            <h4 id={headingId}>{formatMonth(viewMonth)}</h4>
+            <h4 id={headingId}>{formatCalendarMonth(viewMonth)}</h4>
           </div>
         </div>
 
         <div className={styles.monthControls}>
           <button
-            aria-label={`Show ${formatMonth(previousMonth)}`}
+            aria-label={`Show ${formatCalendarMonth(previousMonth)}`}
             className={styles.monthButton}
             disabled={previousDisabled}
             onClick={() => setViewMonth(previousMonth)}
@@ -339,14 +276,16 @@ export function BookingCalendar({
           </button>
           <button
             className={styles.todayButton}
-            disabled={disabled || viewMonth === monthFromDate(minimumDate)}
-            onClick={() => setViewMonth(monthFromDate(minimumDate))}
+            disabled={
+              disabled || viewMonth === monthFromCalendarDate(minimumDate)
+            }
+            onClick={() => setViewMonth(monthFromCalendarDate(minimumDate))}
             type="button"
           >
             Today
           </button>
           <button
-            aria-label={`Show ${formatMonth(nextMonth)}`}
+            aria-label={`Show ${formatCalendarMonth(nextMonth)}`}
             className={styles.monthButton}
             disabled={nextDisabled}
             onClick={() => setViewMonth(nextMonth)}
@@ -358,13 +297,13 @@ export function BookingCalendar({
       </header>
 
       <div aria-hidden="true" className={styles.weekdays}>
-        {weekdayLabels.map((day) => (
+        {calendarWeekdayLabels.map((day) => (
           <span key={day}>{day}</span>
         ))}
       </div>
 
       <div
-        aria-label={`${formatMonth(viewMonth)} appointment availability`}
+        aria-label={`${formatCalendarMonth(viewMonth)} appointment availability`}
         className={styles.monthGrid}
       >
         {cells.map((localDate, index) => {
@@ -377,7 +316,7 @@ export function BookingCalendar({
           const today = minimumDate === localDate;
           const loading = visibleCalendarState === "loading";
           const selectable = day?.state === "available";
-          const ariaLabel = `${formatLocalDate(localDate)} — ${
+          const ariaLabel = `${formatCalendarDate(localDate)} — ${
             loading ? "checking availability" : (day?.label ?? "unavailable")
           }${selected ? ", selected" : ""}`;
 
@@ -388,7 +327,9 @@ export function BookingCalendar({
               aria-pressed={selected}
               className={`${styles.calendarDay} ${stateClass(day?.state)} ${
                 selected ? styles.daySelected : ""
-              } ${loading ? styles.dayLoading : ""}`}
+              } ${today ? styles.dayToday : ""} ${
+                loading ? styles.dayLoading : ""
+              }`}
               data-state={day?.state ?? "loading"}
               disabled={disabled || loading || !selectable}
               key={localDate}
@@ -401,12 +342,7 @@ export function BookingCalendar({
         })}
       </div>
 
-      <ul aria-label="Calendar legend" className={styles.legend}>
-        <li><i className={styles.legendAvailable} />Available</li>
-        <li><i className={styles.legendSelected} />Selected</li>
-        <li><i className={styles.legendFull} />Fully booked</li>
-        <li><i className={styles.legendDayOff} />Day off</li>
-      </ul>
+      <CalendarLegend />
 
       <div
         aria-live="polite"

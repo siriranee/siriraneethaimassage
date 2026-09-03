@@ -37,13 +37,17 @@ export function cmsNoStoreJson(
   return response;
 }
 
-export function cmsErrorResponse(error: unknown) {
+export function cmsErrorResponse(
+  error: unknown,
+  details: Readonly<Record<string, unknown>> = {},
+) {
   if (
     error instanceof CmsValidationError ||
     error instanceof CmsMediaValidationError
   ) {
     return cmsNoStoreJson(
       {
+        ...details,
         error: error.message,
         ...(error instanceof CmsValidationError ? { fields: error.fields } : {}),
       },
@@ -52,11 +56,14 @@ export function cmsErrorResponse(error: unknown) {
   }
 
   if (error instanceof CmsConflictError) {
-    return cmsNoStoreJson({ error: error.message }, { status: 409 });
+    return cmsNoStoreJson({ ...details, error: error.message }, { status: 409 });
   }
 
   if (error instanceof SyntaxError) {
-    return cmsNoStoreJson({ error: "Invalid JSON request." }, { status: 400 });
+    return cmsNoStoreJson(
+      { ...details, error: "Invalid JSON request." },
+      { status: 400 },
+    );
   }
 
   const message =
@@ -66,5 +73,5 @@ export function cmsErrorResponse(error: unknown) {
       ? message
       : "The request could not be completed.";
 
-  return cmsNoStoreJson({ error: safeMessage }, { status: 400 });
+  return cmsNoStoreJson({ ...details, error: safeMessage }, { status: 400 });
 }

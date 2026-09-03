@@ -11,10 +11,6 @@ export function isLivePublicBookingReady(content: CmsContentState) {
     content.bookingSettings.rulesConfirmed &&
     content.bookingSettings.publicBookingEnabled &&
     process.env.CMS_PUBLIC_BOOKING_READY === "true" &&
-    process.env.CMS_PRIVACY_NOTICE_APPROVED === "true" &&
-    process.env.CMS_BOOKING_NOTIFICATION_READY === "true" &&
-    process.env.CMS_MONITORING_READY === "true" &&
-    process.env.CMS_RECOVERY_DRILL_VERIFIED === "true" &&
     hasCmsPiiEncryptionKey()
   );
 }

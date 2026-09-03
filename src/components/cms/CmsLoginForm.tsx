@@ -1,20 +1,41 @@
 "use client";
 
-import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 
+import {
+  CMS_PASSWORD_HTML_PATTERN,
+  CMS_PASSWORD_MAX_LENGTH,
+  CMS_PASSWORD_MIN_LENGTH,
+  CMS_USERNAME_HTML_PATTERN,
+  CMS_USERNAME_MAX_LENGTH,
+  CMS_USERNAME_MIN_LENGTH,
+} from "@/domain/cms/account-policy";
 import type { CmsMode } from "@/server/cms/config";
 
 import styles from "./CmsLoginForm.module.css";
 
 export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
   const router = useRouter();
+  const usernameId = useId();
+  const usernameHintId = useId();
+  const passwordId = useId();
+  const passwordHintId = useId();
+  const errorId = useId();
   const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const hasError = status === "error" && Boolean(message);
 
-  async function submit(payload: { demo?: boolean; email?: string; password?: string }) {
+  async function submit(payload: { demo?: boolean; username?: string; password?: string }) {
     setStatus("working");
     setMessage("");
 
@@ -24,11 +45,13 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const result = (await response.json()) as { error?: string };
-
       if (!response.ok) {
         setStatus("error");
-        setMessage(result.error ?? "Sign in was not successful.");
+        setMessage(
+          response.status === 429
+            ? "Too many sign-in attempts. Please wait before trying again."
+            : "Username or password is incorrect.",
+        );
         return;
       }
 
@@ -45,16 +68,22 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
     const data = new FormData(event.currentTarget);
 
     void submit({
-      email: String(data.get("email") ?? ""),
+      username: String(data.get("username") ?? ""),
       password: String(data.get("password") ?? ""),
     });
+  }
+
+  function clearError() {
+    if (status !== "error") return;
+    setStatus("idle");
+    setMessage("");
   }
 
   if (mode === "disabled") {
     return (
       <div className={styles.disabledState}>
         <LockKeyhole aria-hidden="true" />
-        <h2>CMS setup required</h2>
+        <h1>CMS setup required</h1>
         <p>
           Persistence is safely disabled. Configure MongoDB and provision an
           administrator before this workspace can accept real data.
@@ -69,7 +98,7 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
       <div className={styles.demoState}>
         <span className={styles.demoIcon}><ShieldCheck aria-hidden="true" /></span>
         <span className={styles.kicker}>Local development</span>
-        <h2>Open the mock workspace</h2>
+        <h1>Open the mock workspace</h1>
         <p>
           Explore the complete interface with fictional appointments. No customer
           information is stored and changes reset when the server restarts.
@@ -78,31 +107,90 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
           {status === "working" ? "Opening workspace..." : "Open local demo"}
           <ArrowRight aria-hidden="true" />
         </button>
-        {message ? <p className={styles.error} role="alert">{message}</p> : null}
+        <div className={styles.messageArea}>
+          {message ? <p className={styles.error} role="alert">{message}</p> : null}
+        </div>
       </div>
     );
   }
 
   return (
-    <form className={styles.form} onSubmit={handleCredentials}>
-      <span className={styles.kicker}>Secure access</span>
-      <h2>Sign in to the CMS</h2>
-      <p>Use the administrator or staff account provided for Siriranee.</p>
+    <form
+      aria-busy={status === "working"}
+      className={styles.form}
+      onChange={clearError}
+      onSubmit={handleCredentials}
+    >
+      <span className={styles.kicker}>Siriranee CMS</span>
+      <h1>Welcome back</h1>
+      <p>Sign in to manage Siriranee Thai Massage.</p>
 
-      <label>
-        Email address
-        <input autoComplete="username" name="email" required type="email" />
-      </label>
-      <label>
-        Password
-        <input autoComplete="current-password" minLength={12} name="password" required type="password" />
-      </label>
+      <div className={styles.field}>
+        <label htmlFor={usernameId}>Username</label>
+        <input
+          aria-describedby={`${usernameHintId}${hasError ? ` ${errorId}` : ""}`}
+          aria-invalid={hasError || undefined}
+          autoCapitalize="none"
+          autoComplete="username"
+          autoCorrect="off"
+          autoFocus
+          disabled={status === "working"}
+          id={usernameId}
+          maxLength={CMS_USERNAME_MAX_LENGTH}
+          minLength={CMS_USERNAME_MIN_LENGTH}
+          name="username"
+          pattern={CMS_USERNAME_HTML_PATTERN}
+          required
+          spellCheck={false}
+          title={`${CMS_USERNAME_MIN_LENGTH}–${CMS_USERNAME_MAX_LENGTH} characters using letters and numbers only.`}
+          type="text"
+        />
+        <p className={styles.fieldHint} id={usernameHintId}>
+          {CMS_USERNAME_MIN_LENGTH}–{CMS_USERNAME_MAX_LENGTH} characters.
+          Letters and numbers only.
+        </p>
+      </div>
 
-      <button disabled={status === "working"} type="submit">
+      <div className={styles.field}>
+        <label htmlFor={passwordId}>Password</label>
+        <div className={styles.passwordControl}>
+          <input
+            aria-describedby={`${passwordHintId}${hasError ? ` ${errorId}` : ""}`}
+            aria-invalid={hasError || undefined}
+            autoComplete="current-password"
+            disabled={status === "working"}
+            id={passwordId}
+            maxLength={CMS_PASSWORD_MAX_LENGTH}
+            minLength={CMS_PASSWORD_MIN_LENGTH}
+            name="password"
+            pattern={CMS_PASSWORD_HTML_PATTERN}
+            required
+            title={`${CMS_PASSWORD_MIN_LENGTH}–${CMS_PASSWORD_MAX_LENGTH} characters using letters and numbers only.`}
+            type={showPassword ? "text" : "password"}
+          />
+          <button
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className={styles.passwordToggle}
+            disabled={status === "working"}
+            onClick={() => setShowPassword((visible) => !visible)}
+            type="button"
+          >
+            {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          </button>
+        </div>
+        <p className={styles.fieldHint} id={passwordHintId}>
+          {CMS_PASSWORD_MIN_LENGTH}–{CMS_PASSWORD_MAX_LENGTH} characters.
+          Letters and numbers only.
+        </p>
+      </div>
+
+      <button className={styles.submitButton} disabled={status === "working"} type="submit">
         {status === "working" ? "Signing in..." : "Sign in"}
         <ArrowRight aria-hidden="true" />
       </button>
-      {message ? <p className={styles.error} role="alert">{message}</p> : null}
+      <div className={styles.messageArea}>
+        {message ? <p className={styles.error} id={errorId} role="alert">{message}</p> : null}
+      </div>
     </form>
   );
 }

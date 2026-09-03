@@ -2,12 +2,6 @@ import "server-only";
 
 import { cache } from "react";
 
-import {
-  serviceCategories,
-  services as fallbackServices,
-  type Service,
-  type ServiceCategoryId,
-} from "@/content/services";
 import { defaultHomeHeroSlides } from "@/content/home-hero";
 import {
   googleMapsDirectionsUrl,
@@ -15,6 +9,7 @@ import {
   siteConfig,
 } from "@/content/site";
 import type { CmsPageId } from "@/domain/cms/types";
+import type { CmsServiceHero } from "@/domain/cms/service-hero";
 import type {
   PublicOpeningHours,
   PublicOpeningHoursGroup,
@@ -22,18 +17,16 @@ import type {
   PublicTeamMember,
   PublicVoucher,
 } from "@/domain/public-site";
+import type { Service } from "@/domain/service";
 import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
 import { isLivePublicBookingReady } from "@/server/booking/readiness";
 import { getPublishedCmsContent } from "@/server/cms/content-service";
 
 const getPublicContent = cache(getPublishedCmsContent);
-const fallbackBySlug = new Map(
-  fallbackServices.map((service) => [service.slug, service] as const),
-);
 
-function isServiceCategory(value: string): value is ServiceCategoryId {
-  return serviceCategories.some((category) => category.id === value);
-}
+export type PublicService = Service & {
+  readonly hero: CmsServiceHero;
+};
 
 function safePublicUrl(value: string) {
   try {
@@ -44,10 +37,6 @@ function safePublicUrl(value: string) {
   } catch {
     return null;
   }
-}
-
-function safeFocalPosition(value: number) {
-  return Number.isInteger(value) && value >= 0 && value <= 100 ? value : 50;
 }
 
 function isPublicProjectImage(value: string) {
@@ -84,16 +73,7 @@ function makeHoursGroups(
 
 function mapPublishedService(
   record: Awaited<ReturnType<typeof getPublicContent>>["services"][number],
-): Service | null {
-  if (
-    record.status !== "published"
-  ) {
-    return null;
-  }
-
-  const fallback = fallbackBySlug.get(record.slug) ?? fallbackServices[0];
-  if (!fallback) return null;
-
+): PublicService | null {
   const pricing = record.prices
     .filter((price) => price.active)
     .sort((first, second) => first.durationMinutes - second.durationMinutes)
@@ -104,22 +84,27 @@ function mapPublishedService(
     }));
   if (!pricing.length) return null;
 
-  const category = isServiceCategory(record.category)
-    ? record.category
-    : fallback.category;
-  const imageSource = isPublicProjectImage(record.imageUrl)
-    ? record.imageUrl
-    : fallback.image.src;
+  if (!isPublicProjectImage(record.imageUrl)) return null;
+  const imageSource = record.imageUrl;
+  const heroImageSource = isPublicProjectImage(record.hero.imageUrl)
+    ? record.hero.imageUrl
+    : imageSource;
 
   return {
     slug: record.slug,
     name: record.name,
     shortDescription: record.shortDescription,
     longDescription: record.longDescription,
-    category,
     image: {
       src: imageSource,
-      alt: record.imageAlt || fallback.image.alt,
+      alt: record.imageAlt || record.name,
+    },
+    hero: {
+      imageUrl: heroImageSource,
+      altText:
+        record.hero.altText ||
+        record.imageAlt ||
+        record.name,
     },
     gallery: record.galleryImages
       .filter((image) => isPublicProjectImage(image.imageUrl))
@@ -127,14 +112,12 @@ function mapPublishedService(
         src: image.imageUrl,
         alt: image.altText,
         caption: image.caption,
-        focalX: safeFocalPosition(image.focalX),
-        focalY: safeFocalPosition(image.focalY),
       })),
     durations: pricing.map((price) => `${price.durationMinutes} minutes`),
     pricing,
-    bookingNotice: record.bookingNotice || undefined,
     idealFor: record.idealFor,
     highlights: record.highlights,
+    priceNote: record.priceNote || undefined,
     bookingUrl: `/book?service=${record.slug}&duration=${pricing[0].durationMinutes}`,
     seo: {
       title: record.seoTitle,
@@ -147,21 +130,10 @@ export const getPublicServicesSnapshot = cache(async () => {
   const content = await getPublicContent();
   const mapped = content.services
     .map(mapPublishedService)
-    .filter((service): service is Service => service !== null);
-  const services = mapped.sort((first, second) => {
-    const firstOrder =
-      content.services.find((record) => record.slug === first.slug)?.sortOrder ?? 0;
-    const secondOrder =
-      content.services.find((record) => record.slug === second.slug)?.sortOrder ?? 0;
-    return firstOrder - secondOrder;
-  });
-  const usedCategories = new Set(services.map((service) => service.category));
+    .filter((service): service is PublicService => service !== null);
 
   return {
-    services,
-    categories: serviceCategories.filter((category) =>
-      usedCategories.has(category.id),
-    ),
+    services: mapped,
     lastModified: content.updatedAt,
   };
 });

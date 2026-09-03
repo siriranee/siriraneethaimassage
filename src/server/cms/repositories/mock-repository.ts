@@ -215,9 +215,10 @@ export class MockCmsRepository implements CmsRepository {
     );
   }
 
-  async findUserByEmail(email: string) {
+  async findUserByUsername(username: string) {
     return clone(
-      this.state.users.find((user) => user.email === email.toLowerCase()) ?? null,
+      this.state.users.find((user) => user.username === username.toLowerCase()) ??
+        null,
     );
   }
 
@@ -233,10 +234,70 @@ export class MockCmsRepository implements CmsRepository {
     );
   }
 
-  async saveUser(user: CmsUser) {
+  async insertUser(user: CmsUser) {
+    if (
+      this.state.users.some(
+        (item) => item.id === user.id || item.username === user.username,
+      )
+    ) {
+      throw new CmsConflictError("That username is already in use.");
+    }
+
+    this.state.users.push(clone(user));
+  }
+
+  async updateUser(user: CmsUser, expectedVersion: number) {
     const index = this.state.users.findIndex((item) => item.id === user.id);
-    if (index >= 0) this.state.users[index] = clone(user);
-    else this.state.users.push(clone(user));
+    const current = this.state.users[index];
+    const currentVersion =
+      current && Number.isInteger(current.version) ? current.version : 0;
+
+    if (!current || currentVersion !== expectedVersion) {
+      throw new CmsConflictError();
+    }
+    if (
+      this.state.users.some(
+        (item) => item.id !== user.id && item.username === user.username,
+      )
+    ) {
+      throw new CmsConflictError("That username is already in use.");
+    }
+
+    this.state.users[index] = clone({
+      ...user,
+      lastLoginAt:
+        current.lastLoginAt > user.lastLoginAt
+          ? current.lastLoginAt
+          : user.lastLoginAt,
+      updatedAt:
+        current.updatedAt > user.updatedAt ? current.updatedAt : user.updatedAt,
+    });
+  }
+
+  async recordUserLogin(
+    userId: string,
+    expectedAuthVersion: number,
+    timestamp: string,
+  ) {
+    const index = this.state.users.findIndex(
+      (user) =>
+        user.id === userId &&
+        user.active &&
+        user.authVersion === expectedAuthVersion,
+    );
+    if (index < 0) return null;
+
+    const updated = {
+      ...this.state.users[index],
+      lastLoginAt: timestamp,
+      updatedAt: timestamp,
+    };
+    this.state.users[index] = updated;
+    return clone(updated);
+  }
+
+  async lockUserDirectory() {
+    // Mock transactions already serialize all CMS mutations through one queue.
   }
 
   async findSessionByTokenHash(tokenHash: string) {
@@ -269,6 +330,18 @@ export class MockCmsRepository implements CmsRepository {
     return clone(
       this.state.loginAttempts.find((attempt) => attempt.key === key) ?? null,
     );
+  }
+
+  async incrementLoginAttempt(key: string, expiresAt: string) {
+    const current = this.state.loginAttempts.find((attempt) => attempt.key === key);
+    const next: CmsLoginAttempt = current
+      ? { ...current, count: current.count + 1 }
+      : { key, count: 1, lockedUntil: "", expiresAt };
+    this.state.loginAttempts = this.state.loginAttempts.filter(
+      (attempt) => attempt.key !== key,
+    );
+    this.state.loginAttempts.push(next);
+    return clone(next);
   }
 
   async saveLoginAttempt(attempt: CmsLoginAttempt) {
@@ -408,6 +481,15 @@ export class MockCmsRepository implements CmsRepository {
         .filter((item) => !bookingId || item.bookingId === bookingId)
         .sort((first, second) => second.createdAt.localeCompare(first.createdAt))
         .slice(0, Math.max(1, Math.min(limit, 500))),
+    );
+  }
+
+  async listDashboardNotifications(limit = 8) {
+    return clone(
+      this.state.notifications
+        .filter((item) => item.channel === "dashboard")
+        .sort((first, second) => second.createdAt.localeCompare(first.createdAt))
+        .slice(0, Math.max(1, Math.min(limit, 20))),
     );
   }
 

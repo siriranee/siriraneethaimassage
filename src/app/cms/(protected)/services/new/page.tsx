@@ -8,22 +8,23 @@ const blankService: CmsServiceRecord = {
   id: "new",
   slug: "",
   name: "",
-  category: "thai-massage",
   shortDescription: "",
   longDescription: "",
-  imageUrl: "/images/spa/hero-massage.webp",
+  imageUrl: "",
   imageAlt: "",
+  hero: {
+    imageUrl: "",
+    altText: "",
+  },
   galleryImages: [],
   prices: [
     { id: "new-60", durationMinutes: 60, priceCents: 6500, active: true },
   ],
   idealFor: [],
   highlights: [],
-  bookingNotice: "",
+  priceNote: "",
   seoTitle: "",
   seoDescription: "",
-  status: "draft",
-  sortOrder: 50,
   version: 0,
   createdAt: "",
   updatedAt: "",
@@ -37,13 +38,13 @@ export default async function CmsNewServicePage() {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/services" secondary>Back to services</CmsPrimaryLink>}
-        description="Create a complete treatment draft, then review it before publishing the website snapshot."
+        description="Add the treatment details, pricing and images. Saving publishes the treatment immediately."
         eyebrow="Treatment editor"
         title="Add treatment"
       />
-      <CmsNotice title="New treatments start as drafts">
-        The URL slug is checked for conflicts, archived treatments stay out of the
-        public menu, and the public site changes only after an administrator publishes.
+      <CmsNotice title="This treatment publishes when saved">
+        Complete every required field before saving. The URL is checked for conflicts,
+        and successful changes appear on the public website immediately.
       </CmsNotice>
       <ServiceEditorForm
         cloudinaryOwnership={cloudinaryOwnership}

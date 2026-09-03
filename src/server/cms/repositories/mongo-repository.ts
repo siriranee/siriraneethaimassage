@@ -1,6 +1,12 @@
 import "server-only";
 
-import type { ClientSession, Db, Document, Filter } from "mongodb";
+import {
+  MongoServerError,
+  type ClientSession,
+  type Db,
+  type Document,
+  type Filter,
+} from "mongodb";
 
 import type {
   CmsAuditEvent,
@@ -57,6 +63,14 @@ function decode<T extends Identified>(value: Document | null): T | null {
   if (!value) return null;
   const { _id, ...rest } = value;
   return { id: String(_id), ...rest } as T;
+}
+
+function rethrowCmsUserWriteError(error: unknown): never {
+  if (error instanceof MongoServerError && error.code === 11000) {
+    throw new CmsConflictError("That username is already in use.");
+  }
+
+  throw error;
 }
 
 function encodeBooking(value: CmsBooking): CmsMongoDocument {
@@ -304,12 +318,12 @@ export class MongoCmsRepository implements CmsRepository {
     return false;
   }
 
-  async findUserByEmail(email: string) {
+  async findUserByUsername(username: string) {
     const db = await this.db();
     return decode<CmsUser>(
       await db
         .collection<CmsMongoDocument>(collections.users)
-        .findOne({ email: email.toLowerCase() }, this.options()),
+        .findOne({ username: username.toLowerCase() }, this.options()),
     );
   }
 
@@ -330,11 +344,81 @@ export class MongoCmsRepository implements CmsRepository {
     return rows.map((row) => decode<CmsUser>(row)!);
   }
 
-  async saveUser(user: CmsUser) {
+  async insertUser(user: CmsUser) {
     const db = await this.db();
-    await db.collection<CmsMongoDocument>(collections.users).replaceOne(
-      { _id: user.id },
-      encode(user),
+    try {
+      await db
+        .collection<CmsMongoDocument>(collections.users)
+        .insertOne(encode(user), this.options());
+    } catch (error) {
+      rethrowCmsUserWriteError(error);
+    }
+  }
+
+  async updateUser(user: CmsUser, expectedVersion: number) {
+    const db = await this.db();
+    const versionFilter: Filter<CmsMongoDocument> =
+      expectedVersion === 0
+        ? {
+            _id: user.id,
+            $or: [{ version: 0 }, { version: { $exists: false } }],
+          }
+        : { _id: user.id, version: expectedVersion };
+
+    try {
+      const fields = {
+        username: user.username,
+        ...(user.email ? { email: user.email } : {}),
+        displayName: user.displayName,
+        passwordHash: user.passwordHash,
+        role: user.role,
+        active: user.active,
+        authVersion: user.authVersion,
+        version: user.version,
+        passwordChangedAt: user.passwordChangedAt,
+        createdAt: user.createdAt,
+      };
+      const result = await db
+        .collection<CmsMongoDocument>(collections.users)
+        .updateOne(
+          versionFilter,
+          {
+            $set: fields,
+            $max: { updatedAt: user.updatedAt },
+          },
+          this.options(),
+        );
+      if (!result.matchedCount) throw new CmsConflictError();
+    } catch (error) {
+      rethrowCmsUserWriteError(error);
+    }
+  }
+
+  async recordUserLogin(
+    userId: string,
+    expectedAuthVersion: number,
+    timestamp: string,
+  ) {
+    const db = await this.db();
+    return decode<CmsUser>(
+      await db.collection<CmsMongoDocument>(collections.users).findOneAndUpdate(
+        { _id: userId, active: true, authVersion: expectedAuthVersion },
+        { $set: { lastLoginAt: timestamp, updatedAt: timestamp } },
+        { ...this.options(), returnDocument: "after" },
+      ),
+    );
+  }
+
+  async lockUserDirectory() {
+    const db = await this.db();
+    const timestamp = new Date().toISOString();
+    await db.collection<CmsMongoDocument>(collections.meta).updateOne(
+      { _id: "cms-user-directory-lock" },
+      {
+        $inc: { sequence: 1 },
+        $set: { updatedAt: timestamp },
+        $setOnInsert: { createdAt: timestamp },
+      },
       { ...this.options(), upsert: true },
     );
   }
@@ -387,6 +471,34 @@ export class MongoCmsRepository implements CmsRepository {
       count: Number(value.count ?? 0),
       lockedUntil: String(value.lockedUntil ?? ""),
       expiresAt: String(value.expiresAt ?? ""),
+    };
+  }
+
+  async incrementLoginAttempt(key: string, expiresAt: string) {
+    const db = await this.db();
+    const collection = db.collection<CmsMongoDocument>(
+      collections.loginAttempts,
+    );
+    await collection.updateOne(
+      { _id: key },
+      {
+        $inc: { count: 1 },
+        $setOnInsert: {
+          lockedUntil: "",
+          expiresAt,
+          expiresAtDate: new Date(expiresAt),
+        },
+      },
+      { ...this.options(), upsert: true },
+    );
+    const value = await collection.findOne({ _id: key }, this.options());
+    if (!value) throw new Error("The login throttle could not be recorded.");
+
+    return {
+      key,
+      count: Number(value.count ?? 0),
+      lockedUntil: String(value.lockedUntil ?? ""),
+      expiresAt: String(value.expiresAt ?? expiresAt),
     };
   }
 
@@ -593,6 +705,17 @@ export class MongoCmsRepository implements CmsRepository {
       .find(bookingId ? { bookingId } : {}, this.options())
       .sort({ createdAt: -1 })
       .limit(Math.max(1, Math.min(limit, 500)))
+      .toArray();
+    return rows.map((row) => decode<CmsBookingNotification>(row)!);
+  }
+
+  async listDashboardNotifications(limit = 8) {
+    const db = await this.db();
+    const rows = await db
+      .collection<CmsMongoDocument>(collections.notifications)
+      .find({ channel: "dashboard" }, this.options())
+      .sort({ createdAt: -1 })
+      .limit(Math.max(1, Math.min(limit, 20)))
       .toArray();
     return rows.map((row) => decode<CmsBookingNotification>(row)!);
   }

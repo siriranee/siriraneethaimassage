@@ -1,4 +1,4 @@
-import { CalendarDays, Camera, HeartPulse, MapPinned, MessageCircle, Star } from "lucide-react";
+import { CalendarDays, Camera, MapPinned, MessageCircle, Star } from "lucide-react";
 import Link from "next/link";
 
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink, CmsStatusBadge } from "@/components/cms/CmsUi";
@@ -14,7 +14,6 @@ export default async function CmsIntegrationsPage() {
   const media = getCloudinaryMediaReadiness();
   const items = [
     { icon: CalendarDays, name: "Booking provider", value: content.site.booksyUrl, configured: Boolean(content.site.booksyUrl), edit: "/cms/settings/business" },
-    { icon: MessageCircle, name: "Booking notifications", value: "Dashboard preview queue only — no messages are sent", configured: false, edit: "/cms/notifications" },
     {
       icon: Camera,
       name: "Media storage",
@@ -26,7 +25,6 @@ export default async function CmsIntegrationsPage() {
       configured: media.ready,
       edit: "/cms/media",
     },
-    { icon: HeartPulse, name: "Monitoring & alerts", value: process.env.CMS_MONITORING_READY === "true" ? "Marked operationally ready" : "Provider and alert recipient required", configured: process.env.CMS_MONITORING_READY === "true", edit: "/cms/settings/recovery" },
     { icon: MessageCircle, name: "WhatsApp", value: content.site.whatsappNumber, configured: Boolean(content.site.whatsappNumber), edit: "/cms/settings/business" },
     { icon: Camera, name: "Instagram", value: content.site.instagramUrl, configured: Boolean(content.site.instagramUrl), edit: "/cms/settings/business" },
     { icon: Star, name: "Google reviews", value: content.site.googleReviewUrl, configured: Boolean(content.site.googleReviewUrl), edit: "/cms/settings/business" },

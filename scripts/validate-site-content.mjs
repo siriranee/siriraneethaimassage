@@ -37,31 +37,10 @@ const expectedServiceAreas = [
   "Raheny",
   "Dublin",
 ];
-const expectedServices = {
-  "traditional-thai-massage": {
-    name: "Traditional Thai Massage",
-    pricing: [[60, 65], [90, 95]],
-  },
-  "hot-oil-massage": {
-    name: "Hot Oil Massage",
-    pricing: [[60, 65], [90, 95]],
-  },
-  "neck-shoulder-upper-back-massage": {
-    name: "Neck, Shoulder & Upper Back Massage",
-    pricing: [[30, 40]],
-  },
-  "deep-tissue-massage": {
-    name: "Deep Tissue Massage",
-    pricing: [[60, 65], [90, 95]],
-  },
-  "hot-stone-massage": {
-    name: "Hot Stone Massage",
-    pricing: [[90, 95]],
-  },
-};
-
 const siteSource = await read("src/content/site.ts");
-const servicesSource = await read("src/content/services.ts");
+const serviceDomainSource = await read("src/domain/service.ts");
+const serviceGallerySource = await read("src/content/service-galleries.ts");
+const pageHeroSource = await read("src/content/page-heroes.ts");
 const globalStylesSource = await read("src/app/globals.css");
 const schemaSource = await read("src/lib/structured-data.ts");
 const homePageSource = await read("src/app/(site)/page.tsx");
@@ -73,6 +52,7 @@ const robotsSource = await read("src/app/robots.ts");
 const publicAdapterSource = await read("src/server/cms/public-adapter.ts");
 const publicBookingSource = await read("src/server/booking/public-booking.ts");
 const defaultContentSource = await read("src/server/cms/default-content.ts");
+const contentServiceSource = await read("src/server/cms/content-service.ts");
 const servicesPageSource = await read("src/app/(site)/services/page.tsx");
 const therapistsPageSource = await read("src/app/(site)/therapists/page.tsx");
 const contactPageSource = await read("src/app/(site)/contact/page.tsx");
@@ -269,36 +249,33 @@ check(
   `Service areas must be exactly: ${expectedServiceAreas.join(", ")}`,
 );
 
-const declaredSlugs = extractConstArray(servicesSource, "serviceSlugs");
-const serviceMatches = [...servicesSource.matchAll(/^\s{4}slug: "([^"]+)",$/gm)];
-const implementedSlugs = serviceMatches.map((match) => match[1]);
-const expectedSlugs = Object.keys(expectedServices);
-check(serviceMatches.length === 5, `Expected 5 services; found ${serviceMatches.length}`);
 check(
-  sameArray([...declaredSlugs].sort(), [...expectedSlugs].sort()),
-  "The declared service slug set does not match the confirmed five services",
+  serviceDomainSource.includes("export type Service ="),
+  "Reusable public service types must remain in the domain layer",
 );
 check(
-  sameArray([...implementedSlugs].sort(), [...expectedSlugs].sort()),
-  "The implemented service set does not match the confirmed five services",
+  !serviceDomainSource.includes("export const services"),
+  "The domain layer must not embed a static service catalogue",
 );
-
-for (const [index, match] of serviceMatches.entries()) {
-  const slug = match[1];
-  const expected = expectedServices[slug];
-  if (!expected) continue;
-  const nextIndex = serviceMatches[index + 1]?.index ?? servicesSource.indexOf("\n];", match.index);
-  const block = servicesSource.slice(match.index, nextIndex);
-  const name = block.match(/^\s{4}name: "([^"]+)",$/m)?.[1];
-  const pricingBody = block.match(/^\s{4}pricing: \[([\s\S]*?)^\s{4}\],$/m)?.[1] ?? "";
-  const pricing = [...pricingBody.matchAll(/durationMinutes:\s*(\d+),\s*priceEur:\s*(\d+)/g)]
-    .map((price) => [Number(price[1]), Number(price[2])]);
-  check(name === expected.name, `${slug} must be named ${expected.name}`);
-  check(
-    sameArray(pricing, expected.pricing),
-    `${expected.name} pricing must be ${JSON.stringify(expected.pricing)}`,
-  );
-}
+check(
+  /services:\s*\[\]/.test(defaultContentSource),
+  "Default CMS content must not seed local services",
+);
+check(
+  !serviceGallerySource.includes("serviceGallerySlides") &&
+    !serviceGallerySource.includes("/images/services/"),
+  "The runtime gallery helper must not contain service-specific local fallbacks",
+);
+check(
+  !pageHeroSource.includes("serviceHeroImages") &&
+    !pageHeroSource.includes("getServicePageHero"),
+  "Page hero content must not contain service-specific local fallbacks",
+);
+check(
+  !contentServiceSource.includes("defaultServicesBySlug") &&
+    !contentServiceSource.includes("getServicePageHero"),
+  "Stored service normalization must not restore local catalogue media",
+);
 
 check(
   schemaSource.includes("description: siteDescription(site)"),
@@ -367,8 +344,14 @@ for (const unsupportedClaim of [
 }
 check(
   publicAdapterSource.includes("getPublishedCmsContent") &&
-    publicAdapterSource.includes('record.status !== "published"'),
+    publicAdapterSource.includes("content.services") &&
+    publicAdapterSource.includes("mapPublishedService"),
   "Public pages must resolve services from the immutable published CMS snapshot",
+);
+check(
+  homePageSource.includes("services.slice(0, 4)") &&
+    !homePageSource.includes("featuredSlugs"),
+  "Homepage treatment cards must follow the published CMS service order",
 );
 for (const forbiddenField of [
   "therapist",
@@ -523,6 +506,6 @@ if (failures.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Site content validation passed: ${expectedName}, confirmed Howth address, 5 services, and 7 service areas.`,
+    `Site content validation passed: ${expectedName}, confirmed Howth address, CMS-published services, and 7 service areas.`,
   );
 }

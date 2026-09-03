@@ -53,10 +53,17 @@ export interface CmsRepository {
     secureUrl: string,
   ): Promise<boolean>;
 
-  findUserByEmail(email: string): Promise<CmsUser | null>;
+  findUserByUsername(username: string): Promise<CmsUser | null>;
   findUserById(id: string): Promise<CmsUser | null>;
   listUsers(): Promise<readonly CmsUser[]>;
-  saveUser(user: CmsUser): Promise<void>;
+  insertUser(user: CmsUser): Promise<void>;
+  updateUser(user: CmsUser, expectedVersion: number): Promise<void>;
+  recordUserLogin(
+    userId: string,
+    expectedAuthVersion: number,
+    timestamp: string,
+  ): Promise<CmsUser | null>;
+  lockUserDirectory(): Promise<void>;
 
   findSessionByTokenHash(tokenHash: string): Promise<CmsSession | null>;
   saveSession(session: CmsSession): Promise<void>;
@@ -64,6 +71,10 @@ export interface CmsRepository {
   deleteSessionsForUser(userId: string): Promise<void>;
 
   getLoginAttempt(key: string): Promise<CmsLoginAttempt | null>;
+  incrementLoginAttempt(
+    key: string,
+    expiresAt: string,
+  ): Promise<CmsLoginAttempt>;
   saveLoginAttempt(attempt: CmsLoginAttempt): Promise<void>;
   deleteLoginAttempt(key: string): Promise<void>;
 
@@ -95,6 +106,9 @@ export interface CmsRepository {
 
   listNotifications(
     bookingId?: string,
+    limit?: number,
+  ): Promise<readonly CmsBookingNotification[]>;
+  listDashboardNotifications(
     limit?: number,
   ): Promise<readonly CmsBookingNotification[]>;
   saveNotification(notification: CmsBookingNotification): Promise<void>;

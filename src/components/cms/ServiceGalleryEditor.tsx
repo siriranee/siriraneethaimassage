@@ -12,7 +12,6 @@ import Image from "next/image";
 import { useId, useRef, useState } from "react";
 
 import {
-  DEFAULT_SERVICE_GALLERY_FOCAL_POSITION,
   MAX_SERVICE_GALLERY_IMAGES,
   type CmsServiceGalleryImage,
 } from "@/domain/cms/service-gallery";
@@ -29,7 +28,6 @@ import styles from "./ServiceGalleryEditor.module.css";
 export type ServiceGalleryEditorProps = {
   readonly images: readonly CmsServiceGalleryImage[];
   readonly onChange: (images: readonly CmsServiceGalleryImage[]) => void;
-  readonly serviceSlug: string;
   readonly cloudinaryOwnership?: CloudinaryDeliveryOwnership | null;
   readonly preparedImages?: Readonly<
     Record<string, PreparedClientImage | null | undefined>
@@ -44,15 +42,9 @@ export type ServiceGalleryEditorProps = {
   ) => void;
 };
 
-function placeholderPath(serviceSlug: string) {
-  const safeSlug = serviceSlug || "treatment";
-  return `/images/services/${safeSlug}/gallery-new.webp`;
-}
-
 export function ServiceGalleryEditor({
   images,
   onChange,
-  serviceSlug,
   cloudinaryOwnership,
   preparedImages = {},
   onPreparedImageChange,
@@ -86,8 +78,6 @@ export function ServiceGalleryEditor({
         imageUrl: "",
         altText: "",
         caption: "",
-        focalX: DEFAULT_SERVICE_GALLERY_FOCAL_POSITION,
-        focalY: DEFAULT_SERVICE_GALLERY_FOCAL_POSITION,
       },
     ]);
     setStatusMessage(`Added image ${images.length + 1}.`);
@@ -168,9 +158,8 @@ export function ServiceGalleryEditor({
         <Images aria-hidden="true" />
         <p>
           Choose a file inside an image card to prepare it locally. It stays on
-          this device until the service form is saved. Existing project paths
-          and approved HTTPS URLs remain usable; removing a card only detaches
-          it and never deletes the stored asset.
+          this device until the service form is saved. Removing a card only
+          detaches its saved image from this treatment.
         </p>
       </div>
 
@@ -251,7 +240,7 @@ export function ServiceGalleryEditor({
                       <ArrowDown aria-hidden="true" />
                     </button>
                     <button
-                      aria-label={`Remove image ${index + 1} from this treatment draft`}
+                      aria-label={`Remove image ${index + 1} from this treatment`}
                       className={styles.removeButton}
                       onClick={() => removeImage(image.id, index)}
                       ref={(element) => {
@@ -274,24 +263,16 @@ export function ServiceGalleryEditor({
                           fill
                           sizes="(max-width: 760px) 100vw, 34vw"
                           src={image.imageUrl}
-                          style={{
-                            objectPosition: `${image.focalX}% ${image.focalY}%`,
-                          }}
                         />
                       ) : (
                         <div className={styles.previewEmpty}>
                           <Images aria-hidden="true" />
-                          <span>
-                            {image.imageUrl.startsWith("https://")
-                              ? "This remote image is outside the approved Cloudinary library"
-                              : "Choose a file or enter a valid project image path"}
-                          </span>
+                          <span>Choose a file below to prepare this image</span>
                         </div>
                       )}
                     </div>
                     <p className={styles.previewHint}>
-                      The focal controls change which part stays centred when the
-                      16:9 slider crops the image.
+                      Gallery images use a centred 16:9 crop on the public page.
                     </p>
                   </div>
 
@@ -308,22 +289,9 @@ export function ServiceGalleryEditor({
                           onPreparedImageChange?.(image.id, preparedImage)
                         }
                         preparedImage={preparedImages[image.id] ?? null}
+                        required={!image.imageUrl && !preparedImages[image.id]}
                       />
                     </div>
-                    <label className={styles.fullField}>
-                      Image path or approved HTTPS URL
-                      <input
-                        maxLength={2_048}
-                        onChange={(event) =>
-                          updateImage(image.id, { imageUrl: event.target.value })
-                        }
-                        placeholder={placeholderPath(serviceSlug)}
-                        required={!preparedImages[image.id]}
-                        type="text"
-                        value={image.imageUrl}
-                      />
-                      <small>Changing this value replaces the image for this gallery position after you save.</small>
-                    </label>
                     <label className={styles.fullField}>
                       Alternative text
                       <input
@@ -349,38 +317,6 @@ export function ServiceGalleryEditor({
                         value={image.caption}
                       />
                     </label>
-                    <div className={styles.focalGrid}>
-                      <label className={styles.focalField}>
-                        <span>Horizontal focus <strong>{image.focalX}%</strong></span>
-                        <input
-                          aria-label={`Horizontal focal position for image ${index + 1}`}
-                          max={100}
-                          min={0}
-                          onChange={(event) =>
-                            updateImage(image.id, {
-                              focalX: Number(event.target.value),
-                            })
-                          }
-                          type="range"
-                          value={image.focalX}
-                        />
-                      </label>
-                      <label className={styles.focalField}>
-                        <span>Vertical focus <strong>{image.focalY}%</strong></span>
-                        <input
-                          aria-label={`Vertical focal position for image ${index + 1}`}
-                          max={100}
-                          min={0}
-                          onChange={(event) =>
-                            updateImage(image.id, {
-                              focalY: Number(event.target.value),
-                            })
-                          }
-                          type="range"
-                          value={image.focalY}
-                        />
-                      </label>
-                    </div>
                   </div>
                 </div>
               </article>

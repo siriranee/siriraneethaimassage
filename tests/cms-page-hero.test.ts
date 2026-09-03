@@ -209,7 +209,7 @@ test("CMS home slides and inner-page hero copy stay inside publication boundarie
   assert.match(types, /"therapists"/);
   assert.match(defaults, /heroSlides: defaultHomeHeroSlides/);
   assert.match(contentService, /normaliseStoredPageHeroSlides/);
-  assert.match(contentService, /parseCmsPageHeroSlides\(homePage\?\.heroSlides\)/);
+  assert.match(validation, /parseCmsPageHeroSlides\(value\)/);
   assert.match(validation, /current\.id === "home"/);
   assert.match(adapter, /publishedSlides/);
   assert.match(adapter, /isPublicProjectImage\(slide\.imageUrl\)/);

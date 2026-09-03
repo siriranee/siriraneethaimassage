@@ -52,6 +52,7 @@
   text-transform: uppercase;
 }
 
+.calendarTitle h2,
 .calendarTitle h4 {
   margin: 0;
   color: var(--color-purple-950);
@@ -67,15 +68,19 @@
 
 .monthButton,
 .todayButton {
+  display: inline-flex;
   min-height: 2.75rem;
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-small);
   background: var(--color-surface);
   color: var(--color-purple-800);
+  align-items: center;
   cursor: pointer;
   font: inherit;
   font-size: var(--fs-sm);
   font-weight: 850;
+  justify-content: center;
+  text-decoration: none;
   transition:
     border-color 160ms ease,
     background 160ms ease,
@@ -84,10 +89,8 @@
 }
 
 .monthButton {
-  display: grid;
   width: 2.75rem;
   padding: 0;
-  place-items: center;
 }
 
 .monthButton svg {
@@ -183,19 +186,19 @@
   color: var(--color-purple-800);
 }
 
+.dayToday.dayAvailable:not(.daySelected) {
+  border-color: var(--color-success-border);
+  background: var(--color-success-surface);
+  box-shadow: inset 0 0 0 0.1rem rgb(var(--color-success-rgb) / 0.08);
+  color: var(--color-success);
+}
+
 @media (hover: hover) {
   .dayAvailable:not(:disabled):hover {
     border-color: var(--color-purple-600);
     box-shadow: 0 0.55rem 1.2rem rgb(var(--color-purple-700-rgb) / 0.14);
     transform: translateY(-2px);
   }
-}
-
-.daySelected {
-  border-color: var(--color-purple-700);
-  background: linear-gradient(145deg, var(--color-purple-700), var(--color-purple-800));
-  box-shadow: 0 0.65rem 1.35rem rgb(var(--color-purple-700-rgb) / 0.25);
-  color: var(--color-cream);
 }
 
 .dayFullyBooked {
@@ -226,6 +229,14 @@
   opacity: 0.58;
 }
 
+.daySelected {
+  border-color: var(--color-purple-700);
+  background: linear-gradient(145deg, var(--color-purple-700), var(--color-purple-800));
+  box-shadow: 0 0.65rem 1.35rem rgb(var(--color-purple-700-rgb) / 0.25);
+  color: var(--color-cream);
+  opacity: 1;
+}
+
 .dayLoading {
   background: linear-gradient(
     100deg,
@@ -236,49 +247,6 @@
   background-size: 220% 100%;
   animation: calendar-loading 1.3s ease-in-out infinite;
   color: rgb(var(--color-purple-950-rgb) / 0.45);
-}
-
-.legend {
-  display: flex;
-  margin: 1rem 0 0;
-  padding: 0;
-  color: var(--color-muted);
-  flex-wrap: wrap;
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  gap: 0.45rem 0.85rem;
-  list-style: none;
-}
-
-.legend li {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.legend i {
-  width: 0.7rem;
-  height: 0.7rem;
-  border: 1px solid transparent;
-  border-radius: 50%;
-}
-
-.legendAvailable {
-  border-color: var(--color-purple-600) !important;
-  background: var(--color-purple-50);
-}
-
-.legendSelected {
-  background: var(--color-purple-700);
-}
-
-.legendFull {
-  background: var(--color-disabled-surface);
-}
-
-.legendDayOff {
-  border-color: rgb(var(--color-gold-600-rgb) / 0.35) !important;
-  background: var(--color-gold-100);
 }
 
 .calendarStatus {

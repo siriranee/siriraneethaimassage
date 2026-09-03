@@ -1,157 +1,116 @@
 .page {
   display: grid;
-  min-height: 100vh;
-  grid-template-columns: minmax(22rem, 0.9fr) minmax(28rem, 1.1fr);
-  background: var(--color-ivory);
-}
-
-.brandPanel {
-  position: relative;
-  display: flex;
-  min-height: 100vh;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: clamp(2rem, 5vw, 5rem);
-  overflow: hidden;
+  min-height: 100svh;
+  place-items: center;
+  padding: 3rem var(--pad-x);
   background:
-    radial-gradient(circle at 15% 22%, rgb(var(--color-purple-600-rgb) / 0.62), transparent 22rem),
-    radial-gradient(circle at 85% 78%, rgb(var(--color-gold-500-rgb) / 0.14), transparent 17rem),
-    linear-gradient(150deg, var(--color-purple-800), var(--color-purple-900) 62%, var(--color-purple-950));
-  color: var(--color-on-brand);
+    radial-gradient(
+      circle at 50% 0,
+      rgb(var(--color-gold-500-rgb) / 0.15),
+      transparent 24rem
+    ),
+    linear-gradient(
+      180deg,
+      var(--color-purple-50),
+      var(--color-ivory) 48%,
+      var(--color-canvas)
+    );
 }
 
-.brandPanel::after {
-  position: absolute;
-  right: -8rem;
-  bottom: 4rem;
-  width: 22rem;
-  height: 22rem;
-  border: 1px solid rgb(var(--color-gold-500-rgb) / 0.13);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 3rem rgb(var(--color-gold-500-rgb) / 0.035),
-    0 0 0 6rem rgb(var(--color-gold-500-rgb) / 0.02);
-  content: "";
+.shell {
+  display: grid;
+  width: min(100%, 28rem);
+  gap: 1.35rem;
+  justify-items: center;
 }
 
-.brandTop,
-.brandCopy,
-.brandPanel > small {
-  position: relative;
-  z-index: 1;
-}
-
-.brandTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.brandTop > span {
-  color: rgb(var(--color-surface-rgb) / 0.58);
-  font-size: var(--fs-sm);
-  font-weight: 800;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-}
-
-.brandCopy {
-  padding-block: 5rem;
-}
-
-.brandCopy > span {
+.logoLink {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 1rem;
-  color: var(--color-gold-400);
-  font-size: var(--fs-sm);
-  font-weight: 850;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  justify-content: center;
+  padding: 0.4rem;
+  border-radius: var(--radius-medium);
+  transition: transform 160ms ease;
 }
 
-.brandCopy > span svg {
-  width: 1rem;
-  height: 1rem;
+.logoLink img {
+  width: 7.5rem;
+  height: auto;
 }
 
-.brandCopy h1 {
-  margin-bottom: 1.2rem;
-  color: var(--color-on-brand);
-  font-size: var(--fs-5xl);
-}
-
-.brandCopy p {
-  margin: 0;
-  color: rgb(var(--color-surface-rgb) / 0.7);
-  font-size: var(--fs-base);
-}
-
-.brandPanel > small {
-  color: rgb(var(--color-surface-rgb) / 0.5);
-  font-size: var(--fs-sm);
+.logoLink:hover {
+  transform: translateY(-0.08rem);
 }
 
 .formPanel {
-  display: grid;
-  place-items: center;
-  padding: clamp(2rem, 7vw, 7rem);
-  background:
-    radial-gradient(circle at 90% 8%, rgb(var(--color-gold-500-rgb) / 0.12), transparent 16rem),
-    var(--color-ivory);
-}
-
-.formWrap {
-  width: min(100%, 30rem);
-  padding: clamp(1.4rem, 4vw, 2.2rem);
+  width: 100%;
+  padding: 2rem;
   border: 1px solid var(--color-line);
-  border-radius: 1.2rem;
-  background: rgb(var(--color-surface-rgb) / 0.92);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-large);
+  background: rgb(var(--color-surface-rgb) / 0.96);
+  box-shadow: 0 1.5rem 4rem rgb(var(--color-purple-950-rgb) / 0.09);
 }
 
-.lock {
-  display: grid;
-  width: 2.6rem;
-  height: 2.6rem;
-  margin: 0 0 1.2rem auto;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--color-purple-100);
+.footer {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.footer a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-small);
+  background: rgb(var(--color-surface-rgb) / 0.8);
   color: var(--color-purple-700);
+  font-weight: 700;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
 }
 
-.lock svg {
-  width: 1.1rem;
-  height: 1.1rem;
+.footer a:hover {
+  border-color: var(--color-purple-700);
+  background: var(--color-purple-700);
+  color: var(--color-on-brand);
 }
 
-@media (max-width: 850px) {
+@media (max-width: 520px) {
   .page {
-    grid-template-columns: 1fr;
+    place-items: start center;
+    padding-block: 1.75rem;
   }
 
-  .brandPanel {
-    min-height: 22rem;
-    padding: 1.5rem;
-  }
-
-  .brandCopy {
-    padding: 3rem 0 1rem;
-  }
-
-  .brandCopy h1 {
-    font-size: var(--fs-5xl);
-  }
-
-  .brandPanel > small {
-    display: none;
+  .shell {
+    gap: 1.15rem;
   }
 
   .formPanel {
-    min-height: 28rem;
-    padding: 2rem 1rem 3rem;
+    padding: 1.5rem 1.2rem;
+    border-radius: var(--radius-medium);
+    box-shadow: 0 1rem 2.5rem rgb(var(--color-purple-950-rgb) / 0.07);
+  }
+
+  .footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .logoLink img {
+    width: 6.5rem;
+  }
+
+  .footer a {
+    width: 100%;
   }
 }

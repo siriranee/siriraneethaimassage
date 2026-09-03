@@ -7,7 +7,9 @@ import {
   CmsMediaClientError,
   createCmsMediaSubmissionEnvelope,
   isExactCloudinaryUploadEndpoint,
+  parseCmsMediaServerRollbackSummary,
   rollbackStagedCmsMediaAssets,
+  selectCmsMediaRollbackRetryAssets,
   uploadPreparedCmsImage,
   type CmsStagedMediaAsset,
 } from "../src/lib/media/cms-media-client";
@@ -113,6 +115,7 @@ type XhrRecord = {
 function installBrowserMocks(
   fetchHandler: (call: FetchCall) => Promise<Response>,
   providerResponses: readonly unknown[] = [providerUpload],
+  options: Readonly<{ providerFailure?: "network" | "timeout" }> = {},
 ) {
   const originalFetch = globalThis.fetch;
   const originalXhr = globalThis.XMLHttpRequest;
@@ -162,6 +165,14 @@ function installBrowserMocks(
         loaded: 128,
         total: 256,
       });
+      if (options.providerFailure === "network") {
+        this.onerror?.();
+        return;
+      }
+      if (options.providerFailure === "timeout") {
+        this.ontimeout?.();
+        return;
+      }
       this.responseText = JSON.stringify(
         pendingProviderResponses.shift() ?? providerUpload,
       );
@@ -370,6 +381,41 @@ test("completion failure triggers exact upload-token cleanup fallback", async ()
   }
 });
 
+test("provider network failure cleans the current signed authorization", async () => {
+  const mock = installBrowserMocks(async ({ input, init }) => {
+    if (input === "/api/cms/media-upload" && init.method === "POST") {
+      return jsonResponse(authorizationResponse());
+    }
+    if (input === "/api/cms/media-upload" && init.method === "DELETE") {
+      return jsonResponse({ removed: true });
+    }
+    return jsonResponse({ error: "Unexpected request." }, 500);
+  }, [], { providerFailure: "network" });
+
+  try {
+    await assert.rejects(
+      uploadPreparedCmsImage({
+        submissionId,
+        scope: "service-gallery",
+        image: preparedImage(),
+      }),
+      (error) =>
+        error instanceof CmsMediaClientError &&
+        error.code === "provider-failed" &&
+        error.stage === "uploading",
+    );
+    assert.equal(mock.fetchCalls.length, 2);
+    assert.deepEqual(requestBody(mock.fetchCalls[1]), {
+      submissionId,
+      scope: "service-gallery",
+      publicId: providerPublicId,
+      uploadToken: authorizationResponse().upload.uploadToken,
+    });
+  } finally {
+    mock.restore();
+  }
+});
+
 test("staged rollback is sequential, deduplicated and best effort", async () => {
   let attempt = 0;
   const secondAsset: CmsStagedMediaAsset = {
@@ -394,9 +440,19 @@ test("staged rollback is sequential, deduplicated and best effort", async () => 
       attempted: 2,
       removed: 1,
       failed: 1,
+      pendingFinalSweep: 0,
+      complete: false,
       items: [
-        { publicId: providerPublicId, removed: true },
-        { publicId: secondAsset.publicId, removed: false },
+        {
+          publicId: providerPublicId,
+          removed: true,
+          pendingFinalSweep: false,
+        },
+        {
+          publicId: secondAsset.publicId,
+          removed: false,
+          pendingFinalSweep: false,
+        },
       ],
     });
     assert.equal(mock.fetchCalls.length, 2);
@@ -412,6 +468,139 @@ test("staged rollback is sequential, deduplicated and best effort", async () => 
   } finally {
     mock.restore();
   }
+});
+
+test("staged rollback remains incomplete while a final provider sweep is pending", async () => {
+  const mock = installBrowserMocks(
+    async () =>
+      jsonResponse({
+        removed: true,
+        alreadyRemoved: false,
+        pendingFinalSweep: true,
+      }),
+    [],
+  );
+
+  try {
+    const result = await rollbackStagedCmsMediaAssets(submissionId, [
+      stagedAsset(),
+    ]);
+    assert.deepEqual(result, {
+      attempted: 1,
+      removed: 1,
+      failed: 0,
+      pendingFinalSweep: 1,
+      complete: false,
+      items: [
+        {
+          publicId: providerPublicId,
+          removed: true,
+          pendingFinalSweep: true,
+        },
+      ],
+    });
+  } finally {
+    mock.restore();
+  }
+});
+
+test("upload failure propagates pending cleanup instead of treating any 2xx as complete", async () => {
+  const mock = installBrowserMocks(
+    async ({ input, init }) => {
+      if (input === "/api/cms/media-upload" && init.method === "POST") {
+        return jsonResponse(authorizationResponse());
+      }
+      if (input === "/api/cms/media-upload" && init.method === "DELETE") {
+        return jsonResponse({ removed: true, pendingFinalSweep: true });
+      }
+      return jsonResponse({ error: "Unexpected request." }, 500);
+    },
+    [],
+    { providerFailure: "network" },
+  );
+
+  try {
+    await assert.rejects(
+      uploadPreparedCmsImage({
+        submissionId,
+        scope: "service-gallery",
+        image: preparedImage(),
+      }),
+      (error) =>
+        error instanceof CmsMediaClientError &&
+        error.code === "provider-failed" &&
+        error.stage === "uploading" &&
+        error.message.includes("final safety sweep is still pending") &&
+        error.message.includes("reconcile media cleanup"),
+    );
+  } finally {
+    mock.restore();
+  }
+});
+
+test("server rollback summaries retry only failed or unreported staged assets", () => {
+  const first = stagedAsset();
+  const second: CmsStagedMediaAsset = {
+    ...first,
+    publicId: `${providerPublicId}-two`,
+    secureUrl: `${providerSecureUrl}-two`,
+  };
+  const third: CmsStagedMediaAsset = {
+    ...first,
+    publicId: `${providerPublicId}-three`,
+    secureUrl: `${providerSecureUrl}-three`,
+  };
+  const fourth: CmsStagedMediaAsset = {
+    ...first,
+    publicId: `${providerPublicId}-four`,
+    secureUrl: `${providerSecureUrl}-four`,
+  };
+  const assets = [first, second, third, fourth];
+  const summary = parseCmsMediaServerRollbackSummary(
+    {
+      submissionId,
+      complete: false,
+      items: [
+        {
+          publicId: first.publicId,
+          outcome: "removed",
+          pendingFinalSweep: false,
+        },
+        {
+          publicId: second.publicId,
+          outcome: "protected",
+          pendingFinalSweep: false,
+        },
+        {
+          publicId: third.publicId,
+          outcome: "failed",
+          pendingFinalSweep: false,
+        },
+      ],
+    },
+    submissionId,
+    assets,
+  );
+
+  assert.ok(summary);
+  assert.deepEqual(
+    selectCmsMediaRollbackRetryAssets(assets, summary).map(
+      (asset) => asset.publicId,
+    ),
+    [third.publicId, fourth.publicId],
+  );
+  assert.equal(
+    parseCmsMediaServerRollbackSummary(
+      {
+        submissionId: "media_wrong123",
+        complete: true,
+        items: [],
+      },
+      submissionId,
+      assets,
+    ),
+    null,
+  );
 });
 
 test("submission envelope contains only server-verified staged references", () => {

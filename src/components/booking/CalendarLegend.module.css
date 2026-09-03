@@ -1,0 +1,48 @@
+.legend {
+  display: flex;
+  margin: 1rem 0 0;
+  padding: 0;
+  color: var(--color-muted);
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  gap: 0.45rem 0.85rem;
+  list-style: none;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.legend i {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 50%;
+}
+
+.available {
+  border-color: var(--color-purple-600) !important;
+  background: var(--color-purple-50);
+}
+
+.selected {
+  background: var(--color-purple-700);
+}
+
+.fullyBooked {
+  background: var(--color-disabled-surface);
+}
+
+.dayOff {
+  border-color: rgb(var(--color-gold-600-rgb) / 0.35) !important;
+  background: var(--color-gold-100);
+}
+
+@media (forced-colors: active) {
+  .legend i {
+    forced-color-adjust: none;
+  }
+}

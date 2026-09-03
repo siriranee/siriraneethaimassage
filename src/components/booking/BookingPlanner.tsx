@@ -30,7 +30,6 @@ export type BookingPlannerService = {
   readonly slug: string;
   readonly name: string;
   readonly shortDescription: string;
-  readonly bookingNotice: string;
   readonly pricing: readonly PricePoint[];
 };
 
@@ -514,15 +513,6 @@ export function BookingPlanner({
           : ""
       }`
     : "Not selected yet";
-  const summaryBookingNotice =
-    availabilityMode !== "live" &&
-    selectedService.bookingNotice &&
-    !/^Online booking is (?:being configured|coming soon)\b/i.test(
-      selectedService.bookingNotice.trim(),
-    )
-      ? selectedService.bookingNotice
-      : null;
-
   return (
     <section className={styles.planner} aria-labelledby="booking-planner-title">
       <div className={styles.intro}>
@@ -967,12 +957,6 @@ export function BookingPlanner({
                 <dd>{appointmentLabel}</dd>
               </div>
             </dl>
-
-            {summaryBookingNotice ? (
-              <div className={styles.serviceNote}>
-                <p>{summaryBookingNotice}</p>
-              </div>
-            ) : null}
 
             <div className={styles.totalRow}>
               <span>Price</span>

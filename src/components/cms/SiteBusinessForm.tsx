@@ -62,7 +62,7 @@ export function SiteBusinessForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
       }
 
       setVersion(result.site.version);
-      setFeedback({ tone: "success", text: "Business information saved to the draft." });
+      setFeedback({ tone: "success", text: "Business information saved and published." });
       router.refresh();
     } catch {
       setFeedback({ tone: "error", text: "The CMS could not be reached. Please try again." });
@@ -93,7 +93,7 @@ export function SiteBusinessForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
           <label className={styles.field}>Phone in E.164 format<input defaultValue={site.phoneE164} maxLength={25} name="phoneE164" placeholder="+353123456789" /></label>
           <label className={styles.checkbox}>
             <input defaultChecked={site.phoneConfirmed} name="phoneConfirmed" type="checkbox" />
-            <span>I confirm this public phone number<small>Until confirmed and published, no phone number or call button appears on the website or in search data.</small></span>
+            <span>I confirm this public phone number<small>Until confirmed and saved, no phone number or call button appears on the website or in search data.</small></span>
           </label>
           <label className={styles.field}>Email address<input defaultValue={site.email} maxLength={254} name="email" type="email" /></label>
           <label className={styles.field}>WhatsApp number<input defaultValue={site.whatsappNumber} maxLength={25} name="whatsappNumber" /></label>
@@ -121,8 +121,8 @@ export function SiteBusinessForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
       </section>
 
       <div className={styles.saveBar}>
-        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Draft version ${version}`}</span>
-        <button disabled={saving} type="submit">{saving ? "Saving..." : "Save business information"}</button>
+        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Published version ${version}`}</span>
+        <button disabled={saving} type="submit">{saving ? "Saving and publishing..." : "Save and publish business information"}</button>
       </div>
     </form>
   );

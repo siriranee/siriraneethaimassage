@@ -101,19 +101,41 @@ export type UploadCmsMediaSequentiallyOptions<TKey extends string = string> =
     items: readonly CmsMediaUploadItem<TKey>[];
     signal?: AbortSignal;
     onProgress?: (progress: CmsMediaSequenceProgress<TKey>) => void;
+    onStaged?: (result: CmsMediaUploadItemResult<TKey>) => void;
     rollbackCompletedOnError?: boolean;
   }>;
 
 export type CmsMediaRollbackItemResult = Readonly<{
   publicId: string;
   removed: boolean;
+  pendingFinalSweep: boolean;
 }>;
 
 export type CmsMediaRollbackResult = Readonly<{
   attempted: number;
   removed: number;
   failed: number;
+  pendingFinalSweep: number;
+  complete: boolean;
   items: readonly CmsMediaRollbackItemResult[];
+}>;
+
+export type CmsMediaServerRollbackOutcome =
+  | "removed"
+  | "already-removed"
+  | "protected"
+  | "failed";
+
+export type CmsMediaServerRollbackItem = Readonly<{
+  publicId: string;
+  outcome: CmsMediaServerRollbackOutcome;
+  pendingFinalSweep: boolean;
+}>;
+
+export type CmsMediaServerRollbackSummary = Readonly<{
+  submissionId: string;
+  complete: boolean;
+  items: readonly CmsMediaServerRollbackItem[];
 }>;
 
 type JsonObject = Record<string, unknown>;
@@ -145,6 +167,74 @@ function objectValue(value: unknown): JsonObject | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as JsonObject)
     : null;
+}
+
+export function parseCmsMediaServerRollbackSummary(
+  value: unknown,
+  expectedSubmissionId: string,
+  expectedAssets: readonly Pick<CmsStagedMediaAsset, "publicId">[],
+): CmsMediaServerRollbackSummary | null {
+  const source = objectValue(value);
+  if (
+    !source ||
+    source.submissionId !== expectedSubmissionId ||
+    typeof source.complete !== "boolean" ||
+    !Array.isArray(source.items) ||
+    source.items.length > expectedAssets.length
+  ) {
+    return null;
+  }
+
+  const expectedPublicIds = new Set(expectedAssets.map((asset) => asset.publicId));
+  const seenPublicIds = new Set<string>();
+  const outcomes = new Set<CmsMediaServerRollbackOutcome>([
+    "removed",
+    "already-removed",
+    "protected",
+    "failed",
+  ]);
+  const items: CmsMediaServerRollbackItem[] = [];
+
+  for (const itemValue of source.items) {
+    const item = objectValue(itemValue);
+    const publicId = typeof item?.publicId === "string" ? item.publicId : "";
+    const outcome = item?.outcome;
+    if (
+      !expectedPublicIds.has(publicId) ||
+      seenPublicIds.has(publicId) ||
+      typeof outcome !== "string" ||
+      !outcomes.has(outcome as CmsMediaServerRollbackOutcome) ||
+      typeof item?.pendingFinalSweep !== "boolean"
+    ) {
+      return null;
+    }
+    seenPublicIds.add(publicId);
+    items.push({
+      publicId,
+      outcome: outcome as CmsMediaServerRollbackOutcome,
+      pendingFinalSweep: item.pendingFinalSweep,
+    });
+  }
+
+  return {
+    submissionId: expectedSubmissionId,
+    complete: source.complete,
+    items,
+  };
+}
+
+export function selectCmsMediaRollbackRetryAssets<T extends Pick<CmsStagedMediaAsset, "publicId">>(
+  assets: readonly T[],
+  summary: CmsMediaServerRollbackSummary | null,
+): readonly T[] {
+  if (!summary) return assets;
+  const outcomesByPublicId = new Map(
+    summary.items.map((item) => [item.publicId, item.outcome] as const),
+  );
+  return assets.filter((asset) => {
+    const outcome = outcomesByPublicId.get(asset.publicId);
+    return !outcome || outcome === "failed";
+  });
 }
 
 function clientError(
@@ -637,15 +727,72 @@ async function cleanupAuthorizedUpload(
   uploadToken: string,
 ) {
   try {
-    await sameOriginJson(
-      CMS_MEDIA_UPLOAD_PATH,
-      "DELETE",
-      { submissionId, scope, publicId, uploadToken },
-      "rollback",
+    return parseCleanupResponse(
+      await sameOriginJson(
+        CMS_MEDIA_UPLOAD_PATH,
+        "DELETE",
+        { submissionId, scope, publicId, uploadToken },
+        "rollback",
+      ),
     );
   } catch {
-    // Best effort: the server also expires and cleans abandoned authorizations.
+    return { removed: false, pendingFinalSweep: false } as const;
   }
+}
+
+function parseCleanupResponse(value: unknown) {
+  const source = objectValue(value);
+  const pendingFinalSweep = source?.pendingFinalSweep ?? false;
+  if (
+    source?.removed !== true ||
+    (source.alreadyRemoved !== undefined &&
+      typeof source.alreadyRemoved !== "boolean") ||
+    typeof pendingFinalSweep !== "boolean"
+  ) {
+    throw clientError(
+      "invalid-response",
+      "rollback",
+      "The image cleanup response could not be verified.",
+    );
+  }
+  return { removed: true, pendingFinalSweep } as const;
+}
+
+function cleanupIssue(
+  cleanup: Readonly<{ removed: boolean; pendingFinalSweep: boolean }>,
+) {
+  if (!cleanup.removed) return "failed" as const;
+  if (cleanup.pendingFinalSweep) return "pending" as const;
+  return null;
+}
+
+function withCleanupWarning(
+  error: unknown,
+  issue: "failed" | "pending",
+) {
+  const warning = issue === "pending"
+    ? " The upload was removed, but its final safety sweep is still pending. Stop here and ask an administrator to reconcile media cleanup before selecting a replacement."
+    : " Cleanup could not be confirmed. Stop here and ask an administrator to reconcile media cleanup before selecting a replacement.";
+  if (error instanceof CmsMediaClientError) {
+    if (
+      error.message.includes("Cleanup could not be confirmed") ||
+      error.message.includes("final safety sweep is still pending")
+    ) {
+      return error;
+    }
+    return new CmsMediaClientError(
+      error.code,
+      error.stage,
+      `${error.message}${warning}`,
+      { cause: error },
+    );
+  }
+  return new CmsMediaClientError(
+    "request-failed",
+    "rollback",
+    `The image operation failed.${warning}`,
+    { cause: error },
+  );
 }
 
 export function createCmsMediaSubmissionId() {
@@ -700,15 +847,14 @@ export async function uploadPreparedCmsImage({
       (percent) => onProgress?.({ stage: "uploading", percent }),
     );
   } catch (error) {
-    if (error instanceof CmsMediaClientError && error.code === "invalid-response") {
-      await cleanupAuthorizedUpload(
-        submissionId,
-        scope,
-        authorization.publicId,
-        authorization.uploadToken,
-      );
-    }
-    throw error;
+    const cleanup = await cleanupAuthorizedUpload(
+      submissionId,
+      scope,
+      authorization.publicId,
+      authorization.uploadToken,
+    );
+    const issue = cleanupIssue(cleanup);
+    throw issue ? withCleanupWarning(error, issue) : error;
   }
 
   let providerUpload: CloudinaryUploadResult;
@@ -719,13 +865,14 @@ export async function uploadPreparedCmsImage({
       authorization.publicId,
     );
   } catch (error) {
-    await cleanupAuthorizedUpload(
+    const cleanup = await cleanupAuthorizedUpload(
       submissionId,
       scope,
       authorization.publicId,
       authorization.uploadToken,
     );
-    throw error;
+    const issue = cleanupIssue(cleanup);
+    throw issue ? withCleanupWarning(error, issue) : error;
   }
   onProgress?.({ stage: "uploading", percent: 100 });
   onProgress?.({ stage: "verifying", percent: 0 });
@@ -747,13 +894,14 @@ export async function uploadPreparedCmsImage({
     onProgress?.({ stage: "verifying", percent: 100 });
     return asset;
   } catch (error) {
-    await cleanupAuthorizedUpload(
+    const cleanup = await cleanupAuthorizedUpload(
       submissionId,
       scope,
       authorization.publicId,
       authorization.uploadToken,
     );
-    throw error;
+    const issue = cleanupIssue(cleanup);
+    throw issue ? withCleanupWarning(error, issue) : error;
   }
 }
 
@@ -762,21 +910,31 @@ async function rollbackOne(
   asset: CmsStagedMediaAsset,
 ): Promise<CmsMediaRollbackItemResult> {
   try {
-    await sameOriginJson(
-      CMS_MEDIA_UPLOAD_PATH,
-      "DELETE",
-      {
-        submissionId,
-        scope: asset.scope,
-        publicId: asset.publicId,
-        secureUrl: asset.secureUrl,
-        stagedToken: asset.stagedToken,
-      },
-      "rollback",
+    const cleanup = parseCleanupResponse(
+      await sameOriginJson(
+        CMS_MEDIA_UPLOAD_PATH,
+        "DELETE",
+        {
+          submissionId,
+          scope: asset.scope,
+          publicId: asset.publicId,
+          secureUrl: asset.secureUrl,
+          stagedToken: asset.stagedToken,
+        },
+        "rollback",
+      ),
     );
-    return { publicId: asset.publicId, removed: true };
+    return {
+      publicId: asset.publicId,
+      removed: cleanup.removed,
+      pendingFinalSweep: cleanup.pendingFinalSweep,
+    };
   } catch {
-    return { publicId: asset.publicId, removed: false };
+    return {
+      publicId: asset.publicId,
+      removed: false,
+      pendingFinalSweep: false,
+    };
   }
 }
 
@@ -794,10 +952,16 @@ export async function rollbackStagedCmsMediaAssets(
     items.push(await rollbackOne(submissionId, asset));
   }
   const removed = items.filter((item) => item.removed).length;
+  const pendingFinalSweep = items.filter(
+    (item) => item.pendingFinalSweep,
+  ).length;
+  const failed = items.length - removed;
   return {
     attempted: items.length,
     removed,
-    failed: items.length - removed,
+    failed,
+    pendingFinalSweep,
+    complete: failed === 0 && pendingFinalSweep === 0,
     items,
   };
 }
@@ -807,6 +971,7 @@ export async function uploadCmsMediaSequentially<TKey extends string = string>({
   items,
   signal,
   onProgress,
+  onStaged,
   rollbackCompletedOnError = true,
 }: UploadCmsMediaSequentiallyOptions<TKey>): Promise<
   readonly CmsMediaUploadItemResult<TKey>[]
@@ -836,15 +1001,21 @@ export async function uploadCmsMediaSequentially<TKey extends string = string>({
           });
         },
       });
-      results.push({ key: item.key, asset });
+      const result = { key: item.key, asset };
+      results.push(result);
+      onStaged?.(result);
     }
     return results;
   } catch (error) {
     if (rollbackCompletedOnError && results.length) {
-      await rollbackStagedCmsMediaAssets(
+      const rollback = await rollbackStagedCmsMediaAssets(
         submissionId,
         results.map((result) => result.asset),
       );
+      if (rollback.failed) throw withCleanupWarning(error, "failed");
+      if (rollback.pendingFinalSweep) {
+        throw withCleanupWarning(error, "pending");
+      }
     }
     throw error;
   }

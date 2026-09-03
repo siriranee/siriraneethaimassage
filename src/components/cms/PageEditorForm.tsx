@@ -68,7 +68,7 @@ function saveErrorMessage(error: unknown) {
     }
   }
 
-  return "The page draft could not be saved. Please try again.";
+  return "The page could not be saved and published. Please try again.";
 }
 
 export function PageEditorForm({
@@ -187,7 +187,7 @@ export function PageEditorForm({
       };
 
       setSaveState("saving");
-      setMessage("Saving page draft…");
+      setMessage("Saving and publishing page…");
       const response = await fetch(`/api/cms/pages/${page.id}`, {
         method: "PATCH",
         cache: "no-store",
@@ -200,7 +200,7 @@ export function PageEditorForm({
       };
 
       if (!response.ok || !result.page) {
-        throw new Error(result.error ?? "The page draft could not be saved.");
+        throw new Error(result.error ?? "The page could not be saved and published.");
       }
 
       setVersion(result.page.version);
@@ -211,8 +211,8 @@ export function PageEditorForm({
       setSaveState("saved");
       setMessage(
         page.id === "home"
-          ? "Home hero, page heading and SEO draft saved."
-          : "Page heading and SEO draft saved.",
+          ? "Home hero, page heading and SEO saved and published."
+          : "Page heading and SEO saved and published.",
       );
       router.refresh();
     } catch (error) {
@@ -340,7 +340,7 @@ export function PageEditorForm({
           ) : preparationBusy ? (
             "Preparing an image on this device…"
           ) : (
-            `Draft version ${version}${dirty ? " · unsaved changes" : ""}`
+            `Published version ${version}${dirty ? " · unsaved changes" : ""}`
           )}
         </span>
         <button disabled={locked} type="submit">
@@ -348,7 +348,7 @@ export function PageEditorForm({
             ? "Uploading…"
             : saveState === "saving"
               ? "Saving…"
-              : "Save page draft"}
+              : "Save and publish"}
         </button>
       </div>
     </form>

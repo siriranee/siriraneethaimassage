@@ -1,6 +1,6 @@
-import type { Service } from "@/content/services";
 import { siteConfig } from "@/content/site";
 import type { PublicSiteData } from "@/domain/public-site";
+import type { Service } from "@/domain/service";
 import { absoluteUrl } from "@/lib/metadata";
 
 type PostalAddressJsonLd = {

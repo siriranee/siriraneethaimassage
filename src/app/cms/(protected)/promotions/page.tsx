@@ -32,7 +32,7 @@ export default async function CmsPromotionsPage() {
           ))}
         </div>
       ) : (
-        <CmsEmptyState title="No promotions recorded">Create a draft only when the title, terms and dates can be confirmed.</CmsEmptyState>
+        <CmsEmptyState title="No promotions recorded">Create an offer only when the title, terms and dates can be confirmed.</CmsEmptyState>
       )}
     </>
   );

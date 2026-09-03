@@ -14,7 +14,7 @@ export async function GET() {
       ? {
           id: user.id,
           displayName: user.displayName,
-          email: user.email,
+          username: user.username,
           role: user.role,
         }
       : null,

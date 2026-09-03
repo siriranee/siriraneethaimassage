@@ -53,7 +53,7 @@ export function VoucherEditorForm({
       }
       setVersion(result.voucher.version);
       markSaved();
-      setFeedback({ tone: "success", text: isNew ? "Voucher draft created." : "Voucher draft saved." });
+      setFeedback({ tone: "success", text: isNew ? "Voucher created and website updated." : "Voucher saved and website updated." });
       if (isNew) router.push(`/cms/vouchers/${result.voucher.id}/edit`);
       router.refresh();
     } catch {
@@ -100,7 +100,7 @@ export function VoucherEditorForm({
               <option value="published">Published</option>
               <option value="archived">Archived</option>
             </select>
-            <small>Archived vouchers stay in the CMS but are hidden from the public website after publishing.</small>
+            <small>Changes save immediately; only Published vouchers appear on the website.</small>
           </label>
           <label className={styles.field}>
             Display order
@@ -115,10 +115,10 @@ export function VoucherEditorForm({
             <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>
               {feedback.text}
             </span>
-          ) : `Draft version ${version}${dirty ? " · unsaved changes" : ""}`}
+          ) : `Current version ${version}${dirty ? " · unsaved changes" : ""}`}
         </span>
         <button disabled={saving} type="submit">
-          {saving ? "Saving..." : isNew ? "Create voucher draft" : "Save voucher"}
+          {saving ? "Saving and publishing..." : isNew ? "Create voucher" : "Save website changes"}
         </button>
       </div>
     </form>

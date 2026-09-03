@@ -22,7 +22,7 @@ export default async function CmsNewGalleryItemPage() {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/media" secondary>Back to media</CmsPrimaryLink>}
-        description="Prepare image metadata as a draft before it can appear in a published gallery."
+        description="Add accessible image metadata and choose whether the image appears on the website after saving."
         eyebrow="Media library"
         title="Add gallery image"
       />

@@ -19,7 +19,7 @@ export default async function CmsGalleryEditPage({ params }: PageProps) {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/media" secondary>Back to media</CmsPrimaryLink>}
-        description="Edit accessible image metadata and control whether this record joins the next publication."
+        description="Edit accessible image metadata and control whether this record appears on the website after saving."
         eyebrow="Media library"
         title={item.caption}
       />

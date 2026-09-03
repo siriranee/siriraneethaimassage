@@ -2,7 +2,6 @@
 
 import {
   CalendarDays,
-  BellRing,
   ClipboardList,
   ExternalLink,
   FileImage,
@@ -11,55 +10,55 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
-  Search,
+  ShieldCheck,
   Sparkles,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { canCmsRole, getCmsRoleLabel } from "@/domain/cms/permissions";
-import type { CmsRole } from "@/domain/cms/types";
+import type { CmsNotificationBellItem, CmsRole } from "@/domain/cms/types";
 import { BrandMark } from "@/components/ui/BrandMark";
+import { CmsNotificationBell } from "./CmsNotificationBell";
 
 import styles from "./CmsShell.module.css";
 
 type CmsShellProps = {
   readonly children: ReactNode;
   readonly mode: "mock" | "mongodb";
+  readonly notifications: readonly CmsNotificationBellItem[];
   readonly user: {
     readonly displayName: string;
-    readonly email: string;
+    readonly username: string;
     readonly role: CmsRole;
   };
 };
 
 const navigation = [
   { href: "/cms", label: "Overview", icon: LayoutDashboard, permission: "dashboard:view" },
-  { href: "/cms/search", label: "Search", icon: Search, permission: "dashboard:view" },
   { href: "/cms/bookings", label: "Bookings", icon: ClipboardList, permission: "bookings:view" },
-  { href: "/cms/notifications", label: "Notifications", icon: BellRing, permission: "bookings:view" },
   { href: "/cms/calendar", label: "Calendar", icon: CalendarDays, permission: "calendar:view" },
   { href: "/cms/services", label: "Services", icon: Sparkles, permission: "content:view" },
   { href: "/cms/vouchers", label: "Vouchers", icon: Gift, permission: "content:view" },
-  { href: "/cms/content", label: "Website", icon: FileText, permission: "content:view" },
-  { href: "/cms/team", label: "Team", icon: Users, permission: "content:view" },
+  { href: "/cms/pages", label: "Pages", icon: FileText, permission: "content:view" },
   { href: "/cms/media", label: "Media", icon: FileImage, permission: "content:view" },
   { href: "/cms/settings", label: "Settings", icon: Settings, permission: "settings:view" },
+  { href: "/cms/admin", label: "Admin", icon: ShieldCheck, permission: "users:manage" },
 ] as const;
 
 function isActivePath(pathname: string, href: string) {
   return href === "/cms" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function CmsShell({ children, mode, user }: CmsShellProps) {
+export function CmsShell({ children, mode, notifications, user }: CmsShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const allowedNavigation = navigation.filter((item) =>
     canCmsRole(user.role, item.permission),
   );
+  const canViewNotifications = canCmsRole(user.role, "bookings:view");
 
   async function logOut() {
     setLoggingOut(true);
@@ -80,6 +79,14 @@ export function CmsShell({ children, mode, user }: CmsShellProps) {
       <a className={styles.skipLink} href="#cms-main">
         Skip to CMS content
       </a>
+
+      {canViewNotifications ? (
+        <CmsNotificationBell
+          items={notifications}
+          offsetForBanner={mode === "mock"}
+          placement="desktop"
+        />
+      ) : null}
 
       <aside className={styles.sidebar}>
         <Link aria-label="Siriranee CMS overview" className={styles.brand} href="/cms">
@@ -116,7 +123,7 @@ export function CmsShell({ children, mode, user }: CmsShellProps) {
             </span>
             <div>
               <strong>{user.displayName}</strong>
-              <small>{getCmsRoleLabel(user.role)}</small>
+              <small>@{user.username} · {getCmsRoleLabel(user.role)}</small>
             </div>
           </div>
           <Link href="/" rel="noreferrer" target="_blank">
@@ -161,6 +168,9 @@ export function CmsShell({ children, mode, user }: CmsShellProps) {
             >
               <LogOut aria-hidden="true" />
             </button>
+            {canViewNotifications ? (
+              <CmsNotificationBell items={notifications} placement="mobile" />
+            ) : null}
           </div>
         </header>
 

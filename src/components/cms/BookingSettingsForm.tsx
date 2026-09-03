@@ -66,7 +66,7 @@ export function BookingSettingsForm({
       setVersion(result.bookingSettings.version);
       setRulesConfirmed(result.bookingSettings.rulesConfirmed);
       setPublicBookingEnabled(result.bookingSettings.publicBookingEnabled);
-      setFeedback({ tone: "success", text: "Booking rules saved to the draft." });
+      setFeedback({ tone: "success", text: "Booking rules saved and published." });
       router.refresh();
     } catch {
       setFeedback({ tone: "error", text: "The CMS could not be reached. Please try again." });
@@ -122,8 +122,8 @@ export function BookingSettingsForm({
               Enable public date and time booking
               <small>
                 {canEnablePublicBooking
-                  ? "This saves the owner decision to the draft. Server-side privacy, notification, monitoring and recovery gates must also pass before booking becomes live."
-                  : "Confirm both the opening hours and booking rules before enabling this draft setting."}
+                  ? "This publishes the owner decision immediately. The server booking switch, MongoDB and customer-data encryption must also be ready."
+                  : "Confirm both the opening hours and booking rules before enabling this setting."}
               </small>
             </span>
           </label>
@@ -131,8 +131,8 @@ export function BookingSettingsForm({
       </section>
 
       <div className={styles.saveBar}>
-        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Draft version ${version}`}</span>
-        <button disabled={saving} type="submit">{saving ? "Saving..." : "Save booking rules"}</button>
+        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Published version ${version}`}</span>
+        <button disabled={saving} type="submit">{saving ? "Saving and publishing..." : "Save and publish booking rules"}</button>
       </div>
     </form>
   );

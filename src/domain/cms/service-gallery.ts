@@ -1,14 +1,10 @@
-export const CMS_CONTENT_SCHEMA_VERSION = 4 as const;
 export const MAX_SERVICE_GALLERY_IMAGES = 10;
-export const DEFAULT_SERVICE_GALLERY_FOCAL_POSITION = 50;
 
 export type CmsServiceGalleryImage = {
   readonly id: string;
   readonly imageUrl: string;
   readonly altText: string;
   readonly caption: string;
-  readonly focalX: number;
-  readonly focalY: number;
 };
 
 export class CmsServiceGalleryValidationError extends Error {
@@ -41,24 +37,6 @@ function galleryText(
   }
 
   return result;
-}
-
-function galleryInteger(
-  value: unknown,
-  field: string,
-  minimum: number,
-  maximum: number,
-) {
-  const parsed = typeof value === "number" ? value : Number(value);
-
-  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
-    throw new CmsServiceGalleryValidationError(
-      "Please check the treatment gallery fields.",
-      { [field]: `Use a whole number from ${minimum} to ${maximum}.` },
-    );
-  }
-
-  return parsed;
 }
 
 export function parseServiceGalleryImageUrl(value: unknown, field: string) {
@@ -156,18 +134,6 @@ export function parseCmsServiceGalleryImages(
         galleryField(index, "caption"),
         2,
         240,
-      ),
-      focalX: galleryInteger(
-        source.focalX,
-        galleryField(index, "focalX"),
-        0,
-        100,
-      ),
-      focalY: galleryInteger(
-        source.focalY,
-        galleryField(index, "focalY"),
-        0,
-        100,
       ),
     } satisfies CmsServiceGalleryImage;
   });

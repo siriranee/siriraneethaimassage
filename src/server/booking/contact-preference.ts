@@ -18,9 +18,7 @@ export async function resolvePublishedAppointmentPreference(
 
   const content = await getPublishedCmsContent();
   const service = content.services.find(
-    (candidate) =>
-      candidate.status === "published" &&
-      candidate.slug === input.serviceSlug,
+    (candidate) => candidate.slug === input.serviceSlug,
   );
   const price = service?.prices.find(
     (candidate) =>

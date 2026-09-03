@@ -99,6 +99,7 @@
   z-index: 1;
   display: grid;
   gap: 0.35rem;
+  padding-bottom: 1.25rem;
   margin-top: 1.35rem;
 }
 
@@ -186,8 +187,11 @@
 }
 
 .identity small {
+  overflow: hidden;
   color: rgb(var(--color-surface-rgb) / 0.55);
   font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebarFooter > a,
@@ -253,7 +257,7 @@
 .main {
   width: calc(100% - 3.5rem);
   margin-inline: auto;
-  padding: 2.5rem 0 5rem;
+  padding: 5.25rem 0 5rem;
 }
 
 @media (max-width: 980px) {
@@ -270,6 +274,8 @@
   }
 
   .mobileHeader {
+    position: relative;
+    z-index: 30;
     display: flex;
     min-height: 4.5rem;
     align-items: center;

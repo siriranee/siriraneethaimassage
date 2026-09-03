@@ -2,33 +2,28 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import type {
-  CmsBookingSettings,
-  CmsContentState,
-  CmsGalleryRecord,
-  CmsPageId,
-  CmsPageRecord,
-  CmsPublication,
-  CmsPromotionRecord,
-  CmsServiceRecord,
-  CmsSiteSettings,
-  CmsTeamRecord,
-  CmsUser,
-  CmsVoucherRecord,
-} from "@/domain/cms/types";
-import { migrateLegacyHomeHeroSlides } from "@/content/home-hero";
-import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
-import {
-  CmsPageHeroValidationError,
-  normaliseStoredPageHeroSlides,
-  parseCmsPageHeroSlides,
-} from "@/domain/cms/page-hero";
 import {
   CMS_CONTENT_SCHEMA_VERSION,
-  CmsServiceGalleryValidationError,
-  normaliseStoredServiceGalleryImages,
-  parseCmsServiceGalleryImages,
-} from "@/domain/cms/service-gallery";
+  type CmsBookingSettings,
+  type CmsContentState,
+  type CmsGalleryRecord,
+  type CmsPageId,
+  type CmsPageRecord,
+  type CmsPublication,
+  type CmsPromotionRecord,
+  type CmsServiceRecord,
+  type CmsSiteSettings,
+  type CmsTeamRecord,
+  type CmsUser,
+  type CmsVoucherRecord,
+} from "@/domain/cms/types";
+import { migrateLegacyHomeHeroSlides } from "@/content/home-hero";
+import { normaliseStoredPageHeroSlides } from "@/domain/cms/page-hero";
+import { normaliseStoredServiceGalleryImages } from "@/domain/cms/service-gallery";
+import {
+  normaliseStoredServiceHero,
+  type CmsServiceHero,
+} from "@/domain/cms/service-hero";
 import { appendCmsAudit } from "@/server/cms/audit";
 import { getCmsMode } from "@/server/cms/config";
 import {
@@ -52,6 +47,7 @@ import {
   parseVoucherUpdate,
 } from "@/server/cms/content-validation";
 import { CmsConflictError, getCmsRepository } from "@/server/cms/repositories";
+import type { CmsRepository } from "@/server/cms/repositories/repository";
 import type { CmsMediaSubmission } from "@/server/media/submission";
 import {
   assertCmsContentMediaReferencesApproved,
@@ -64,6 +60,184 @@ type MutationContext = {
   readonly mediaSubmission?: CmsMediaSubmission | null;
 };
 
+type CmsPublicationTarget =
+  | {
+      readonly section:
+        | "services"
+        | "pages"
+        | "team"
+        | "gallery"
+        | "promotions"
+        | "vouchers";
+      readonly entityId: string;
+    }
+  | {
+      readonly section:
+        | "site"
+        | "bookingSettings";
+    };
+
+function legacyServiceHero(
+  service: CmsServiceRecord,
+): CmsServiceHero {
+  return {
+    imageUrl: service.imageUrl,
+    altText: service.imageAlt,
+  };
+}
+
+function assertServiceReadyForPublication(service: CmsServiceRecord) {
+  if (!service.prices.some((price) => price.active)) {
+    throw new CmsValidationError(
+      "Add at least one available appointment option before saving.",
+      { prices: "Turn on at least one duration and price." },
+    );
+  }
+}
+
+function replacePublishedService(
+  services: readonly CmsServiceRecord[],
+  nextService: CmsServiceRecord,
+) {
+  let replaced = false;
+  const nextServices = services.flatMap((service) => {
+    if (service.id !== nextService.id && service.slug !== nextService.slug) {
+      return [service];
+    }
+    if (replaced) return [];
+    replaced = true;
+    return [nextService];
+  });
+
+  return replaced ? nextServices : [...nextServices, nextService];
+}
+
+function replacePublishedRecord<T extends { readonly id: string }>(
+  records: readonly T[],
+  nextRecord: T,
+) {
+  return records.some((record) => record.id === nextRecord.id)
+    ? records.map((record) =>
+        record.id === nextRecord.id ? nextRecord : record,
+      )
+    : [...records, nextRecord];
+}
+
+function createImmediatePublicationSnapshot(
+  publicBase: CmsContentState,
+  content: CmsContentState,
+  target: CmsPublicationTarget,
+) {
+  const snapshotBase: CmsContentState = {
+    ...structuredClone(publicBase),
+    schemaVersion: CMS_CONTENT_SCHEMA_VERSION,
+    revision: content.revision,
+    updatedAt: content.updatedAt,
+    updatedBy: content.updatedBy,
+  };
+
+  switch (target.section) {
+    case "services": {
+      const service = content.services.find(
+        (item) => item.id === target.entityId,
+      );
+      if (!service) throw new Error("Service not found after saving.");
+      assertServiceReadyForPublication(service);
+      return {
+        ...snapshotBase,
+        services: replacePublishedService(publicBase.services, service),
+      };
+    }
+    case "site":
+      return { ...snapshotBase, site: structuredClone(content.site) };
+    case "bookingSettings":
+      return {
+        ...snapshotBase,
+        bookingSettings: structuredClone(content.bookingSettings),
+      };
+    case "pages": {
+      const page = content.pages?.find(
+        (item) => item.id === target.entityId,
+      );
+      if (!page) throw new Error("Page not found after saving.");
+      return {
+        ...snapshotBase,
+        pages: replacePublishedRecord(publicBase.pages ?? [], page),
+      };
+    }
+    case "team": {
+      const member = content.team.find(
+        (item) => item.id === target.entityId,
+      );
+      if (!member) throw new Error("Team member not found after saving.");
+      return {
+        ...snapshotBase,
+        team: replacePublishedRecord(publicBase.team, member),
+      };
+    }
+    case "gallery": {
+      const item = content.gallery.find(
+        (record) => record.id === target.entityId,
+      );
+      if (!item) throw new Error("Gallery item not found after saving.");
+      return {
+        ...snapshotBase,
+        gallery: replacePublishedRecord(publicBase.gallery, item),
+      };
+    }
+    case "promotions": {
+      const promotion = content.promotions.find(
+        (item) => item.id === target.entityId,
+      );
+      if (!promotion) throw new Error("Promotion not found after saving.");
+      return {
+        ...snapshotBase,
+        promotions: replacePublishedRecord(
+          publicBase.promotions,
+          promotion,
+        ),
+      };
+    }
+    case "vouchers": {
+      const voucher = content.vouchers?.find(
+        (item) => item.id === target.entityId,
+      );
+      if (!voucher) throw new Error("Voucher not found after saving.");
+      return {
+        ...snapshotBase,
+        vouchers: replacePublishedRecord(publicBase.vouchers ?? [], voucher),
+      };
+    }
+  }
+}
+
+async function publishContentImmediately(
+  repository: CmsRepository,
+  content: CmsContentState,
+  target: CmsPublicationTarget,
+  context: MutationContext,
+) {
+  const currentPublication = await repository.getPublishedContent();
+  const publicBase = currentPublication
+    ? normalisePublishedCmsContent(currentPublication.snapshot)
+    : createSafePublicContentState();
+  const snapshot = createImmediatePublicationSnapshot(
+    publicBase,
+    content,
+    target,
+  );
+
+  assertCmsContentMediaReferencesApproved(snapshot);
+  const publication: CmsPublication = {
+    id: randomUUID(),
+    revision: content.revision,
+    publishedAt: new Date().toISOString(),
+    publishedBy: context.actor.id,
+    snapshot,
+  };
+  await repository.savePublication(publication);
+}
+
 async function mutateContent(
   context: MutationContext,
   action: string,
@@ -71,6 +245,7 @@ async function mutateContent(
   entityId: string,
   summary: string,
   update: (current: CmsContentState) => CmsContentState,
+  publicationTarget: CmsPublicationTarget,
 ) {
   const repository = getCmsRepository();
 
@@ -87,6 +262,12 @@ async function mutateContent(
       requestId: context.requestId,
     });
     await transaction.saveContent(next, storedCurrent.revision);
+    await publishContentImmediately(
+      transaction,
+      next,
+      publicationTarget,
+      context,
+    );
     await appendCmsAudit(transaction, {
       actor: context.actor,
       action,
@@ -115,9 +296,6 @@ function normaliseCmsContent(content: CmsContentState): CmsContentState {
     !content.site.phoneE164.trim();
   const migrateConfirmedWhatsapp =
     storedSchemaVersion < 4 && !content.site.whatsappNumber.trim();
-  const defaultServicesBySlug = new Map(
-    defaults.services.map((service) => [service.slug, service] as const),
-  );
   const mode = getCmsMode();
   const fallbackVouchers = mode === "mock" ? defaults.vouchers : [];
   const defaultPages = defaults.pages ?? [];
@@ -142,18 +320,42 @@ function normaliseCmsContent(content: CmsContentState): CmsContentState {
     };
   });
   const services = content.services.map((service) => {
-    const storedGallery = (
-      service as CmsServiceRecord & { readonly galleryImages?: unknown }
-    ).galleryImages;
-    const fallbackGallery =
-      defaultServicesBySlug.get(service.slug)?.galleryImages ?? [];
+    const storedService = service as CmsServiceRecord & {
+      readonly galleryImages?: unknown;
+      readonly hero?: unknown;
+      readonly priceNote?: unknown;
+    };
+    const fallbackHero = legacyServiceHero(service);
+    const hero =
+      storedSchemaVersion < 5
+        ? fallbackHero
+        : normaliseStoredServiceHero(storedService.hero, fallbackHero);
 
     return {
-      ...service,
+      id: service.id,
+      slug: service.slug,
+      name: service.name,
+      shortDescription: service.shortDescription,
+      longDescription: service.longDescription,
+      imageUrl: service.imageUrl,
+      imageAlt: service.imageAlt,
+      hero,
       galleryImages: normaliseStoredServiceGalleryImages(
-        storedGallery,
-        fallbackGallery,
+        storedService.galleryImages,
+        [],
       ),
+      prices: service.prices,
+      idealFor: service.idealFor,
+      highlights: service.highlights,
+      priceNote:
+        typeof storedService.priceNote === "string"
+          ? storedService.priceNote
+          : "",
+      seoTitle: service.seoTitle,
+      seoDescription: service.seoDescription,
+      version: service.version,
+      createdAt: service.createdAt,
+      updatedAt: service.updatedAt,
     };
   });
 
@@ -181,11 +383,17 @@ function normaliseCmsContent(content: CmsContentState): CmsContentState {
   };
 }
 
-export class CmsPublicContentUnavailableError extends Error {
-  constructor(cause: unknown) {
-    super("Published website content is temporarily unavailable.", { cause });
-    this.name = "CmsPublicContentUnavailableError";
-  }
+function normalisePublishedCmsContent(content: CmsContentState) {
+  const services =
+    content.schemaVersion < 6
+      ? content.services.filter(
+          (service) =>
+            (service as CmsServiceRecord & { readonly status?: unknown }).status ===
+            "published",
+        )
+      : content.services;
+
+  return normaliseCmsContent({ ...content, services });
 }
 
 export async function getPublishedCmsContent() {
@@ -194,189 +402,15 @@ export async function getPublishedCmsContent() {
 
   try {
     const publication = await getCmsRepository().getPublishedContent();
-    if (publication) return normaliseCmsContent(publication.snapshot);
+    if (publication) return normalisePublishedCmsContent(publication.snapshot);
 
     return mode === "mock"
       ? createDefaultContentState()
       : createSafePublicContentState();
-  } catch (error) {
+  } catch {
     if (mode === "mock") return createDefaultContentState();
-    throw new CmsPublicContentUnavailableError(error);
+    return createSafePublicContentState();
   }
-}
-
-function contentChanged(first: unknown, second: unknown) {
-  return JSON.stringify(first) !== JSON.stringify(second);
-}
-
-export function inspectCmsPublishReadiness(content: CmsContentState) {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  const publishedServices = content.services.filter((service) => service.status === "published");
-  const slugs = content.services.map((service) => service.slug.toLowerCase());
-
-  if (!publishedServices.length) errors.push("Publish at least one treatment.");
-  if (new Set(slugs).size !== slugs.length) errors.push("Treatment URL slugs must be unique.");
-  if (publishedServices.some((service) => !service.prices.some((price) => price.active))) {
-    errors.push("Every published treatment needs an active duration and price.");
-  }
-  if (publishedServices.some((service) => !service.imageAlt.trim())) {
-    errors.push("Every published treatment needs descriptive image alternative text.");
-  }
-  for (const service of publishedServices) {
-    try {
-      parseCmsServiceGalleryImages(service.galleryImages);
-    } catch (error) {
-      errors.push(
-        error instanceof CmsServiceGalleryValidationError
-          ? `${service.name}: ${error.message}`
-          : `${service.name}: the treatment gallery is invalid.`,
-      );
-    }
-  }
-  const homePage = content.pages?.find((page) => page.id === "home");
-  try {
-    parseCmsPageHeroSlides(homePage?.heroSlides);
-  } catch (error) {
-    errors.push(
-      error instanceof CmsPageHeroValidationError
-        ? error.message
-        : "The home hero slides are invalid.",
-    );
-  }
-  if (
-    homePage?.heroSlides?.some(
-      (slide) =>
-        slide.imageUrl.startsWith("https://") &&
-        !isApprovedPublicImageUrl(slide.imageUrl),
-    )
-  ) {
-    warnings.push(
-      "Remote home hero images remain hidden until a media provider is approved.",
-    );
-  }
-  if (
-    publishedServices.some((service) =>
-      [service.imageUrl, ...service.galleryImages.map((image) => image.imageUrl)]
-        .some(
-          (imageUrl) =>
-            imageUrl.startsWith("https://") &&
-            !isApprovedPublicImageUrl(imageUrl),
-        ),
-    )
-  ) {
-    warnings.push(
-      "Unapproved remote treatment images remain hidden.",
-    );
-  }
-  if (!content.site.openingHoursConfirmed) {
-    warnings.push("Opening hours are still marked as provisional.");
-  }
-  if (!content.site.phoneConfirmed) {
-    warnings.push("The public phone number is hidden until the owner confirms it.");
-  }
-  if (!content.bookingSettings.rulesConfirmed) {
-    warnings.push("Booking capacity, notice and buffer rules still need owner confirmation.");
-  }
-  if (!content.site.email) warnings.push("No public email address is configured.");
-  if (!content.site.whatsappNumber) warnings.push("WhatsApp is not configured.");
-  if (
-    content.gallery.some(
-      (item) =>
-        item.published &&
-        item.imageUrl.startsWith("https://") &&
-        !isApprovedPublicImageUrl(item.imageUrl),
-    )
-  ) {
-    warnings.push("Remote gallery images remain hidden until a media provider is approved.");
-  }
-  if (!content.team.some((member) => member.publicProfile)) {
-    warnings.push("No team profile is selected for public display.");
-  }
-
-  return { errors, warnings } as const;
-}
-
-export async function getCmsPublicationPreview() {
-  const repository = getCmsRepository();
-  const [draft, publishedRecord, history] = await Promise.all([
-    repository.getContent().then(normaliseCmsContent),
-    repository.getPublishedContent(),
-    repository.listPublications(20),
-  ]);
-  const published = publishedRecord
-    ? {
-        ...publishedRecord,
-        snapshot: normaliseCmsContent(publishedRecord.snapshot),
-      }
-    : null;
-  const snapshot = published?.snapshot;
-  const changes = [
-    { key: "services", label: "Treatments and prices", changed: contentChanged(draft.services, snapshot?.services) },
-    { key: "business", label: "Business details and SEO", changed: contentChanged(draft.site, snapshot?.site) },
-    { key: "booking", label: "Booking rules", changed: contentChanged(draft.bookingSettings, snapshot?.bookingSettings) },
-    { key: "team", label: "Team profiles", changed: contentChanged(draft.team, snapshot?.team) },
-    { key: "promotions", label: "Promotions", changed: contentChanged(draft.promotions, snapshot?.promotions) },
-    { key: "vouchers", label: "Gift vouchers", changed: contentChanged(draft.vouchers, snapshot?.vouchers ?? []) },
-    { key: "gallery", label: "Gallery", changed: contentChanged(draft.gallery, snapshot?.gallery) },
-    { key: "pages", label: "Page headings and SEO", changed: contentChanged(draft.pages, snapshot?.pages) },
-  ];
-
-  return {
-    draft,
-    published,
-    history,
-    changes,
-    readiness: inspectCmsPublishReadiness(draft),
-  };
-}
-
-export async function restoreCmsPublicationToDraft(
-  publicationId: string,
-  expectedRevision: number,
-  context: MutationContext,
-) {
-  const repository = getCmsRepository();
-  return repository.transaction(async (transaction) => {
-    const [storedCurrent, publication] = await Promise.all([
-      transaction.getContent(),
-      transaction.getPublication(publicationId),
-    ]);
-    const current = normaliseCmsContent(storedCurrent);
-    if (!publication) throw new Error("Publication not found.");
-    if (current.revision !== expectedRevision) throw new CmsConflictError();
-
-    const publishedSnapshot = normaliseCmsContent(publication.snapshot);
-    const restored: CmsContentState = {
-      ...structuredClone(publishedSnapshot),
-      id: current.id,
-      schemaVersion: CMS_CONTENT_SCHEMA_VERSION,
-      revision: current.revision + 1,
-      site: {
-        ...structuredClone(publishedSnapshot.site),
-        phoneDisplay: current.site.phoneDisplay,
-        phoneE164: current.site.phoneE164,
-        phoneConfirmed: current.site.phoneConfirmed,
-        weeklyHours: current.site.weeklyHours,
-        openingHoursConfirmed: current.site.openingHoursConfirmed,
-      },
-      bookingSettings: current.bookingSettings,
-      updatedAt: new Date().toISOString(),
-      updatedBy: context.actor.id,
-    };
-
-    assertCmsContentMediaReferencesApproved(restored);
-    await transaction.saveContent(restored, storedCurrent.revision);
-    await appendCmsAudit(transaction, {
-      actor: context.actor,
-      action: "content.restored-to-draft",
-      entityType: "publication",
-      entityId: publication.id,
-      summary: `Restored website publication revision ${publication.revision} as new draft revision ${restored.revision}.`,
-      requestId: context.requestId,
-    });
-    return restored;
-  });
 }
 
 export async function createCmsService(
@@ -391,7 +425,7 @@ export async function createCmsService(
     "service.created",
     "service",
     serviceId,
-    "Created a new treatment draft.",
+    "Created and published a new treatment.",
     (current) => {
       created = parseServiceCreate(input, serviceId);
       const slug = created.slug.toLowerCase();
@@ -410,6 +444,7 @@ export async function createCmsService(
         updatedBy: context.actor.id,
       };
     },
+    { section: "services", entityId: serviceId },
   );
 
   return created!;
@@ -445,6 +480,7 @@ export async function updateCmsPage(
         updatedBy: context.actor.id,
       };
     },
+    { section: "pages", entityId: pageId },
   );
   return updated!;
 }
@@ -462,13 +498,13 @@ export async function updateCmsService(
     "service.updated",
     "service",
     serviceId,
-    "Updated treatment content, pricing or publication status.",
+    "Updated and published treatment content and pricing.",
     (current) => {
       const existing = current.services.find((service) => service.id === serviceId);
 
       if (!existing) throw new Error("Service not found.");
       if (existing.version !== expectedVersion) {
-        throw new Error("This service was changed by another request.");
+        throw new CmsConflictError();
       }
 
       updated = parseServiceUpdate(input, existing);
@@ -482,6 +518,7 @@ export async function updateCmsService(
         updatedBy: context.actor.id,
       };
     },
+    { section: "services", entityId: serviceId },
   );
 
   return updated!;
@@ -514,6 +551,7 @@ export async function updateCmsSiteSettings(
         updatedBy: context.actor.id,
       };
     },
+    { section: "site" },
   );
 
   return updated!;
@@ -550,6 +588,7 @@ export async function updateCmsBookingSettings(
         updatedBy: context.actor.id,
       };
     },
+    { section: "bookingSettings" },
   );
 
   return updated!;
@@ -588,6 +627,7 @@ export async function updateCmsTeamMember(
         updatedBy: context.actor.id,
       };
     },
+    { section: "team", entityId: memberId },
   );
 
   return updated!;
@@ -605,7 +645,7 @@ export async function createCmsTeamMember(
     "team.created",
     "team-member",
     memberId,
-    "Created a new team profile draft.",
+    "Created and published a new team profile.",
     (current) => {
       created = parseTeamCreate(input, memberId);
       return {
@@ -616,6 +656,7 @@ export async function createCmsTeamMember(
         updatedBy: context.actor.id,
       };
     },
+    { section: "team", entityId: memberId },
   );
 
   return created!;
@@ -644,6 +685,7 @@ export async function createCmsGalleryItem(
         updatedBy: context.actor.id,
       };
     },
+    { section: "gallery", entityId: itemId },
   );
 
   return created!;
@@ -678,6 +720,7 @@ export async function updateCmsGalleryItem(
         updatedBy: context.actor.id,
       };
     },
+    { section: "gallery", entityId: itemId },
   );
 
   return updated!;
@@ -695,7 +738,7 @@ export async function createCmsPromotion(
     "promotion.created",
     "promotion",
     promotionId,
-    "Created a promotion draft.",
+    "Created and published a promotion record.",
     (current) => {
       created = parsePromotionCreate(input, promotionId);
       return {
@@ -706,6 +749,7 @@ export async function createCmsPromotion(
         updatedBy: context.actor.id,
       };
     },
+    { section: "promotions", entityId: promotionId },
   );
   return created!;
 }
@@ -723,7 +767,7 @@ export async function updateCmsPromotion(
     "promotion.updated",
     "promotion",
     promotionId,
-    "Updated a promotion draft.",
+    "Updated and published a promotion record.",
     (current) => {
       const existing = current.promotions.find((item) => item.id === promotionId);
       if (!existing) throw new Error("Promotion not found.");
@@ -737,6 +781,7 @@ export async function updateCmsPromotion(
         updatedBy: context.actor.id,
       };
     },
+    { section: "promotions", entityId: promotionId },
   );
   return updated!;
 }
@@ -753,7 +798,7 @@ export async function createCmsVoucher(
     "voucher.created",
     "voucher",
     voucherId,
-    "Created a gift voucher draft.",
+    "Created and published a gift voucher record.",
     (current) => {
       created = parseVoucherCreate(input, voucherId);
       return {
@@ -764,6 +809,7 @@ export async function createCmsVoucher(
         updatedBy: context.actor.id,
       };
     },
+    { section: "vouchers", entityId: voucherId },
   );
   return created!;
 }
@@ -781,7 +827,7 @@ export async function updateCmsVoucher(
     "voucher.updated",
     "voucher",
     voucherId,
-    "Updated a gift voucher draft.",
+    "Updated and published a gift voucher record.",
     (current) => {
       const vouchers = current.vouchers ?? [];
       const existing = vouchers.find((item) => item.id === voucherId);
@@ -796,39 +842,7 @@ export async function updateCmsVoucher(
         updatedBy: context.actor.id,
       };
     },
+    { section: "vouchers", entityId: voucherId },
   );
   return updated!;
-}
-
-export async function publishCmsContent(context: MutationContext) {
-  const repository = getCmsRepository();
-
-  return repository.transaction(async (transaction) => {
-    const current = normaliseCmsContent(await transaction.getContent());
-
-    assertCmsContentMediaReferencesApproved(current);
-
-    const readiness = inspectCmsPublishReadiness(current);
-    if (readiness.errors.length) throw new CmsValidationError(readiness.errors[0]);
-
-    const publication: CmsPublication = {
-      id: randomUUID(),
-      revision: current.revision,
-      publishedAt: new Date().toISOString(),
-      publishedBy: context.actor.id,
-      snapshot: structuredClone(current),
-    };
-
-    await transaction.savePublication(publication);
-    await appendCmsAudit(transaction, {
-      actor: context.actor,
-      action: "content.published",
-      entityType: "publication",
-      entityId: publication.id,
-      summary: `Published website content revision ${current.revision}.`,
-      requestId: context.requestId,
-    });
-
-    return publication;
-  });
 }

@@ -44,7 +44,7 @@ export default async function CmsMediaPage() {
             <article className={styles.serviceCard} key={item.id}>
               <div className={styles.serviceTop}>
                 <span>Gallery image</span>
-                <CmsStatusBadge label={item.published ? "Ready to publish" : "Draft only"} tone={item.published ? "success" : "warning"} />
+                <CmsStatusBadge label={item.published ? "Visible" : "Hidden"} tone={item.published ? "success" : "warning"} />
               </div>
               <span className={styles.cardIcon}><FileImage aria-hidden="true" /></span>
               <h2>{item.caption}</h2>

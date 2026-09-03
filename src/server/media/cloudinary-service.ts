@@ -27,11 +27,17 @@ import {
   isOwnedCloudinaryPublicId,
   parseCmsCloudinarySecureUrl,
 } from "@/server/media/references";
-import { parseCmsMediaSubmission } from "@/server/media/submission";
+import { verifyCloudinaryUploadResponseSignature } from "@/server/media/response-signature";
+import {
+  parseCmsMediaSubmission,
+  type CmsMediaSubmission,
+} from "@/server/media/submission";
 import {
   issueCmsMediaStagedToken,
   issueCmsMediaUploadToken,
+  verifyCmsMediaStagedCleanupCapability,
   verifyCmsMediaStagedToken,
+  verifyCmsMediaUploadCleanupCapability,
   verifyCmsMediaUploadToken,
 } from "@/server/media/tokens";
 
@@ -43,7 +49,16 @@ export class CmsMediaProviderError extends Error {
 }
 
 export class CmsMediaStateError extends Error {
-  constructor(message: string) {
+  constructor(
+    readonly code:
+      | "not-authorized"
+      | "already-processed"
+      | "committed"
+      | "referenced"
+      | "state-changed"
+      | "not-expired",
+    message: string,
+  ) {
     super(message);
     this.name = "CmsMediaStateError";
   }
@@ -267,14 +282,14 @@ function parseCompletedUpload(
     format,
     version,
   });
-  const utils = cloudinaryClient(config).utils as typeof cloudinary.utils & {
-    verify_api_response_signature(
-      responsePublicId: string,
-      responseVersion: number,
-      responseSignature: string,
-    ): boolean;
-  };
-  if (!utils.verify_api_response_signature(publicId, version, signature)) {
+  if (
+    !verifyCloudinaryUploadResponseSignature({
+      apiSecret: config.apiSecret,
+      publicId,
+      version,
+      signature,
+    })
+  ) {
     throw new CmsMediaValidationError("The upload response signature is invalid.");
   }
 
@@ -365,7 +380,10 @@ export async function completeCmsMediaUpload(
     let record: CmsMediaAsset;
 
     if (!existing) {
-      throw new CmsMediaStateError("This image upload was not authorized.");
+      throw new CmsMediaStateError(
+        "not-authorized",
+        "This image upload was not authorized.",
+      );
     }
 
     if (existing.status === "staged") {
@@ -381,7 +399,10 @@ export async function completeCmsMediaUpload(
         existing.width !== completed.width ||
         existing.height !== completed.height
       ) {
-        throw new CmsMediaStateError("This image upload has already been processed.");
+        throw new CmsMediaStateError(
+          "already-processed",
+          "This image upload has already been processed.",
+        );
       }
 
       record = {
@@ -398,7 +419,10 @@ export async function completeCmsMediaUpload(
         existing.submissionId !== submissionId ||
         existing.scope !== scope
       ) {
-        throw new CmsMediaStateError("This image upload has already been processed.");
+        throw new CmsMediaStateError(
+          "already-processed",
+          "This image upload has already been processed.",
+        );
       }
 
       record = {
@@ -510,10 +534,16 @@ async function deleteRegisteredCmsMediaAsset(
     if (!record || record.status === "deleted") return null;
     assertRecord(record);
     if (record.status === "committed") {
-      throw new CmsMediaStateError("Images used by CMS content cannot be deleted here.");
+      throw new CmsMediaStateError(
+        "committed",
+        "Images used by CMS content cannot be deleted here.",
+      );
     }
     if (await transaction.isMediaAssetReferenced(record.publicId, record.secureUrl)) {
-      throw new CmsMediaStateError("Images referenced by CMS content cannot be deleted.");
+      throw new CmsMediaStateError(
+        "referenced",
+        "Images referenced by CMS content cannot be deleted.",
+      );
     }
     if (record.status === "deleting") return record;
 
@@ -565,7 +595,10 @@ async function deleteRegisteredCmsMediaAsset(
     const current = await transaction.getMediaAsset(prepared.publicId);
     if (!current || current.status === "deleted") return;
     if (current.status !== "deleting") {
-      throw new CmsMediaStateError("The image cleanup state changed. Try again.");
+      throw new CmsMediaStateError(
+        "state-changed",
+        "The image cleanup state changed. Try again.",
+      );
     }
     const now = new Date().toISOString();
     if (current.providerSignatureExpiresAt > now) {
@@ -611,9 +644,10 @@ async function deleteRegisteredCmsMediaAsset(
   } as const;
 }
 
-export async function cleanupCmsMediaUpload(
+async function cleanupCmsMediaUploadInternal(
   value: unknown,
-  actor: Pick<CmsUser, "id" | "displayName">,
+  authenticatedActor: Pick<CmsUser, "id" | "displayName"> | null,
+  capabilityUserId: string | null,
   requestId?: string,
   provider: CmsCloudinaryProvider = defaultCloudinaryProvider,
 ) {
@@ -623,31 +657,60 @@ export async function cleanupCmsMediaUpload(
   if (!isOwnedCloudinaryPublicId(asset.publicId, config.folder)) {
     throw new CmsMediaValidationError("The staged image is not owned by this website.");
   }
-  let stagedClaims: ReturnType<typeof verifyCmsMediaStagedToken> | null = null;
+  let stagedClaims: ReturnType<
+    typeof verifyCmsMediaStagedCleanupCapability
+  > | null = null;
+  let signedUserId: string;
   if (authorization.kind === "staged") {
-    stagedClaims = verifyCmsMediaStagedToken(
-      authorization.token,
-      {
-        userId: actor.id,
-        submissionId,
-        scope: asset.scope,
-        publicId: asset.publicId,
-        secureUrl: asset.secureUrl,
-      },
-      config.tokenSecret,
-    );
+    const expected = {
+      submissionId,
+      scope: asset.scope,
+      publicId: asset.publicId,
+      secureUrl: asset.secureUrl,
+    } as const;
+    stagedClaims = authenticatedActor
+      ? verifyCmsMediaStagedToken(
+          authorization.token,
+          { ...expected, userId: authenticatedActor.id },
+          config.tokenSecret,
+        )
+      : verifyCmsMediaStagedCleanupCapability(
+          authorization.token,
+          expected,
+          config.tokenSecret,
+        );
+    signedUserId = stagedClaims.userId;
   } else {
-    verifyCmsMediaUploadToken(
-      authorization.token,
-      {
-        userId: actor.id,
-        submissionId,
-        scope: asset.scope,
-        publicId: asset.publicId,
-      },
-      config.tokenSecret,
+    const expected = {
+      submissionId,
+      scope: asset.scope,
+      publicId: asset.publicId,
+    } as const;
+    const uploadClaims = authenticatedActor
+      ? verifyCmsMediaUploadToken(
+          authorization.token,
+          { ...expected, userId: authenticatedActor.id },
+          config.tokenSecret,
+        )
+      : verifyCmsMediaUploadCleanupCapability(
+          authorization.token,
+          expected,
+          config.tokenSecret,
+        );
+    signedUserId = uploadClaims.userId;
+  }
+  if (
+    !authenticatedActor &&
+    (!capabilityUserId || capabilityUserId !== signedUserId)
+  ) {
+    throw new CmsMediaValidationError(
+      "The staged image authorization is invalid or has expired. Upload the image again.",
     );
   }
+  const actor = authenticatedActor ?? {
+    id: signedUserId,
+    displayName: "Signed CMS media cleanup",
+  };
 
   return deleteRegisteredCmsMediaAsset(
     asset.publicId,
@@ -660,14 +723,152 @@ export async function cleanupCmsMediaUpload(
         record.submissionId !== submissionId ||
         record.scope !== asset.scope ||
         (authorization.kind === "staged" &&
-          (record.secureUrl !== asset.secureUrl ||
-            record.providerAssetId !== stagedClaims?.providerAssetId))
+          (!stagedClaims ||
+            record.secureUrl !== asset.secureUrl ||
+            record.providerAssetId !== stagedClaims.providerAssetId ||
+            record.cloudinaryVersion !== stagedClaims.assetVersion ||
+            record.format !== stagedClaims.format ||
+            record.bytes !== stagedClaims.bytes ||
+            record.width !== stagedClaims.width ||
+            record.height !== stagedClaims.height))
       ) {
         throw new CmsMediaValidationError(
           "The staged image details do not match.",
         );
       }
     },
+    provider,
+  );
+}
+
+export async function cleanupCmsMediaUpload(
+  value: unknown,
+  actor: Pick<CmsUser, "id" | "displayName">,
+  requestId?: string,
+  provider: CmsCloudinaryProvider = defaultCloudinaryProvider,
+) {
+  return cleanupCmsMediaUploadInternal(value, actor, null, requestId, provider);
+}
+
+export async function cleanupCmsMediaUploadWithCapability(
+  value: unknown,
+  capabilityUserId: string,
+  requestId?: string,
+  provider: CmsCloudinaryProvider = defaultCloudinaryProvider,
+) {
+  return cleanupCmsMediaUploadInternal(
+    value,
+    null,
+    capabilityUserId,
+    requestId,
+    provider,
+  );
+}
+
+export type CmsMediaSubmissionRollbackItem = Readonly<{
+  publicId: string;
+  outcome: "removed" | "already-removed" | "protected" | "failed";
+  pendingFinalSweep: boolean;
+}>;
+
+export type CmsMediaSubmissionRollbackResult = Readonly<{
+  submissionId: string;
+  complete: boolean;
+  items: readonly CmsMediaSubmissionRollbackItem[];
+}>;
+
+async function rollbackCmsMediaSubmissionInternal(
+  submission: CmsMediaSubmission,
+  actor: Pick<CmsUser, "id" | "displayName"> | null,
+  capabilityUserId: string | null,
+  requestId?: string,
+  provider: CmsCloudinaryProvider = defaultCloudinaryProvider,
+): Promise<CmsMediaSubmissionRollbackResult> {
+  const uniqueAssets = submission.assets.filter(
+    (asset, index) =>
+      submission.assets.findIndex(
+        (candidate) => candidate.publicId === asset.publicId,
+      ) === index,
+  );
+  const items: CmsMediaSubmissionRollbackItem[] = [];
+
+  for (const asset of uniqueAssets) {
+    try {
+      const cleanupRequest = {
+        submissionId: submission.submissionId,
+        scope: asset.scope,
+        publicId: asset.publicId,
+        secureUrl: asset.secureUrl,
+        stagedToken: asset.stagedToken,
+      };
+      const result = actor
+        ? await cleanupCmsMediaUpload(
+            cleanupRequest,
+            actor,
+            requestId,
+            provider,
+          )
+        : await cleanupCmsMediaUploadWithCapability(
+            cleanupRequest,
+            capabilityUserId ?? "",
+            requestId,
+            provider,
+          );
+      items.push({
+        publicId: asset.publicId,
+        outcome: result.alreadyRemoved ? "already-removed" : "removed",
+        pendingFinalSweep:
+          "pendingFinalSweep" in result
+            ? Boolean(result.pendingFinalSweep)
+            : false,
+      });
+    } catch (error) {
+      const protectedAsset =
+        error instanceof CmsMediaStateError &&
+        (error.code === "committed" || error.code === "referenced");
+      items.push({
+        publicId: asset.publicId,
+        outcome: protectedAsset ? "protected" : "failed",
+        pendingFinalSweep: false,
+      });
+    }
+  }
+
+  return {
+    submissionId: submission.submissionId,
+    complete: items.every(
+      (item) => item.outcome !== "failed" && !item.pendingFinalSweep,
+    ),
+    items,
+  };
+}
+
+export async function rollbackCmsMediaSubmission(
+  submission: CmsMediaSubmission,
+  actor: Pick<CmsUser, "id" | "displayName">,
+  requestId?: string,
+  provider: CmsCloudinaryProvider = defaultCloudinaryProvider,
+) {
+  return rollbackCmsMediaSubmissionInternal(
+    submission,
+    actor,
+    null,
+    requestId,
+    provider,
+  );
+}
+
+export async function rollbackCmsMediaSubmissionWithCapability(
+  submission: CmsMediaSubmission,
+  capabilityUserId: string,
+  requestId?: string,
+  provider: CmsCloudinaryProvider = defaultCloudinaryProvider,
+) {
+  return rollbackCmsMediaSubmissionInternal(
+    submission,
+    null,
+    capabilityUserId,
+    requestId,
     provider,
   );
 }
@@ -703,7 +904,10 @@ export async function cleanupExpiredCmsMediaUploads(
         requestId,
         (current) => {
           if (current.expiresAt > nowIso) {
-            throw new CmsMediaStateError("The image upload is no longer expired.");
+            throw new CmsMediaStateError(
+              "not-expired",
+              "The image upload is no longer expired.",
+            );
           }
         },
         provider,

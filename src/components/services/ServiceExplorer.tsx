@@ -3,7 +3,6 @@
 import { ArrowRight, CalendarDays, Clock3 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
 
 import styles from "./ServiceExplorer.module.css";
 
@@ -17,7 +16,6 @@ export type ServiceExplorerItem = {
   slug: string;
   name: string;
   shortDescription: string;
-  category: string;
   bookingUrl: string;
   image: {
     src: string;
@@ -27,59 +25,17 @@ export type ServiceExplorerItem = {
   pricing: readonly ServicePricing[];
 };
 
-export type ServiceExplorerCategory = {
-  id: string;
-  label: string;
-};
-
 type ServiceExplorerProps = {
   services: readonly ServiceExplorerItem[];
-  categories: readonly ServiceExplorerCategory[];
 };
 
-export function ServiceExplorer({ services, categories }: ServiceExplorerProps) {
-  const [activeCategory, setActiveCategory] = useState("all");
+export function ServiceExplorer({ services }: ServiceExplorerProps) {
   const bookingLabel = "Book Now";
-
-  const visibleServices = useMemo(() => {
-    if (activeCategory === "all") {
-      return services;
-    }
-
-    return services.filter((service) => service.category === activeCategory);
-  }, [activeCategory, services]);
 
   return (
     <div className={styles.explorer}>
-      <div className={styles.filters} aria-label="Filter massage services">
-        <button
-          className={activeCategory === "all" ? styles.active : ""}
-          type="button"
-          aria-pressed={activeCategory === "all"}
-          onClick={() => setActiveCategory("all")}
-        >
-          All treatments
-        </button>
-        {categories.map((category) => (
-          <button
-            className={activeCategory === category.id ? styles.active : ""}
-            key={category.id}
-            type="button"
-            aria-pressed={activeCategory === category.id}
-            onClick={() => setActiveCategory(category.id)}
-          >
-            {category.label}
-          </button>
-        ))}
-      </div>
-
-      <p className={styles.resultCount} aria-live="polite">
-        Showing {visibleServices.length}{" "}
-        {visibleServices.length === 1 ? "treatment" : "treatments"}
-      </p>
-
       <div className={styles.grid}>
-        {visibleServices.map((service) => (
+        {services.map((service) => (
           <article className={styles.card} key={service.slug}>
             <Link
               className={styles.imageLink}
@@ -130,10 +86,10 @@ export function ServiceExplorer({ services, categories }: ServiceExplorerProps) 
         ))}
       </div>
 
-      {visibleServices.length === 0 ? (
+      {services.length === 0 ? (
         <div className={styles.empty}>
-          <h2>No treatments in this category yet</h2>
-          <p>Please explore all services or contact us for help choosing a treatment.</p>
+          <h2>No treatments are available yet</h2>
+          <p>Please contact us for help choosing a treatment.</p>
         </div>
       ) : null}
     </div>

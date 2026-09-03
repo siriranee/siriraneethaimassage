@@ -22,7 +22,7 @@ export default async function CmsServiceEditPage({ params }: PageProps) {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/services" secondary>Back to services</CmsPrimaryLink>}
-        description="Edit the draft record, review every field, then publish the complete website snapshot when ready."
+        description="Update this treatment’s content, pricing and images. Successful saves publish immediately."
         eyebrow="Treatment editor"
         title={service.name}
       />

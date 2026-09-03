@@ -16,12 +16,33 @@ const client = new MongoClient(uri, {
 try {
   await client.connect();
   const db = client.db(dbName);
+  const users = db.collection("cmsUsers");
+  const usersCollectionExists = await db
+    .listCollections({ name: "cmsUsers" }, { nameOnly: true })
+    .hasNext();
+  const userIndexes = usersCollectionExists ? await users.indexes() : [];
+  const obsoleteEmailIndex = userIndexes.find(
+    (index) =>
+      index.name === "cms_users_email_unique" &&
+      index.unique === true &&
+      !index.partialFilterExpression,
+  );
+
+  await users.createIndex(
+    { username: 1 },
+    {
+      name: "cms_users_username_unique",
+      unique: true,
+      partialFilterExpression: { username: { $type: "string" } },
+    },
+  );
+
+  if (obsoleteEmailIndex?.name) {
+    await users.dropIndex(obsoleteEmailIndex.name);
+    console.log("Removed obsolete CMS email login index.");
+  }
 
   await Promise.all([
-    db.collection("cmsUsers").createIndex(
-      { email: 1 },
-      { name: "cms_users_email_unique", unique: true },
-    ),
     db.collection("cmsSessions").createIndex(
       { tokenHash: 1 },
       { name: "cms_sessions_token_unique", unique: true },
@@ -99,6 +120,10 @@ try {
     db.collection("cmsBookingNotifications").createIndex(
       { status: 1, createdAt: 1 },
       { name: "cms_notifications_status_created" },
+    ),
+    db.collection("cmsBookingNotifications").createIndex(
+      { channel: 1, createdAt: -1 },
+      { name: "cms_notifications_channel_created" },
     ),
     db.collection("cmsMediaAssets").createIndex(
       { providerAssetId: 1 },

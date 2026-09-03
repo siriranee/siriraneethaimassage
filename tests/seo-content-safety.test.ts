@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 
-import { services } from "@/content/services";
 import { siteConfig } from "@/content/site";
 import robots from "@/app/robots";
 import {
@@ -14,6 +13,15 @@ import {
 async function source(path: string) {
   return readFile(resolve(process.cwd(), path), "utf8");
 }
+
+const publishedServicePricing = [
+  {
+    pricing: [
+      { durationMinutes: 30, label: "30 minutes", priceEur: 40 },
+      { durationMinutes: 90, label: "90 minutes", priceEur: 95 },
+    ],
+  },
+] as const;
 
 function restoreEnvironment(
   name: "VERCEL" | "VERCEL_ENV",
@@ -27,7 +35,7 @@ function restoreEnvironment(
 }
 
 test("DaySpa price range comes from the published service list", () => {
-  assert.equal(buildServicePriceRange(services), "€40–€95");
+  assert.equal(buildServicePriceRange(publishedServicePricing), "€40–€95");
   assert.equal(
     buildServicePriceRange([
       {
@@ -39,7 +47,7 @@ test("DaySpa price range comes from the published service list", () => {
     "€72.5",
   );
 
-  const schema = buildDaySpaJsonLd(siteConfig, services);
+  const schema = buildDaySpaJsonLd(siteConfig, publishedServicePricing);
   assert.equal(schema.priceRange, "€40–€95");
   assert.equal("priceRange" in buildDaySpaJsonLd(siteConfig, []), false);
 });

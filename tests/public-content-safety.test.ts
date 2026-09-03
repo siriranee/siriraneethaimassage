@@ -50,21 +50,30 @@ test("only owner-confirmed public contact data reaches static configuration and 
   assert.match(structuredData, /phone\s*\?\s*\{ telephone: phone\.e164 \}/);
 });
 
-test("legacy snapshots fail closed and production reads use a safe brochure boundary", async () => {
+test("legacy snapshots and unavailable production reads use a safe brochure boundary", async () => {
   const [service, defaults, validation] = await Promise.all([
     source("src/server/cms/content-service.ts"),
     source("src/server/cms/default-content.ts"),
     source("src/server/cms/content-validation.ts"),
   ]);
+  const publishedRead = service.slice(
+    service.indexOf("export async function getPublishedCmsContent"),
+    service.indexOf("function contentChanged"),
+  );
 
   assert.match(service, /content\.site\.phoneConfirmed === true/);
   assert.match(service, /storedSchemaVersion < 4/);
   assert.match(service, /migrateConfirmedPhone/);
   assert.match(service, /migrateConfirmedWhatsapp/);
-  assert.match(service, /mode === "disabled"\) return createSafePublicContentState\(\)/);
-  assert.match(service, /mode === "mock"\) return createDefaultContentState\(\)/);
-  assert.match(service, /throw new CmsPublicContentUnavailableError\(error\)/);
+  assert.match(publishedRead, /mode === "disabled"\) return createSafePublicContentState\(\)/);
+  assert.match(publishedRead, /mode === "mock"\) return createDefaultContentState\(\)/);
+  assert.match(publishedRead, /catch \{[\s\S]*?return createSafePublicContentState\(\)/);
+  assert.doesNotMatch(publishedRead, /CmsPublicContentUnavailableError/);
   assert.match(defaults, /export function createSafePublicContentState/);
+  assert.match(
+    defaults,
+    /export function createSafePublicContentState[\s\S]*?services: \[\]/,
+  );
   assert.doesNotMatch(defaults, /phoneDisplay: ""/);
   assert.match(defaults, /team: \[\]/);
   assert.match(defaults, /vouchers: \[\]/);

@@ -51,7 +51,7 @@ export function GalleryEditorForm({
 
     saveLockRef.current = true;
     setSaving(true);
-    setActivity(preparedImage ? "Preparing image upload…" : "Saving gallery draft…");
+    setActivity(preparedImage ? "Preparing image upload…" : "Saving and publishing gallery item…");
     setFeedback(null);
     const data = new FormData(form);
     let submissionId: string | null = null;
@@ -87,7 +87,7 @@ export function GalleryEditorForm({
         nextImageUrl = uploaded[0]?.asset.secureUrl ?? nextImageUrl;
       }
 
-      setActivity("Saving gallery draft…");
+      setActivity("Saving and publishing gallery item…");
       const payload = {
         expectedVersion: version,
         imageUrl: nextImageUrl,
@@ -129,7 +129,7 @@ export function GalleryEditorForm({
       markSaved();
       setFeedback({
         tone: "success",
-        text: isNew ? "Gallery draft created." : "Gallery draft saved.",
+        text: isNew ? "Gallery item created and website updated." : "Gallery item saved and website updated.",
       });
       if (isNew) router.push(`/cms/media/${result.item.id}/edit`);
       router.refresh();
@@ -157,7 +157,7 @@ export function GalleryEditorForm({
         <section className={styles.section}>
           <header className={styles.sectionHeader}>
             <h2>Image information</h2>
-            <p>Choose a file to prepare it on this device. It uploads only when this draft is saved.</p>
+            <p>Choose a file to prepare it on this device. It uploads only when this form is saved.</p>
           </header>
           <div className={styles.grid}>
             <div className={styles.fullField}>
@@ -182,12 +182,12 @@ export function GalleryEditorForm({
                 required={!preparedImage}
                 value={imageUrl}
               />
-              <small>A prepared file replaces this value after the draft saves successfully.</small>
+              <small>A prepared file replaces this value after the form saves successfully.</small>
             </label>
             <label className={styles.fullField}>Alternative text<input defaultValue={item.altText} maxLength={180} minLength={8} name="altText" required /><small>Describe what is visible; do not repeat “image of”.</small></label>
             <label className={styles.fullField}>Caption<input defaultValue={item.caption} maxLength={240} minLength={2} name="caption" required /></label>
             <label className={styles.field}>Display order<input defaultValue={item.sortOrder} max={1000} min={0} name="sortOrder" required type="number" /></label>
-            <label className={styles.checkbox}><input defaultChecked={item.published} name="published" type="checkbox" /><span>Include in next publication<small>The live gallery changes only after publishing the complete content snapshot.</small></span></label>
+            <label className={styles.checkbox}><input defaultChecked={item.published} name="published" type="checkbox" /><span>Show on the website<small>This gallery item publishes immediately when the form saves.</small></span></label>
           </div>
         </section>
       </fieldset>
@@ -200,11 +200,11 @@ export function GalleryEditorForm({
           ) : preparationBusy ? (
             "Preparing image on this device…"
           ) : (
-            `Draft version ${version}${dirty ? " · unsaved changes" : ""}`
+            `Current version ${version}${dirty ? " · unsaved changes" : ""}`
           )}
         </span>
         <button disabled={locked} type="submit">
-          {saving ? (stagedAssetsLabel(activity) ? "Uploading…" : "Saving…") : isNew ? "Create gallery draft" : "Save gallery item"}
+          {saving ? (stagedAssetsLabel(activity) ? "Uploading…" : "Saving and publishing…") : isNew ? "Create gallery item" : "Save website changes"}
         </button>
       </div>
     </form>

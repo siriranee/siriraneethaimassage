@@ -7,7 +7,6 @@ import { notFound } from "next/navigation";
 import { BookingCta } from "@/components/marketing/BookingCta";
 import { PageHero } from "@/components/marketing/PageHero";
 import { ServiceImageSlider } from "@/components/services/ServiceImageSlider";
-import { getServicePageHero } from "@/content/page-heroes";
 import { getServiceGalleryImages } from "@/content/service-galleries";
 import { createMetadata } from "@/lib/metadata";
 import {
@@ -25,11 +24,6 @@ import styles from "./page.module.css";
 type ServiceDetailPageProps = {
   params: Promise<{ slug: string }>;
 };
-
-export async function generateStaticParams() {
-  const { services } = await getPublicServicesSnapshot();
-  return services.map((service) => ({ slug: service.slug }));
-}
 
 export async function generateMetadata({ params }: ServiceDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -54,7 +48,7 @@ export async function generateMetadata({ params }: ServiceDetailPageProps): Prom
 
 export default async function ServiceDetailPage({ params }: ServiceDetailPageProps) {
   const { slug } = await params;
-  const [{ categories: serviceCategories, services }, site] =
+  const [{ services }, site] =
     await Promise.all([
       getPublicServicesSnapshot(),
       getPublicSiteData(),
@@ -65,13 +59,11 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
     notFound();
   }
 
-  const category = serviceCategories.find((item) => item.id === service.category);
   const relatedServices = services
-    .filter((item) => item.slug !== service.slug && item.category === service.category)
+    .filter((item) => item.slug !== service.slug)
     .slice(0, 3);
   const serviceJsonLd = buildServiceJsonLd(service, site);
   const serviceGallery = getServiceGalleryImages(service);
-  const serviceHero = getServicePageHero(service.slug);
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },
     { name: "Services", path: "/services" },
@@ -84,10 +76,11 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
       <script {...jsonLdScriptProps(breadcrumbJsonLd)} />
 
       <PageHero
-        {...serviceHero}
-        eyebrow={`${category?.label ?? "Massage treatment"} · Howth, Dublin`}
+        eyebrow="Massage treatment · Howth, Dublin"
         title={service.name}
         description={service.shortDescription}
+        image={service.hero.imageUrl}
+        imageAlt={service.hero.altText}
       />
 
       <section className={styles.optionsSection} aria-labelledby="treatment-options-heading">
@@ -137,10 +130,6 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
               )}
 
               {service.priceNote ? <p className={styles.serviceNote}>{service.priceNote}</p> : null}
-              {service.bookingNotice ? (
-                <p className={styles.serviceNote}>{service.bookingNotice}</p>
-              ) : null}
-
               <div className={styles.actions}>
                 <Link className={styles.primaryAction} href={service.bookingUrl}>
                   <CalendarDays aria-hidden="true" size={18} />
@@ -182,32 +171,36 @@ export default async function ServiceDetailPage({ params }: ServiceDetailPagePro
             ) : null}
           </article>
 
-          <aside className={styles.sidebar} aria-label="Treatment guidance">
-            <div className={styles.guidanceCard}>
-              <span className={styles.sidebarIcon}>
-                <Sparkles aria-hidden="true" size={22} />
-              </span>
-              <h2>This may suit you if…</h2>
-              <ul>
-                {service.idealFor.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-              <p>
-                Please let your therapist know about comfort preferences or anything relevant before your treatment begins.
-              </p>
-            </div>
-
-            {service.pricing.length ? (
-              <div className={styles.smallCard}>
-                <Euro aria-hidden="true" size={22} />
-                <div>
-                  <strong>Clear treatment options</strong>
-                  <span>Choose a listed duration when you book.</span>
+          {service.idealFor.length || service.pricing.length ? (
+            <aside className={styles.sidebar} aria-label="Treatment guidance">
+              {service.idealFor.length ? (
+                <div className={styles.guidanceCard}>
+                  <span className={styles.sidebarIcon}>
+                    <Sparkles aria-hidden="true" size={22} />
+                  </span>
+                  <h2>This may suit you if…</h2>
+                  <ul>
+                    {service.idealFor.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                  <p>
+                    Please let your therapist know about comfort preferences or anything relevant before your treatment begins.
+                  </p>
                 </div>
-              </div>
-            ) : null}
-          </aside>
+              ) : null}
+
+              {service.pricing.length ? (
+                <div className={styles.smallCard}>
+                  <Euro aria-hidden="true" size={22} />
+                  <div>
+                    <strong>Clear treatment options</strong>
+                    <span>Choose a listed duration when you book.</span>
+                  </div>
+                </div>
+              ) : null}
+            </aside>
+          ) : null}
         </div>
       </section>
 
