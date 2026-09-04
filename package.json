@@ -24,7 +24,7 @@
     "test:launch": "tsx --test tests/launch-workflows.test.ts",
     "test:migrations": "node --test tests/voucher-migration.test.mjs",
     "test:media": "tsx --test tests/cloudinary-media.test.ts tests/cloudinary-delivery.test.ts tests/client-image-preparation.test.ts tests/cms-media-client.test.ts",
-    "test:ui": "tsx --test tests/home-hero-slider.test.ts tests/page-hero.test.ts tests/service-image-slider.test.ts tests/contact-fab.test.ts tests/site-header.test.ts tests/seo-content-safety.test.ts",
+    "test:ui": "tsx --test tests/home-hero-slider.test.ts tests/page-hero.test.ts tests/service-image-slider.test.ts tests/contact-fab.test.ts tests/site-header.test.ts tests/seo-content-safety.test.ts tests/loading-boundaries.test.ts",
     "test:env": "tsx --test tests/production-env.test.ts",
     "test:content": "node scripts/validate-site-content.mjs",
     "test:rendered": "node scripts/validate-rendered-site.mjs",
