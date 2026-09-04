@@ -15,7 +15,6 @@ import Link from "next/link";
 import { HomeHeroSlider } from "@/components/marketing/HomeHeroSlider";
 import { VoucherSlider } from "@/components/marketing/VoucherSlider";
 import { ButtonLink } from "@/components/ui/ButtonLink";
-import { LotusIcon } from "@/components/ui/LotusIcon";
 import { getPageCopy } from "@/content/page-copy";
 import { createMetadata } from "@/lib/metadata";
 import {
@@ -146,7 +145,6 @@ export default async function HomePage() {
       <section className={`section ${styles.servicesSection}`}>
         <div className="container">
           <header className={styles.sectionHeader}>
-            <LotusIcon className={styles.lotus} />
             <span className="eyebrow">Massage treatments</span>
             <h2>Find your moment of calm</h2>
             <p className="lead">
@@ -236,7 +234,6 @@ export default async function HomePage() {
         <section aria-labelledby="voucher-section-title" className={`section ${styles.voucherSection}`}>
           <div className="container">
             <header className={`${styles.sectionHeader} ${styles.voucherHeader}`}>
-              <LotusIcon className={styles.lotus} />
               <span className="eyebrow">A thoughtful massage gift</span>
               <h2 id="voucher-section-title">Give someone time to unwind</h2>
               <p className="lead">

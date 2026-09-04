@@ -82,15 +82,6 @@
   margin-inline: auto;
 }
 
-.lotus {
-  width: 3.6rem;
-  margin: 0 auto 0.85rem;
-  stroke: var(--color-gold-600);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.6;
-}
-
 .serviceGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
