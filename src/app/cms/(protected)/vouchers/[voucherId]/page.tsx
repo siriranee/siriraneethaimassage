@@ -6,7 +6,7 @@ import { getCmsContent } from "@/server/cms/content-service";
 
 type PageProps = { readonly params: Promise<{ readonly voucherId: string }> };
 
-export default async function CmsVoucherEditPage({ params }: PageProps) {
+export default async function CmsVoucherPage({ params }: PageProps) {
   await requireCmsPageUser("content:write");
   const { voucherId } = await params;
   const content = await getCmsContent();

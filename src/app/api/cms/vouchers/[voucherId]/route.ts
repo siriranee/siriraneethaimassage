@@ -1,7 +1,14 @@
 import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
-import { updateCmsVoucher } from "@/server/cms/content-service";
-import { cmsNoStoreJson, readCmsJsonObject } from "@/server/cms/http";
+import {
+  deleteCmsVoucher,
+  updateCmsVoucher,
+} from "@/server/cms/content-service";
+import {
+  cmsErrorResponse,
+  cmsNoStoreJson,
+  readCmsJsonObject,
+} from "@/server/cms/http";
 import { isMongoCommitResultIndeterminate } from "@/server/cms/mongo-error-label";
 import { getCmsMediaCleanupGrantUserId } from "@/server/media/cleanup-grant";
 import {
@@ -87,5 +94,27 @@ export async function PATCH(request: Request, context: RouteContext) {
         : {}),
       ...(mediaRollback ? { mediaRollback } : {}),
     });
+  }
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  if (!isSameOriginMutation(request)) {
+    return cmsNoStoreJson({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  const { response, user } = await requireCmsApiUser("content:write");
+  if (response || !user) return response;
+
+  try {
+    const body = await readCmsJsonObject(request);
+    const { voucherId } = await context.params;
+    const voucher = await deleteCmsVoucher(
+      voucherId,
+      Number(body.expectedVersion),
+      { actor: user, requestId: getRequestId(request) },
+    );
+    return cmsNoStoreJson({ voucher });
+  } catch (error) {
+    return cmsErrorResponse(error);
   }
 }

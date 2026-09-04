@@ -162,7 +162,7 @@ export function VoucherEditorForm({
         tone: "success",
         text: isNew ? "Voucher created and published." : "Voucher saved and published.",
       });
-      if (isNew) router.push(`/cms/vouchers/${result.voucher.id}/edit`);
+      if (isNew) router.push(`/cms/vouchers/${result.voucher.id}`);
       router.refresh();
     } catch (error) {
       if (requestState === "ambiguous" || requestState === "succeeded") {

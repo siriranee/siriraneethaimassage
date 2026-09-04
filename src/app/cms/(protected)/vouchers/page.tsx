@@ -37,7 +37,7 @@ export default async function CmsVouchersPage() {
                 )}
               </div>
               <h2>{voucher.title}</h2>
-              {canCmsRole(user.role, "content:write") ? <Link href={`/cms/vouchers/${voucher.id}/edit`}><Pencil aria-hidden="true" /> Edit voucher</Link> : null}
+              {canCmsRole(user.role, "content:write") ? <Link href={`/cms/vouchers/${voucher.id}`}><Pencil aria-hidden="true" /> Edit voucher</Link> : null}
             </article>
           ))}
         </div>

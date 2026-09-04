@@ -60,6 +60,7 @@ type CmsPublicationTarget =
         | "promotions"
         | "vouchers";
       readonly entityId: string;
+      readonly deletedVoucher?: true;
     }
   | {
       readonly section:
@@ -179,6 +180,14 @@ function createImmediatePublicationSnapshot(
       const voucher = content.vouchers?.find(
         (item) => item.id === target.entityId,
       );
+      if (target.deletedVoucher) {
+        return {
+          ...snapshotBase,
+          vouchers: (snapshotBase.vouchers ?? []).filter(
+            (item) => item.id !== target.entityId,
+          ),
+        };
+      }
       if (!voucher) throw new Error("Voucher not found after saving.");
       return {
         ...snapshotBase,
@@ -728,4 +737,37 @@ export async function updateCmsVoucher(
     { section: "vouchers", entityId: voucherId },
   );
   return updated!;
+}
+
+export async function deleteCmsVoucher(
+  voucherId: string,
+  expectedVersion: number,
+  context: MutationContext,
+): Promise<CmsVoucherRecord> {
+  let deleted: CmsVoucherRecord | null = null;
+
+  await mutateContent(
+    context,
+    "voucher.deleted",
+    "voucher",
+    voucherId,
+    "Deleted a gift voucher record.",
+    (current) => {
+      const vouchers = current.vouchers ?? [];
+      const existing = vouchers.find((item) => item.id === voucherId);
+      if (!existing) throw new Error("Voucher not found.");
+      if (existing.version !== expectedVersion) throw new CmsConflictError();
+
+      deleted = existing;
+      return {
+        ...current,
+        revision: current.revision + 1,
+        vouchers: vouchers.filter((item) => item.id !== voucherId),
+        updatedAt: new Date().toISOString(),
+        updatedBy: context.actor.id,
+      };
+    },
+    { section: "vouchers", entityId: voucherId, deletedVoucher: true },
+  );
+  return deleted!;
 }
