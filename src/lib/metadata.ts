@@ -60,8 +60,11 @@ export function createMetadata({
     title: formattedTitle,
     description,
     icons: {
-      icon: [{ url: "/siriranee_logo.svg", type: "image/svg+xml" }],
-      shortcut: ["/siriranee_logo.svg"],
+      icon: [
+        { url: "/favicon.ico", sizes: "any", type: "image/x-icon" },
+        { url: "/siriranee_logo.svg", type: "image/svg+xml" },
+      ],
+      shortcut: ["/favicon.ico"],
     },
     alternates: {
       canonical,
