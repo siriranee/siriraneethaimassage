@@ -176,11 +176,15 @@ check(
 );
 
 for (const declaration of [
-  "--color-purple-950: #2b2028;",
-  "--color-purple-800: #4a2246;",
-  "--color-purple-600: #6a2467;",
-  "--color-purple-500: #7c2a90;",
-  "--color-purple-400: #90278d;",
+  "--color-purple-950: #230d35;",
+  "--color-purple-900: #32124c;",
+  "--color-purple-800: #451966;",
+  "--color-purple-700: #5c2288;",
+  "--color-purple-600: #6e2aa0;",
+  "--color-purple-500: #8138b5;",
+  "--color-purple-400: #9348bd;",
+  "--color-purple-100: #efe4f7;",
+  "--color-purple-50: #faf6fc;",
   "--color-gold-700: #7a590d;",
   "--color-gold-500: #d5b350;",
   "--color-gold-400: #e1c65f;",
@@ -189,7 +193,7 @@ for (const declaration of [
 ]) {
   check(
     globalStylesSource.includes(declaration),
-    `Official-logo-derived Siriranee palette is missing: ${declaration}`,
+    `Approved Siriranee palette is missing: ${declaration}`,
   );
 }
 
@@ -201,6 +205,13 @@ for (const retiredColor of [
   "#3d125a",
   "#46116d",
   "#521a82",
+  "#352130",
+  "#4a2246",
+  "#5b245b",
+  "#6a2467",
+  "#7c2a90",
+  "#90278d",
+  "#f3e9f4",
   "#eaae3d",
   "#f2c56e",
 ]) {

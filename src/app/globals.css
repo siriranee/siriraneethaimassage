@@ -1,24 +1,24 @@
 :root {
   color-scheme: light;
 
-  /* Palette sampled from the official Siriranee logo artwork. */
-  --color-purple-950: #2b2028;
-  --color-purple-900: #352130;
-  --color-purple-800: #4a2246;
-  --color-purple-700: #5b245b;
-  --color-purple-600: #6a2467;
-  --color-purple-500: #7c2a90;
-  --color-purple-400: #90278d;
-  --color-purple-100: #f3e9f4;
-  --color-purple-50: #fbf7fb;
-  --color-purple-950-rgb: 43 32 40;
-  --color-purple-900-rgb: 53 33 48;
-  --color-purple-800-rgb: 74 34 70;
-  --color-purple-700-rgb: 91 36 91;
-  --color-purple-600-rgb: 106 36 103;
-  --color-purple-500-rgb: 124 42 144;
-  --color-purple-400-rgb: 144 39 141;
-  --color-purple-100-rgb: 243 233 244;
+  /* Fresh violet palette anchored to the supplied #5c2288 brand reference. */
+  --color-purple-950: #230d35;
+  --color-purple-900: #32124c;
+  --color-purple-800: #451966;
+  --color-purple-700: #5c2288;
+  --color-purple-600: #6e2aa0;
+  --color-purple-500: #8138b5;
+  --color-purple-400: #9348bd;
+  --color-purple-100: #efe4f7;
+  --color-purple-50: #faf6fc;
+  --color-purple-950-rgb: 35 13 53;
+  --color-purple-900-rgb: 50 18 76;
+  --color-purple-800-rgb: 69 25 102;
+  --color-purple-700-rgb: 92 34 136;
+  --color-purple-600-rgb: 110 42 160;
+  --color-purple-500-rgb: 129 56 181;
+  --color-purple-400-rgb: 147 72 189;
+  --color-purple-100-rgb: 239 228 247;
   --color-gold-700: #7a590d;
   --color-gold-600: #9d771f;
   --color-gold-500: #d5b350;
@@ -37,7 +37,7 @@
   --color-canvas: #fbf8f0;
   --color-surface: #fffdf7;
   --color-on-brand: #f9f4ea;
-  --color-on-gold: #4a2246;
+  --color-on-gold: #451966;
   --color-ink: #2b2028;
   --color-brown: #3c2515;
   --color-muted: #675d64;
@@ -47,7 +47,7 @@
   --color-cream-rgb: 243 235 212;
   --color-surface-rgb: 255 253 247;
   --color-on-brand-rgb: 249 244 234;
-  --color-shadow-rgb: 43 32 40;
+  --color-shadow-rgb: 35 13 53;
   --color-line: rgb(var(--color-purple-800-rgb) / 0.11);
   --color-line-strong: rgb(var(--color-purple-800-rgb) / 0.22);
   --color-control-border: rgb(var(--color-purple-600-rgb) / 0.5);

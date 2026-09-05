@@ -96,3 +96,18 @@ test("public phone and hours consumers render only confirmed values", async () =
   assert.match(publicUi, /Opening hours are being confirmed/);
   assert.doesNotMatch(publicUi, /Provisional opening hours|Draft schedule/);
 });
+
+test("contact page always offers the owner-confirmed WhatsApp number", async () => {
+  const contactPage = await source("src/app/(site)/contact/page.tsx");
+
+  assert.match(
+    contactPage,
+    /site\.contact\.whatsapp\.number \?\? siteConfig\.contact\.whatsapp\.number/,
+  );
+  assert.match(
+    contactPage,
+    /site\.contact\.whatsapp\.url \?\? siteConfig\.contact\.whatsapp\.url/,
+  );
+  assert.match(contactPage, /WhatsApp \+\{whatsappNumber\}/);
+  assert.match(contactPage, /Message on WhatsApp/);
+});

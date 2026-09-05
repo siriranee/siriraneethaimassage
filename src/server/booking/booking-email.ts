@@ -125,24 +125,24 @@ function section(input: {
   readonly cmsBookingUrl?: string;
 }) {
   const button = input.cmsBookingUrl
-    ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 4px;"><tr><td style="border-radius:999px;background:#6a2467;"><a href="${escapeHtml(input.cmsBookingUrl)}" style="display:inline-block;padding:13px 22px;color:#fffdf7;font-size:15px;font-weight:700;line-height:1.2;text-decoration:none;">${escapeHtml(input.buttonLabel)}</a></td></tr></table>`
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 4px;"><tr><td style="border-radius:999px;background:#6e2aa0;"><a href="${escapeHtml(input.cmsBookingUrl)}" style="display:inline-block;padding:13px 22px;color:#fffdf7;font-size:15px;font-weight:700;line-height:1.2;text-decoration:none;">${escapeHtml(input.buttonLabel)}</a></td></tr></table>`
     : "";
 
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;"><tr><td lang="${input.language}" style="padding:30px 30px 32px;">
     <p style="margin:0 0 7px;color:#7a590d;font-size:12px;font-weight:800;letter-spacing:.08em;line-height:1.4;text-transform:uppercase;">${escapeHtml(input.eyebrow)}</p>
-    <h1 style="margin:0;color:#4a2246;font-size:26px;line-height:1.25;">${escapeHtml(input.heading)}</h1>
+    <h1 style="margin:0;color:#5c2288;font-size:26px;line-height:1.25;">${escapeHtml(input.heading)}</h1>
     <p style="margin:12px 0 20px;color:#3c3340;font-size:16px;line-height:1.65;">${escapeHtml(input.introduction)}</p>
     <div style="margin:0 0 24px;padding:14px 16px;border:1px solid #e1c65f;border-radius:12px;background:#f8f0ce;">
       <span style="display:block;margin-bottom:3px;color:#7a590d;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">${escapeHtml(input.statusLabel)}</span>
-      <strong style="color:#4a2246;font-size:18px;line-height:1.35;">${escapeHtml(input.statusValue)}</strong>
+      <strong style="color:#5c2288;font-size:18px;line-height:1.35;">${escapeHtml(input.statusValue)}</strong>
     </div>
-    <h2 style="margin:0 0 5px;color:#4a2246;font-size:18px;line-height:1.4;">${escapeHtml(input.appointmentHeading)}</h2>
+    <h2 style="margin:0 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">${escapeHtml(input.appointmentHeading)}</h2>
     <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">${input.appointmentRows.map(([label, value]) => detailRow(label, value)).join("")}</table>
-    <h2 style="margin:26px 0 5px;color:#4a2246;font-size:18px;line-height:1.4;">${escapeHtml(input.customerHeading)}</h2>
+    <h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">${escapeHtml(input.customerHeading)}</h2>
     <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">${input.customerRows.map(([label, value, direction]) => detailRow(label, value, direction)).join("")}</table>
-    <h2 style="margin:26px 0 5px;color:#4a2246;font-size:18px;line-height:1.4;">${escapeHtml(input.requestHeading)}</h2>
+    <h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">${escapeHtml(input.requestHeading)}</h2>
     <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">${input.requestRows.map(([label, value]) => detailRow(label, value)).join("")}</table>
-    <p style="margin:22px 0 0;padding-left:13px;border-left:4px solid #d5b350;color:#4a2246;font-size:15px;font-weight:700;line-height:1.55;">${escapeHtml(input.warning)}</p>
+    <p style="margin:22px 0 0;padding-left:13px;border-left:4px solid #d5b350;color:#5c2288;font-size:15px;font-weight:700;line-height:1.55;">${escapeHtml(input.warning)}</p>
     ${button}
   </td></tr></table>`;
 }
@@ -273,11 +273,11 @@ export function renderOwnerBookingRequestedEmail(
       <tr>
         <td align="center" style="padding:24px 12px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:640px;border:1px solid #e6d9be;border-radius:18px;border-collapse:separate;overflow:hidden;background:#fffdf7;box-shadow:0 12px 36px rgba(43,32,40,.10);">
-            <tr><td lang="en-IE" style="padding:18px 30px;background:#4a2246;color:#fffdf7;font-size:17px;font-weight:800;line-height:1.4;">Siriranee Thai Massage</td></tr>
+            <tr><td lang="en-IE" style="padding:18px 30px;background:#5c2288;color:#fffdf7;font-size:17px;font-weight:800;line-height:1.4;">Siriranee Thai Massage</td></tr>
             <tr><td>${thai}</td></tr>
             <tr><td style="height:1px;background:#d8c7d7;"></td></tr>
             <tr><td>${english}</td></tr>
-            <tr><td lang="en-IE" style="padding:17px 30px;background:#f3e9f4;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">This operational email was generated automatically from a website booking request.</td></tr>
+            <tr><td lang="en-IE" style="padding:17px 30px;background:#efe4f7;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">This operational email was generated automatically from a website booking request.</td></tr>
           </table>
         </td>
       </tr>

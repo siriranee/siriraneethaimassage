@@ -16,6 +16,7 @@ import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
 import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
+import { siteConfig } from "@/content/site";
 import {
   buildAppointmentWhatsAppUrl,
   buildPlannerPreferenceHref,
@@ -45,10 +46,14 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
     getPublicSiteData(),
   ]);
   const appointmentPreference = await resolvePublishedAppointmentPreference(query);
+  const whatsappNumber =
+    site.contact.whatsapp.number ?? siteConfig.contact.whatsapp.number;
+  const whatsappUrl =
+    site.contact.whatsapp.url ?? siteConfig.contact.whatsapp.url;
   const appointmentWhatsappUrl = appointmentPreference
     ? buildAppointmentWhatsAppUrl(appointmentPreference, {
         businessName: site.name,
-        whatsappNumber: site.contact.whatsapp.number,
+        whatsappNumber,
       })
     : null;
   const changePreferencesHref = appointmentPreference
@@ -57,7 +62,6 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
   const phone = site.contact.phone;
   const email = site.contact.email;
   const instagram = site.social.instagram;
-  const whatsappUrl = site.contact.whatsapp.url;
   const contactCardCount =
     1 + (phone ? 1 : 0) + (email ? 1 : 0) + (whatsappUrl ? 1 : 0);
   const gridClass =
@@ -229,16 +233,21 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
               </article>
             ) : null}
 
-            {whatsappUrl ? (
+            {whatsappUrl && whatsappNumber ? (
               <article className={styles.contactCard}>
                 <span className={styles.iconWrap}>
                   <MessageCircle aria-hidden="true" size={23} strokeWidth={1.65} />
                 </span>
-                <p className={styles.cardLabel}>WhatsApp</p>
-                <h3>Message the spa</h3>
-                <p>Start a WhatsApp conversation for a general booking question.</p>
+                <p className={styles.cardLabel}>Message us</p>
+                <h3>
+                  <a href={whatsappUrl} target="_blank" rel="noreferrer">
+                    WhatsApp +{whatsappNumber}
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                </h3>
+                <p>Send us a WhatsApp message about a booking or your visit.</p>
                 <a href={whatsappUrl} target="_blank" rel="noreferrer">
-                  Open WhatsApp
+                  Message on WhatsApp
                   <ArrowUpRight aria-hidden="true" size={16} />
                   <span className="sr-only"> (opens in a new tab)</span>
                 </a>
