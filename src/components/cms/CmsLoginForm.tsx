@@ -9,7 +9,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 
 import {
   CMS_PASSWORD_HTML_PATTERN,
@@ -40,6 +47,10 @@ function updateRememberedUsername(username: string, remember: boolean) {
   } catch {
     // Sign-in still works when browser storage is unavailable.
   }
+}
+
+function stripWhitespace(value: string) {
+  return value.replace(/\s+/g, "");
 }
 
 export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
@@ -107,11 +118,20 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
   function handleCredentials(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const username = stripWhitespace(String(data.get("username") ?? ""));
+    const password = stripWhitespace(String(data.get("password") ?? ""));
 
     void submit({
-      username: String(data.get("username") ?? ""),
-      password: String(data.get("password") ?? ""),
+      username,
+      password,
     }, data.get("rememberUsername") === "on");
+  }
+
+  function handleInputTrim(event: ChangeEvent<HTMLInputElement>) {
+    const trimmed = stripWhitespace(event.currentTarget.value);
+    if (trimmed !== event.currentTarget.value) {
+      event.currentTarget.value = trimmed;
+    }
   }
 
   function clearError() {
@@ -186,6 +206,7 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
           spellCheck={false}
           title={`${CMS_USERNAME_MIN_LENGTH}–${CMS_USERNAME_MAX_LENGTH} characters using letters and numbers only.`}
           type="text"
+          onChange={handleInputTrim}
         />
         <p className={styles.fieldHint} id={usernameHintId}>
           {CMS_USERNAME_MIN_LENGTH}–{CMS_USERNAME_MAX_LENGTH} characters.
@@ -209,6 +230,7 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
             required
             title={`${CMS_PASSWORD_MIN_LENGTH}–${CMS_PASSWORD_MAX_LENGTH} characters using letters and numbers only.`}
             type={showPassword ? "text" : "password"}
+            onChange={handleInputTrim}
           />
           <button
             aria-label={showPassword ? "Hide password" : "Show password"}
