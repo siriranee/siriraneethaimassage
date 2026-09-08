@@ -5,10 +5,15 @@ import { BookingEditorForm } from "@/components/cms/BookingEditorForm";
 import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
 import { CmsDeleteBookingButton } from "@/components/cms/CmsDeleteBookingButton";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
+import { CmsRetryConfirmationEmail } from "@/components/cms/CmsRetryConfirmationEmail";
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
+import {
+  customerBookingConfirmationEmailFeedback,
+} from "@/domain/booking/confirmation-email";
 import { isPendingCapacityExpired } from "@/domain/booking/status";
 import { canCmsRole } from "@/domain/cms/permissions";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
+import { canRetryCustomerBookingConfirmationEmail } from "@/server/cms/notification-service";
 import { getCmsBooking, listCmsBookingTimeline, listCmsNotifications } from "@/server/cms/read-service";
 
 import styles from "@/components/cms/CmsViews.module.css";
@@ -27,6 +32,34 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
   ]);
   if (!booking) notFound();
   const expiredPending = isPendingCapacityExpired(booking);
+  const confirmationNotification = notifications.find(
+    (notification) =>
+      notification.audience === "customer" &&
+      notification.channel === "email" &&
+      notification.kind === "booking-confirmed" &&
+      notification.provider === "resend",
+  );
+  const confirmationFeedback =
+    booking.status !== "confirmed"
+      ? null
+      : confirmationNotification
+        ? customerBookingConfirmationEmailFeedback(
+            booking.demo
+              ? { status: "skipped", reason: "mock-mode" }
+              : confirmationNotification.status === "sent"
+                ? { status: "sent" }
+                : confirmationNotification.status === "queued"
+                  ? { status: "pending" }
+                  : confirmationNotification.status === "failed"
+                    ? { status: "failed" }
+                    : { status: "indeterminate" },
+          )
+        : !booking.customer.email
+          ? customerBookingConfirmationEmailFeedback({
+              status: "skipped",
+              reason: "missing-customer-email",
+            })
+          : null;
 
   return (
     <>
@@ -54,6 +87,19 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
         </CmsNotice>
       ) : null}
 
+      {confirmationFeedback ? (
+        <CmsNotice
+          tone={confirmationFeedback.tone}
+          title={
+            confirmationFeedback.tone === "success"
+              ? "Confirmation email accepted"
+              : "Booking saved; email needs attention"
+          }
+        >
+          {confirmationFeedback.text}
+        </CmsNotice>
+      ) : null}
+
       {expiredPending ? (
         <CmsNotice tone="warning" title="Temporary capacity hold has expired">
           This pending request no longer blocks the appointment time. Confirming or rescheduling it will recheck opening hours, closures and current capacity before saving.
@@ -67,7 +113,12 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
               <dt>Status</dt>
               <dd className={styles.bookingDetailStatus}>
                 <CmsBookingStatus status={booking.status} />
-                <CmsBookingQuickActions booking={booking} />
+                <CmsBookingQuickActions
+                  booking={booking}
+                  hasCustomerEmail={Boolean(booking.customer.email)}
+                  isMock={booking.demo}
+                  key={`quick-actions:${booking.id}:${booking.version}`}
+                />
               </dd>
             </div>
             <div><dt>Reference</dt><dd>{booking.reference}</dd></div>
@@ -114,6 +165,10 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
                   <strong>
                     {notification.audience === "owner" && notification.channel === "email"
                       ? "Owner booking alert"
+                      : notification.audience === "customer" &&
+                          notification.channel === "email" &&
+                          notification.kind === "booking-confirmed"
+                        ? "Customer confirmation email"
                       : `${notification.kind.replaceAll("-", " ")} · ${notification.channel}`}
                   </strong>
                   <span>
@@ -131,6 +186,17 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
                     {" · "}
                     {new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Dublin" }).format(new Date(notification.updatedAt || notification.createdAt))}
                   </span>
+                  {!booking.demo &&
+                  booking.status === "confirmed" &&
+                  canRetryCustomerBookingConfirmationEmail(notification) ? (
+                    <CmsRetryConfirmationEmail
+                      bookingId={booking.id}
+                      deliveryUncertain={
+                        notification.status === "indeterminate" ||
+                        notification.status === "sending"
+                      }
+                    />
+                  ) : null}
                 </div>
               </li>
             ))}
@@ -138,7 +204,10 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
         ) : <p>No notification activity has been recorded for this booking.</p>}
       </CmsPanel>
 
-      <BookingEditorForm booking={booking} />
+      <BookingEditorForm
+        booking={booking}
+        key={`editor:${booking.id}:${booking.version}`}
+      />
     </>
   );
 }

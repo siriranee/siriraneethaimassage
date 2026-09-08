@@ -31,6 +31,7 @@ export type CmsCalendarBooking = {
   readonly reference: string;
   readonly customerName: string;
   readonly customerPhone: string;
+  readonly hasCustomerEmail: boolean;
   readonly customerNotes: string;
   readonly serviceName: string;
   readonly durationMinutes: number;
@@ -442,6 +443,8 @@ export function CmsCalendar({
                         {canManageBookings ? (
                           <CmsBookingQuickActions
                             booking={booking}
+                            hasCustomerEmail={booking.hasCustomerEmail}
+                            isMock={booking.demo}
                             key={`${booking.id}:${booking.version}`}
                           />
                         ) : null}

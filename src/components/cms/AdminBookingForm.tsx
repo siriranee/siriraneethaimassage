@@ -34,6 +34,9 @@ export function AdminBookingForm({
   const [availabilityMessage, setAvailabilityMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [bookingStatus, setBookingStatus] = useState<"pending" | "confirmed">(
+    "pending",
+  );
   const selectedVariant = useMemo(
     () => variants.find((variant) => `${variant.serviceId}|${variant.durationMinutes}` === variantKey),
     [variantKey, variants],
@@ -93,9 +96,23 @@ export function AdminBookingForm({
       return;
     }
 
+    const data = new FormData(event.currentTarget);
+    const customerEmail = String(data.get("email") ?? "").trim();
+    if (
+      bookingStatus === "confirmed" &&
+      !window.confirm(
+        isMock
+          ? "Create this demo booking as confirmed? Demo mode will not contact Resend."
+          : customerEmail
+          ? `Create this booking as confirmed and email ${customerEmail} now?`
+          : "Create this booking as confirmed? No customer email is recorded, so no confirmation email will be sent.",
+      )
+    ) {
+      return;
+    }
+
     setSaving(true);
     setFeedback("");
-    const data = new FormData(event.currentTarget);
 
     try {
       const response = await fetch("/api/cms/bookings", {
@@ -115,7 +132,10 @@ export function AdminBookingForm({
           internalNotes: data.get("internalNotes"),
         }),
       });
-      const result = (await response.json()) as { error?: string; booking?: { id: string } };
+      const result = (await response.json()) as {
+        error?: string;
+        booking?: { id: string };
+      };
 
       if (!response.ok || !result.booking) {
         setFeedback(result.error ?? "The booking could not be saved.");
@@ -125,7 +145,10 @@ export function AdminBookingForm({
       router.push(`/cms/bookings/${result.booking.id}`);
       router.refresh();
     } catch {
-      setFeedback("The CMS could not be reached. Please try again.");
+      setFeedback(
+        "The response was interrupted. Check Bookings and Resend before submitting again to avoid a duplicate.",
+      );
+      router.refresh();
     } finally {
       setSaving(false);
     }
@@ -161,7 +184,7 @@ export function AdminBookingForm({
         <div className={styles.grid}>
           <label className={styles.field}>Customer name<input defaultValue={isMock ? "Demo guest" : ""} maxLength={100} minLength={2} name="customerName" required /></label>
           <label className={styles.field}>Phone<input defaultValue={isMock ? "+353 00 000 0000" : ""} maxLength={30} minLength={7} name="phone" required /></label>
-          <label className={styles.fullField}>Email, optional<input maxLength={254} name="email" type="email" /></label>
+          <label className={styles.fullField}>Email, optional<input maxLength={254} name="email" type="email" /><small>{isMock ? "Demo mode does not contact Resend." : "A confirmation email is sent only when this booking is created or later moved to Confirmed."}</small></label>
           <label className={styles.fullField}>Customer note, optional<textarea maxLength={1000} name="customerNotes" /><small>Do not record unnecessary medical or sensitive information.</small></label>
         </div>
       </section>
@@ -169,7 +192,7 @@ export function AdminBookingForm({
       <section className={styles.section}>
         <header className={styles.sectionHeader}><h2>Booking details</h2><p>Record how the appointment arrived and whether it is already confirmed.</p></header>
         <div className={styles.grid}>
-          <label className={styles.field}>Status<select defaultValue="confirmed" name="status"><option value="pending">Pending</option><option value="confirmed">Confirmed</option></select></label>
+          <label className={styles.field}>Status<select name="status" onChange={(event) => setBookingStatus(event.target.value as "pending" | "confirmed")} value={bookingStatus}><option value="pending">Pending</option><option value="confirmed">Confirmed</option></select><small>{isMock ? "Creating a confirmed demo booking does not contact Resend." : "Creating as Confirmed immediately sends a confirmation email when the customer has an email address."}</small></label>
           <label className={styles.field}>Source<select defaultValue="phone" name="source"><option value="phone">Phone</option><option value="whatsapp">WhatsApp</option><option value="walk-in">Walk-in</option><option value="administrator">Administrator</option></select></label>
           <label className={styles.fullField}>Internal notes<textarea maxLength={1000} name="internalNotes" /></label>
         </div>
@@ -177,7 +200,7 @@ export function AdminBookingForm({
 
       <div className={styles.saveBar}>
         <span aria-live="polite">{feedback ? <span className={styles.error} role="alert">{feedback}</span> : selectedVariant ? `€${(selectedVariant.priceCents / 100).toFixed(0)} · ${selectedVariant.durationMinutes} minutes` : "Choose a treatment"}</span>
-        <button disabled={saving || !localTime} type="submit">{saving ? "Saving..." : "Create booking"}</button>
+        <button disabled={saving || !localTime} type="submit">{saving ? "Saving..." : bookingStatus === "confirmed" ? isMock ? "Create & confirm demo booking" : "Create & confirm booking" : "Create pending booking"}</button>
       </div>
     </form>
   );

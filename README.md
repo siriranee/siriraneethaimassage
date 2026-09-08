@@ -24,10 +24,11 @@ Howth, Dublin, Ireland.
   website unchanged.
 - URL-based booking filters, per-booking activity timelines, unsaved-change
   warnings and metadata-only notification records. A newly stored website
-  request triggers one owner-only Resend email in Thai and English without
-  storing the recipient address or rendered message in MongoDB. Optional
-  customer notes stay in the encrypted CMS record instead of being forwarded
-  through email.
+  request triggers one owner Resend alert in Thai and English. When the shop
+  confirms a booking, Resend sends the customer an English confirmation with
+  the appointment, published business contact details and safe public links.
+  Recipient addresses and rendered messages are never stored in notification
+  records, and customer confirmation emails exclude customer and internal notes.
 - MongoDB persistence, username-and-password authentication, role-based access,
   salted scrypt passwords, revocable sessions, source-aware login throttling and AES-256-GCM
   booking-contact encryption.
@@ -36,7 +37,7 @@ Howth, Dublin, Ireland.
 - Safe local mock CMS and fail-closed production readiness gates.
 
 Direct website booking is implemented but remains disabled until the production
-database, owner approvals, privacy notice and Resend owner-email settings are ready.
+database, owner approvals, privacy notice and Resend booking-email settings are ready.
 
 ## Local development
 
@@ -91,8 +92,8 @@ The normal production sequence is:
 
 1. For the initial Vercel deployment, keep system environment variables enabled
    so VERCEL_PROJECT_PRODUCTION_URL can provide the canonical HTTPS origin.
-   When a custom domain is confirmed and connected, set NEXT_PUBLIC_SITE_URL to
-   that exact origin.
+   For the connected Siriranee domain, set `NEXT_PUBLIC_SITE_URL` to
+   `https://siriranee.com`.
 2. Create a production MongoDB deployment that supports transactions.
 3. Set CMS_MODE=mongodb, MONGODB_URI, MONGODB_DB and CMS_ORIGIN.
 4. Store a secret 32-byte CMS_PII_ENCRYPTION_KEY in the deployment secret
@@ -114,9 +115,15 @@ The normal production sequence is:
    ~~~
 7. Create a Resend API key, verify the sending domain, and set
    `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and `RESEND_BOOKING_TO_EMAIL` in the
-   deployment secret manager. The recipient must be the owner address that
-   should receive every new website booking request. For testing with Resend's
-   shared domain, the recipient must match the Resend account email.
+   deployment secret manager. Use a sender address on `siriranee.com`.
+   `RESEND_BOOKING_TO_EMAIL` is the owner address that receives every new
+   website booking request; confirmed customer emails go to the optional email
+   stored with that booking. For testing with Resend's shared domain, the
+   recipient must match the Resend account email.
+   DMARC is a DNS setting rather than application code. A verified Resend domain
+   already passes SPF and DKIM; add and monitor a `_dmarc.siriranee.com` TXT
+   record, then move from monitoring to `quarantine` or `reject` only after all
+   legitimate senders for the domain are aligned.
 8. Run npm.cmd run cms:indexes.
 9. Temporarily set `CMS_SEED_USERNAME`, `CMS_SEED_PASSWORD`,
    `CMS_SEED_DISPLAY_NAME` and `CMS_SEED_ROLE`, then run
@@ -134,7 +141,9 @@ The normal production sequence is:
 11. Test image preparation, upload, direct publication and failed-save cleanup, then
    set CMS_MEDIA_UPLOAD_READY=true.
 12. Send a test booking to the owner address and confirm the Thai section,
-   English section, reply-to address and CMS booking link. Complete the privacy,
+   English section, reply-to address and CMS booking link. Then confirm that
+   changing the booking from pending to confirmed sends one customer email with
+   the correct Dublin appointment time and public links. Complete the privacy,
    retention, monitoring and isolated
    recovery-drill operational reviews. These are launch responsibilities, not
    application environment gates.
@@ -143,9 +152,10 @@ The normal production sequence is:
 
 The hosted build and runtime both require complete Resend settings before
 direct booking is available. A temporary Resend failure never rolls back an
-already stored booking. The outbox retries a transient failure once with the
-same provider idempotency key, and records failed or uncertain delivery for
-operator review without storing the recipient or message body.
+already stored or confirmed booking. Separate durable outbox records and stable
+provider idempotency keys protect the owner alert and customer confirmation.
+The CMS records failed or uncertain delivery for operator review without
+storing the recipient or message body.
 
 The runtime requires MongoDB mode, a valid customer-data encryption key,
 complete valid Resend settings, and a published CMS snapshot with confirmed
@@ -203,7 +213,7 @@ against the live database by default.
 Before public launch, confirm that production hosting uses the already verified
 MongoDB and Cloudinary accounts, signed upload preset and Resend sending domain.
 Confirm the owner recipient address with a real test email. Then confirm the
-Eircode or exact map pin, building access, cancellation policy, final domain,
+Eircode or exact map pin, building access, cancellation policy,
 remaining public contact and social channels, team details, approved
 photography, privacy details, retention period, notification response process,
 monitoring ownership and backup schedule.

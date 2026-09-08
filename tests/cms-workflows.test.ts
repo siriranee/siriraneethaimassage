@@ -69,7 +69,7 @@ test("public service details resolve current CMS slugs only at request time", as
   assert.match(page, /notFound\(\)/);
 });
 
-test("notification records keep owner Resend delivery metadata free of contact details and message bodies", async () => {
+test("notification records keep Resend delivery metadata free of contact details and message bodies", async () => {
   const [types, notifications, publicBooking] = await Promise.all([
     source("src/domain/cms/types.ts"),
     source("src/server/cms/notification-service.ts"),
@@ -83,6 +83,11 @@ test("notification records keep owner Resend delivery metadata free of contact d
     /id: ownerBookingRequestEmailNotificationId\(booking\.id\)/,
   );
   assert.match(notifications, /audience: "owner"/);
+  assert.match(
+    notifications,
+    /id: customerBookingConfirmationEmailNotificationId\(booking\.id\)/,
+  );
+  assert.match(notifications, /audience: "customer"/);
   assert.match(notifications, /status: "queued"/);
   assert.match(notifications, /provider: "resend"/);
   assert.match(

@@ -67,6 +67,7 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
       reference: booking.reference,
       customerName: booking.customer.name,
       customerPhone: booking.customer.phone,
+      hasCustomerEmail: Boolean(booking.customer.email),
       customerNotes: booking.customer.notes,
       serviceName: booking.serviceName,
       durationMinutes: booking.durationMinutes,

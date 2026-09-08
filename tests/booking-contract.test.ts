@@ -87,7 +87,8 @@ test("CMS booking views use cards with accessible icon-only status actions", asy
   assert.match(calendar, /<CmsBookingQuickActions/);
   assert.match(calendar, /booking\.customerPhone/);
   assert.match(calendar, /booking\.customerNotes \|\| "No notes provided"/);
-  assert.match(quickActions, /aria-label=\{`Confirm booking \$\{booking\.reference\}`\}/);
+  assert.match(quickActions, /Confirm booking \$\{booking\.reference\} and email customer/);
+  assert.match(quickActions, /No customer email is recorded/);
   assert.match(quickActions, /aria-label=\{`Cancel booking \$\{booking\.reference\}`\}/);
   assert.match(quickActions, /<Check aria-hidden="true"/);
   assert.match(quickActions, /<X aria-hidden="true"/);
@@ -175,6 +176,91 @@ test("booking mutations reject assignment fields and unsafe initial statuses", a
   assert.match(service, /parseBookingInput[\s\S]*?assertNoStaffAssignment\(source\)/);
   assert.match(service, /assignedStaffId:\s*""/);
   assert.doesNotMatch(service, /assignedStaffId:\s*input\./);
+});
+
+test("customer confirmation email is dispatched after commit with safe CMS feedback and retry controls", async () => {
+  const [
+    bookingService,
+    bookingDetailPage,
+    updateRoute,
+    createRoute,
+    retryRoute,
+    notifications,
+    quickActions,
+    editor,
+    adminForm,
+    retryButton,
+    feedback,
+  ] = await Promise.all([
+    source("src/server/cms/booking-service.ts"),
+    source("src/app/cms/(protected)/bookings/[bookingId]/page.tsx"),
+    source("src/app/api/cms/bookings/[bookingId]/route.ts"),
+    source("src/app/api/cms/bookings/route.ts"),
+    source(
+      "src/app/api/cms/bookings/[bookingId]/confirmation-email/route.ts",
+    ),
+    source("src/server/cms/notification-service.ts"),
+    source("src/components/cms/CmsBookingQuickActions.tsx"),
+    source("src/components/cms/BookingEditorForm.tsx"),
+    source("src/components/cms/AdminBookingForm.tsx"),
+    source("src/components/cms/CmsRetryConfirmationEmail.tsx"),
+    source("src/domain/booking/confirmation-email.ts"),
+  ]);
+
+  assert.match(
+    bookingService,
+    /await transaction\.saveBooking\(updated, current\.version\);[\s\S]*?recordBookingNotificationPlan\(transaction, updated, notificationKind\)/,
+  );
+  assert.doesNotMatch(
+    bookingService,
+    /attemptCustomerBookingConfirmationEmail/,
+  );
+  assert.ok(
+    updateRoute.indexOf("await updateAdminBooking(") <
+      updateRoute.indexOf("await attemptCustomerBookingConfirmationEmail("),
+  );
+  assert.ok(
+    createRoute.indexOf("await createAdminBooking(") <
+      createRoute.indexOf("await attemptCustomerBookingConfirmationEmail("),
+  );
+  assert.match(updateRoute, /confirmationEmail/);
+  assert.match(createRoute, /confirmationEmail/);
+  assert.match(
+    notifications,
+    /customerBookingConfirmationEmailNotificationId\(booking\.id\)/,
+  );
+  assert.match(notifications, /repository\.mode === "mock" && !options\.sender/);
+
+  assert.match(retryRoute, /isSameOriginMutation\(request\)/);
+  assert.match(retryRoute, /requireCmsApiUser\("bookings:write"\)/);
+  assert.match(retryRoute, /getNotification\(/);
+  assert.match(retryRoute, /No confirmation email is available to retry/);
+  assert.match(retryRoute, /Only a confirmed booking can receive a confirmation email/);
+  assert.match(retryButton, /check the Resend dashboard first/i);
+  assert.match(retryButton, /response was interrupted\. Check Resend/i);
+  assert.match(retryButton, /router\.refresh\(\)/);
+  assert.match(retryButton, /method: "POST"/);
+  assert.match(quickActions, /customerBookingConfirmationEmailFeedback/);
+  assert.match(editor, /customerBookingConfirmationEmailFeedback/);
+  assert.match(feedback, /Confirmation email accepted by Resend/);
+  assert.match(feedback, /No customer email address was provided/);
+  assert.match(feedback, /Email delivery is uncertain/);
+  assert.match(feedback, /confirmation email has not been sent yet/i);
+  assert.match(quickActions, /and email the customer now/);
+  assert.match(editor, /Moving a pending booking to Confirmed sends the customer/);
+  assert.match(adminForm, /Create & confirm booking/);
+  assert.match(adminForm, /Creating as Confirmed immediately sends a confirmation email/);
+  assert.match(quickActions, /Demo mode will not contact Resend/);
+  assert.match(editor, /Demo mode does not contact Resend/);
+  assert.match(adminForm, /Creating a confirmed demo booking does not contact Resend/);
+  assert.match(
+    bookingDetailPage,
+    /key=\{`quick-actions:\$\{booking\.id\}:\$\{booking\.version\}`\}/,
+  );
+  assert.match(
+    bookingDetailPage,
+    /key=\{`editor:\$\{booking\.id\}:\$\{booking\.version\}`\}/,
+  );
 });
 
 test("contact handoff resolves service and price from the published snapshot", async () => {

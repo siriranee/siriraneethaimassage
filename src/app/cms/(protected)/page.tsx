@@ -85,6 +85,8 @@ export default async function CmsDashboardPage() {
                   {canManageBookings ? (
                     <CmsBookingQuickActions
                       booking={booking}
+                      hasCustomerEmail={Boolean(booking.customer.email)}
+                      isMock={booking.demo}
                       key={`${booking.id}:${booking.version}`}
                     />
                   ) : null}

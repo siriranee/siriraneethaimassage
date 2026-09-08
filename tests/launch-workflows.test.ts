@@ -88,6 +88,10 @@ test("isolated launch verification covers services, ten bookings and administrat
     { CmsValidationError },
     { CmsConflictError, getCmsRepository },
     {
+      attemptCustomerBookingConfirmationEmail,
+      customerBookingConfirmationEmailNotificationId,
+    },
+    {
       createManagedCmsUser,
       resetManagedCmsUserPassword,
       revokeManagedCmsUserSessions,
@@ -101,6 +105,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     import("@/server/cms/content-service"),
     import("@/server/cms/content-validation"),
     import("@/server/cms/repositories"),
+    import("@/server/cms/notification-service"),
     import("@/server/cms/user-service"),
   ]);
 
@@ -529,6 +534,92 @@ test("isolated launch verification covers services, ten bookings and administrat
         notification.providerMessageId === "isolated-resend-email-id" &&
         notification.attemptCount === 1,
     ),
+  );
+
+  const confirmedPublicBooking = await updateAdminBooking(
+    publicBooking.id,
+    {
+      status: "confirmed",
+      internalNotes: "",
+      changeReason: "other-operational",
+    },
+    publicBooking.version,
+    context,
+  );
+  assert.equal(confirmedPublicBooking.status, "confirmed");
+  const customerNotificationId =
+    customerBookingConfirmationEmailNotificationId(publicBooking.id);
+  assert.equal(
+    (await repository.listNotifications(publicBooking.id, 20)).filter(
+      (notification) => notification.id === customerNotificationId,
+    ).length,
+    1,
+  );
+
+  let customerEmailAttempts = 0;
+  const failedConfirmation =
+    await attemptCustomerBookingConfirmationEmail(
+      productionModeRepository,
+      confirmedPublicBooking,
+      {
+        sender: async () => {
+          customerEmailAttempts += 1;
+          throw new Error("Simulated customer confirmation outage");
+        },
+      },
+    );
+  assert.deepEqual(failedConfirmation, { status: "indeterminate" });
+  assert.equal(
+    (await repository.getBooking(publicBooking.id))?.status,
+    "confirmed",
+  );
+
+  const recoveredConfirmation =
+    await attemptCustomerBookingConfirmationEmail(
+      productionModeRepository,
+      confirmedPublicBooking,
+      {
+        sender: async () => {
+          customerEmailAttempts += 1;
+          return {
+            status: "sent" as const,
+            attempted: true as const,
+            providerMessageId: "isolated-customer-confirmation-id",
+          };
+        },
+      },
+    );
+  assert.deepEqual(recoveredConfirmation, { status: "sent" });
+  assert.deepEqual(
+    await attemptCustomerBookingConfirmationEmail(
+      productionModeRepository,
+      confirmedPublicBooking,
+      {
+        sender: async () => {
+          customerEmailAttempts += 1;
+          return {
+            status: "sent" as const,
+            attempted: true as const,
+            providerMessageId: "must-not-send-twice",
+          };
+        },
+      },
+    ),
+    { status: "sent" },
+  );
+  assert.equal(customerEmailAttempts, 2);
+  const customerNotification = await repository.getNotification(
+    customerNotificationId,
+  );
+  assert.equal(customerNotification?.status, "sent");
+  assert.equal(customerNotification?.attemptCount, 2);
+  assert.equal(
+    customerNotification?.providerMessageId,
+    "isolated-customer-confirmation-id",
+  );
+  assert.doesNotMatch(
+    JSON.stringify(customerNotification),
+    /demo\.public@example\.invalid|Demo Public Guest|Fictional public booking/,
   );
 
   const audits = await repository.listAudit(100);

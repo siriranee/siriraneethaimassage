@@ -19,7 +19,7 @@ export default async function CmsBookingSettingsPage() {
         The CMS switch records the owner&apos;s decision after hours and rules are
         confirmed. Hosted production also requires MongoDB, the booking-data
         encryption key, the public-booking environment switch and complete Resend
-        owner-email settings. Privacy, monitoring and recovery remain launch
+        booking-email settings. Privacy, monitoring and recovery remain launch
         responsibilities.
       </CmsNotice>
       <BookingSettingsForm openingHoursConfirmed={content.site.openingHoursConfirmed} settings={content.bookingSettings} />

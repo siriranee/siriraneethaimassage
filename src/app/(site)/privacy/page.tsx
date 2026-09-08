@@ -74,8 +74,13 @@ export default async function PrivacyPage() {
             booking record. After a website request is stored, Resend processes the
             appointment and contact details needed to deliver an operational email
             notification to the owner, including any optional notes supplied with
-            the request. Hosting and support providers may process limited
-            information only when configured for this service.
+            the request. If you provide an email address and the shop confirms the
+            appointment, Resend also processes your name, email address,
+            appointment details and published business details needed to send your
+            confirmation. The
+            customer confirmation does not include your notes or internal CMS
+            notes. Hosting and support providers may process limited information
+            only when configured for this service.
           </p>
           <p>
             Booking records are retained for two years after the appointment and

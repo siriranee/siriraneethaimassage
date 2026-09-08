@@ -72,6 +72,15 @@ const configuration = {
   siteOrigin: "https://siriranee.example",
 };
 
+const customerEmailBusiness = {
+  name: "Siriranee Thai Massage",
+  address: "Floor 3, Harbour House, Harbour Road, Howth, Dublin, Ireland",
+  phone: "+353899484585",
+  email: "hello@siriranee.com",
+  arrivalGuidance: "Please arrive five minutes early.",
+  directionsUrl: "https://maps.example/directions",
+};
+
 test("Resend owner booking email uses the owner address, reply-to and stable idempotency key", async () => {
   const {
     getOwnerBookingEmailDeliveryFingerprint,
@@ -150,6 +159,145 @@ test("Resend owner booking email uses the owner address, reply-to and stable ide
     String(fingerprint),
     /Nok Example|nok@example\.com|353 85 123 4567/,
   );
+});
+
+test("Resend customer confirmation targets the customer with a stable, private payload", async () => {
+  const {
+    getCustomerBookingEmailDeliveryFingerprint,
+    sendCustomerBookingConfirmedEmail,
+  } = await import("@/server/booking/resend-booking-email");
+  const confirmed = { ...booking(), status: "confirmed" as const };
+  let capturedPayload: Record<string, unknown> | undefined;
+  let capturedOptions: Record<string, unknown> | undefined;
+
+  const result = await sendCustomerBookingConfirmedEmail(
+    confirmed,
+    customerEmailBusiness,
+    {
+      configuration,
+      client: {
+        emails: {
+          async send(payload, options): Promise<CreateEmailResponse> {
+            capturedPayload = payload as unknown as Record<string, unknown>;
+            capturedOptions = options as Record<string, unknown> | undefined;
+            return {
+              data: { id: "customer-confirmation-id" },
+              error: null,
+              headers: null,
+            };
+          },
+        },
+      },
+    },
+  );
+
+  assert.deepEqual(result, {
+    status: "sent",
+    attempted: true,
+    providerMessageId: "customer-confirmation-id",
+  });
+  assert.deepEqual(capturedPayload?.to, ["nok@example.com"]);
+  assert.equal(capturedPayload?.from, configuration.from);
+  assert.equal(capturedPayload?.replyTo, "hello@siriranee.com");
+  assert.equal(
+    capturedOptions?.idempotencyKey,
+    "customer-booking-confirmed/11111111-2222-4333-8444-555555555555",
+  );
+  assert.deepEqual(capturedPayload?.tags, [
+    { name: "event", value: "booking-confirmed" },
+    { name: "audience", value: "customer" },
+  ]);
+  assert.match(String(capturedPayload?.html), /Your appointment is confirmed/);
+  assert.match(String(capturedPayload?.html), /https:\/\/siriranee\.example\/book\/status/);
+  assert.doesNotMatch(
+    `${String(capturedPayload?.html)}\n${String(capturedPayload?.text)}`,
+    /Quiet room if possible|11111111-2222-4333-8444-555555555555/,
+  );
+
+  const fingerprintOptions = {
+    configuration,
+    fingerprintSecret: "test-only-customer-confirmation-secret",
+  };
+  const fingerprint = getCustomerBookingEmailDeliveryFingerprint(
+    confirmed,
+    customerEmailBusiness,
+    fingerprintOptions,
+  );
+  assert.equal(
+    fingerprint,
+    getCustomerBookingEmailDeliveryFingerprint(
+      {
+        ...confirmed,
+        version: 99,
+        internalNotes: "Changed internally",
+        customer: { ...confirmed.customer, notes: "Changed customer note" },
+      },
+      customerEmailBusiness,
+      fingerprintOptions,
+    ),
+  );
+  assert.notEqual(
+    fingerprint,
+    getCustomerBookingEmailDeliveryFingerprint(
+      { ...confirmed, localTime: "10:30" },
+      customerEmailBusiness,
+      fingerprintOptions,
+    ),
+  );
+  assert.doesNotMatch(String(fingerprint), /nok@example\.com|Nok Example/);
+});
+
+test("customer confirmation refuses missing recipients and unconfirmed bookings", async () => {
+  const { sendCustomerBookingConfirmedEmail } = await import(
+    "@/server/booking/resend-booking-email"
+  );
+  let calls = 0;
+  const client = {
+    emails: {
+      async send(): Promise<CreateEmailResponse> {
+        calls += 1;
+        return { data: { id: "must-not-send" }, error: null, headers: null };
+      },
+    },
+  };
+
+  assert.deepEqual(
+    await sendCustomerBookingConfirmedEmail(
+      { ...booking(""), status: "confirmed" },
+      customerEmailBusiness,
+      { configuration, client },
+    ),
+    {
+      status: "failed",
+      attempted: false,
+      errorCode: "customer-email-missing",
+    },
+  );
+  assert.deepEqual(
+    await sendCustomerBookingConfirmedEmail(
+      { ...booking("not-an-email"), status: "confirmed" },
+      customerEmailBusiness,
+      { configuration, client },
+    ),
+    {
+      status: "failed",
+      attempted: false,
+      errorCode: "customer-email-invalid",
+    },
+  );
+  assert.deepEqual(
+    await sendCustomerBookingConfirmedEmail(
+      booking(),
+      customerEmailBusiness,
+      { configuration, client },
+    ),
+    {
+      status: "failed",
+      attempted: false,
+      errorCode: "booking-not-confirmed",
+    },
+  );
+  assert.equal(calls, 0);
 });
 
 test("owner email is still sent when the customer did not provide an email", async () => {
@@ -526,4 +674,255 @@ test("delivery respects an active claim, the original idempotency window, and pa
   assert.equal(changedPayloadNotification?.status, "failed");
   assert.equal(changedPayloadNotification?.lastError, "resend-payload-changed");
   assert.equal(changedPayloadNotification?.attemptCount, 1);
+  assert.equal(changedPayloadNotification?.deliveryPayloadHash, "original-payload");
+});
+
+test("confirmed customer email uses one durable outbox record and cannot resend after acceptance", async () => {
+  const { MockCmsRepository } = await import(
+    "@/server/cms/repositories/mock-repository"
+  );
+  const {
+    attemptCustomerBookingConfirmationEmail,
+    customerBookingConfirmationEmailNotificationId,
+    recordBookingNotificationPlan,
+  } = await import("@/server/cms/notification-service");
+  const repository = new MockCmsRepository();
+  const confirmed: CmsBooking = {
+    ...booking(),
+    id: "88888888-2222-4333-8444-555555555555",
+    reference: "SRN-20260910-OUTBOX1",
+    status: "confirmed",
+  };
+  await repository.saveBooking(confirmed);
+
+  await recordBookingNotificationPlan(
+    repository,
+    confirmed,
+    "booking-confirmed",
+  );
+  await recordBookingNotificationPlan(
+    repository,
+    confirmed,
+    "booking-confirmed",
+  );
+  const notificationId = customerBookingConfirmationEmailNotificationId(
+    confirmed.id,
+  );
+  const planned = (await repository.listNotifications(confirmed.id, 100)).filter(
+    (item) => item.id === notificationId,
+  );
+  assert.equal(planned.length, 1);
+  assert.equal(planned[0]?.status, "queued");
+  assert.equal(planned[0]?.audience, "customer");
+  assert.equal(planned[0]?.provider, "resend");
+
+  let senderCalls = 0;
+  const options = {
+    business: customerEmailBusiness,
+    sender: async () => {
+      senderCalls += 1;
+      return {
+        status: "sent" as const,
+        attempted: true as const,
+        providerMessageId: "accepted-once",
+      };
+    },
+    fingerprinter: () => "customer-payload-fingerprint",
+    retryDelayMs: 0,
+  };
+  assert.deepEqual(
+    await attemptCustomerBookingConfirmationEmail(
+      repository,
+      confirmed,
+      options,
+    ),
+    { status: "sent" },
+  );
+  assert.deepEqual(
+    await attemptCustomerBookingConfirmationEmail(
+      repository,
+      confirmed,
+      options,
+    ),
+    { status: "sent" },
+  );
+  assert.equal(senderCalls, 1);
+
+  const saved = await repository.getNotification(notificationId);
+  assert.equal(saved?.status, "sent");
+  assert.equal(saved?.attemptCount, 1);
+  assert.equal(saved?.providerMessageId, "accepted-once");
+  assert.doesNotMatch(
+    JSON.stringify(saved),
+    /nok@example\.com|Nok Example|Quiet room if possible/,
+  );
+});
+
+test("customer delivery rechecks the stored booking after claiming the outbox", async () => {
+  const { MockCmsRepository } = await import(
+    "@/server/cms/repositories/mock-repository"
+  );
+  const {
+    attemptCustomerBookingConfirmationEmail,
+    customerBookingConfirmationEmailNotificationId,
+    recordBookingNotificationPlan,
+  } = await import("@/server/cms/notification-service");
+  const repository = new MockCmsRepository();
+  const confirmed: CmsBooking = {
+    ...booking(),
+    id: "77777777-2222-4333-8444-555555555555",
+    reference: "SRN-20260910-STALE1",
+    status: "confirmed",
+  };
+  await repository.saveBooking(confirmed);
+  await recordBookingNotificationPlan(
+    repository,
+    confirmed,
+    "booking-confirmed",
+  );
+  const claimThenCancelRepository = new Proxy(repository, {
+    get(target, property, receiver) {
+      if (property === "claimNotificationDelivery") {
+        return async (
+          ...args: Parameters<CmsRepository["claimNotificationDelivery"]>
+        ) => {
+          const claimed = await target.claimNotificationDelivery(...args);
+          if (claimed) {
+            await target.saveBooking(
+              {
+                ...confirmed,
+                status: "cancelled",
+                version: confirmed.version + 1,
+              },
+              confirmed.version,
+            );
+          }
+          return claimed;
+        };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as CmsRepository;
+
+  let senderCalls = 0;
+  const outcome = await attemptCustomerBookingConfirmationEmail(
+    claimThenCancelRepository,
+    confirmed,
+    {
+      business: customerEmailBusiness,
+      sender: async () => {
+        senderCalls += 1;
+        return {
+          status: "sent" as const,
+          attempted: true as const,
+          providerMessageId: "must-not-send-stale-booking",
+        };
+      },
+      fingerprinter: () => "customer-payload-fingerprint",
+      retryDelayMs: 0,
+    },
+  );
+
+  assert.deepEqual(outcome, { status: "failed" });
+  assert.equal(senderCalls, 0);
+  const saved = await repository.getNotification(
+    customerBookingConfirmationEmailNotificationId(confirmed.id),
+  );
+  assert.equal(saved?.status, "failed");
+  assert.equal(saved?.lastError, "booking-not-confirmed");
+});
+
+test("a known-unsent retry starts a fresh uncertain-delivery window", async () => {
+  const { MockCmsRepository } = await import(
+    "@/server/cms/repositories/mock-repository"
+  );
+  const { deliverOwnerBookingRequestEmail } = await import(
+    "@/server/cms/notification-service"
+  );
+  const repository = new MockCmsRepository();
+  const currentBooking = booking();
+  const oldAttempt = "2026-01-01T00:00:00.000Z";
+  await repository.saveNotification({
+    id: `owner-booking-requested:${currentBooking.id}`,
+    bookingId: currentBooking.id,
+    bookingReference: currentBooking.reference,
+    channel: "email",
+    audience: "owner",
+    kind: "booking-requested",
+    status: "failed",
+    provider: "resend",
+    attemptCount: 1,
+    firstAttemptedAt: oldAttempt,
+    attemptedAt: oldAttempt,
+    deliveryPayloadHash: "original-payload",
+    lastError: "resend-message-rejected",
+    createdAt: oldAttempt,
+    updatedAt: oldAttempt,
+  });
+
+  const startedAt = Date.now();
+  const result = await deliverOwnerBookingRequestEmail(
+    repository,
+    currentBooking,
+    async () => ({
+      status: "failed",
+      attempted: true,
+      errorCode: "resend-timeout",
+    }),
+    () => "original-payload",
+  );
+  assert.deepEqual(result, {
+    status: "failed",
+    attempted: true,
+    errorCode: "resend-timeout",
+  });
+  const saved = await repository.getNotification(
+    `owner-booking-requested:${currentBooking.id}`,
+  );
+  assert.equal(saved?.status, "indeterminate");
+  assert.ok(Date.parse(saved?.firstAttemptedAt ?? "") >= startedAt);
+});
+
+test("retry permits known-unsent failures but expires uncertain Resend outcomes", async () => {
+  const { canRetryCustomerBookingConfirmationEmail } = await import(
+    "@/server/cms/notification-service"
+  );
+  const oldAttempt = new Date(
+    Date.now() - 24 * 60 * 60 * 1_000,
+  ).toISOString();
+  const base: CmsBookingNotification = {
+    id: "customer-booking-confirmed:retry-policy",
+    bookingId: "99999999-2222-4333-8444-555555555555",
+    bookingReference: "SRN-20260910-RETRY1",
+    channel: "email",
+    audience: "customer",
+    kind: "booking-confirmed",
+    status: "failed",
+    provider: "resend",
+    attemptCount: 1,
+    firstAttemptedAt: oldAttempt,
+    attemptedAt: oldAttempt,
+    lastError: "resend-message-rejected",
+    createdAt: oldAttempt,
+    updatedAt: oldAttempt,
+  };
+
+  assert.equal(canRetryCustomerBookingConfirmationEmail(base), true);
+  assert.equal(
+    canRetryCustomerBookingConfirmationEmail({
+      ...base,
+      status: "indeterminate",
+      lastError: "resend-timeout",
+    }),
+    false,
+  );
+  assert.equal(
+    canRetryCustomerBookingConfirmationEmail({
+      ...base,
+      status: "sent",
+      lastError: "",
+    }),
+    false,
+  );
 });

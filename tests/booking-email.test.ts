@@ -151,3 +151,71 @@ test("owner booking email supplies bilingual fallbacks for optional customer fie
   assert.doesNotMatch(message.html, /Open booking in CMS/);
   assert.doesNotMatch(message.text, /Open booking in CMS:/);
 });
+
+test("customer confirmation email contains safe appointment and public business details only", async () => {
+  const { renderCustomerBookingConfirmedEmail } = await import(
+    "@/server/booking/booking-email"
+  );
+  const message = renderCustomerBookingConfirmedEmail(
+    booking({
+      status: "confirmed",
+      customer: {
+        name: "Nok <Example>\u202E",
+        phone: "+353 85 123 4567",
+        email: "nok@example.com",
+        notes: "Quiet room if possible.",
+      },
+    }),
+    {
+      name: "Siriranee Thai Massage",
+      address: "Floor 3, Harbour House, Harbour Road, Howth, Dublin, Ireland",
+      phone: "+353899484585",
+      email: "hello@siriranee.com",
+      arrivalGuidance: "Please arrive five minutes early.",
+      directionsUrl: "https://maps.example/directions",
+      siteOrigin: "https://siriranee.com",
+    },
+  );
+
+  for (const expected of [
+    "Your appointment is confirmed",
+    "SRN-20260910-ABC123",
+    "Traditional Thai Massage",
+    "60 minutes",
+    "Thursday 10 September 2026",
+    "10:00 (Dublin time)",
+    "€65.00",
+    "Floor 3, Harbour House, Harbour Road, Howth, Dublin, Ireland",
+    "+353899484585",
+    "hello@siriranee.com",
+    "https://siriranee.com/visit",
+    "https://siriranee.com/contact",
+    "https://siriranee.com/book/status",
+  ]) {
+    assert.match(
+      `${message.html}\n${message.text}`,
+      new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+  }
+  assert.match(message.html, /Nok &lt;Example&gt;/);
+  assert.doesNotMatch(message.html, /\u202E|<Example>/);
+  assert.doesNotMatch(message.text, /\u202E/);
+  assert.doesNotMatch(message.html, /book\/status\?/);
+
+  for (const forbidden of [
+    "nok@example.com",
+    "+353 85 123 4567",
+    "Quiet room if possible.",
+    "Never include this internal note.",
+    "11111111-2222-4333-8444-555555555555",
+    "secret-hold-hash",
+    "secret-idempotency-hash",
+    "secret-fingerprint-hash",
+    "Open booking in CMS",
+  ]) {
+    assert.doesNotMatch(
+      `${message.html}\n${message.text}`,
+      new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+  }
+});

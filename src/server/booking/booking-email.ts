@@ -21,6 +21,31 @@ type BookingEmailInput = Pick<
   | "createdAt"
 >;
 
+type CustomerBookingEmailInput = Pick<
+  CmsBooking,
+  | "id"
+  | "reference"
+  | "serviceName"
+  | "durationMinutes"
+  | "priceCents"
+  | "currency"
+  | "localDate"
+  | "localTime"
+  | "timezone"
+> & {
+  readonly customer: Pick<CmsBooking["customer"], "name" | "email">;
+};
+
+export type CustomerBookingEmailBusiness = {
+  readonly name: string;
+  readonly address: string;
+  readonly phone?: string;
+  readonly email?: string;
+  readonly arrivalGuidance?: string;
+  readonly directionsUrl?: string;
+  readonly siteOrigin?: string;
+};
+
 export type BookingEmailMessage = {
   readonly subject: string;
   readonly html: string;
@@ -344,4 +369,144 @@ This request is not confirmed yet. Check availability before confirming it with 
     html,
     text,
   };
+}
+
+function safeHttpUrl(value: string | undefined) {
+  if (!value) return undefined;
+
+  try {
+    const url = new URL(value);
+    if (url.username || url.password) return undefined;
+    const localHttp =
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1");
+    if (url.protocol !== "https:" && !localHttp) {
+      return undefined;
+    }
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function customerEmailLink(label: string, href: string) {
+  return `<a href="${escapeHtml(href)}" style="display:inline-block;padding:13px 22px;border-radius:999px;background:#5c2288;color:#fffdf7;font-size:15px;font-weight:700;line-height:1.2;text-decoration:none;">${escapeHtml(label)}</a>`;
+}
+
+export function renderCustomerBookingConfirmedEmail(
+  booking: CustomerBookingEmailInput,
+  business: CustomerBookingEmailBusiness,
+): BookingEmailMessage {
+  const customerName = cleanDisplayText(booking.customer.name);
+  const reference = cleanDisplayText(booking.reference);
+  const serviceName = cleanDisplayText(booking.serviceName);
+  const localTime = cleanDisplayText(booking.localTime);
+  const businessName = cleanDisplayText(business.name) || "Siriranee Thai Massage";
+  const address = cleanDisplayText(business.address);
+  const phone = cleanDisplayText(business.phone ?? "");
+  const email = cleanDisplayText(business.email ?? "");
+  const arrivalGuidance = cleanDisplayText(business.arrivalGuidance ?? "", true);
+  const formattedDate = formatBookingDate(booking.localDate, "en-IE");
+  const formattedPrice = formatPrice(
+    booking.priceCents,
+    booking.currency,
+    "en-IE",
+  );
+  const origin = safeHttpUrl(business.siteOrigin)?.replace(/\/+$/, "");
+  const directionsUrl = safeHttpUrl(business.directionsUrl);
+  const visitUrl = origin ? `${origin}/visit` : directionsUrl;
+  const contactUrl = origin ? `${origin}/contact` : undefined;
+  const statusUrl = origin ? `${origin}/book/status` : undefined;
+  const subject = `Booking confirmed · ${reference} · ${businessName}`;
+  const preheader = `Your appointment on ${formattedDate} at ${localTime} is confirmed.`;
+  const contactLines = [
+    phone ? `Phone: ${phone}` : "",
+    email ? `Email: ${email}` : "",
+  ].filter(Boolean);
+
+  const locationSection = address
+    ? `<h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">Where to go</h2>
+      <p style="margin:0;color:#3c3340;font-size:15px;line-height:1.65;">${escapeHtml(address)}</p>
+      ${arrivalGuidance ? `<p style="margin:8px 0 0;color:#675d64;font-size:14px;line-height:1.6;">${escapeHtmlMultiline(arrivalGuidance)}</p>` : ""}
+      ${visitUrl ? `<p style="margin:18px 0 0;">${customerEmailLink("Plan your visit", visitUrl)}</p>` : ""}`
+    : "";
+
+  const statusSection = statusUrl
+    ? `<div style="margin:26px 0 0;padding:18px;border:1px solid #d8c7d7;border-radius:14px;background:#f7f0fa;">
+        <h2 style="margin:0 0 8px;color:#5c2288;font-size:18px;line-height:1.4;">Check your booking status</h2>
+        <p style="margin:0 0 16px;color:#3c3340;font-size:14px;line-height:1.6;">Enter booking reference <strong>${escapeHtml(reference)}</strong>. For your privacy, the link does not contain your booking details.</p>
+        ${customerEmailLink("Check booking status", statusUrl)}
+      </div>`
+    : "";
+
+  const html = `<!doctype html>
+<html lang="en-IE">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light only">
+    <title>${escapeHtml(subject)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f9f4ea;color:#2b2028;font-family:Arial,Tahoma,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;background:#f9f4ea;">
+      <tr>
+        <td align="center" style="padding:24px 12px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:640px;border:1px solid #e6d9be;border-radius:18px;border-collapse:separate;overflow:hidden;background:#fffdf7;box-shadow:0 12px 36px rgba(43,32,40,.10);">
+            <tr><td style="padding:18px 30px;background:#5c2288;color:#fffdf7;font-size:17px;font-weight:800;line-height:1.4;">${escapeHtml(businessName)}</td></tr>
+            <tr><td style="padding:30px 30px 32px;">
+              <p style="margin:0 0 7px;color:#2d6d4f;font-size:12px;font-weight:800;letter-spacing:.08em;line-height:1.4;text-transform:uppercase;">Booking confirmation</p>
+              <h1 style="margin:0;color:#5c2288;font-size:28px;line-height:1.25;">Your appointment is confirmed</h1>
+              <p dir="auto" style="margin:12px 0 20px;color:#3c3340;font-size:16px;line-height:1.65;">Hi ${escapeHtml(customerName)}, your appointment with ${escapeHtml(businessName)} is confirmed. We look forward to welcoming you.</p>
+              <div style="margin:0 0 24px;padding:14px 16px;border:1px solid #98c8ae;border-radius:12px;background:#eaf6ef;">
+                <span style="display:block;margin-bottom:3px;color:#2d6d4f;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">Status</span>
+                <strong style="color:#22573f;font-size:18px;line-height:1.35;">Confirmed</strong>
+              </div>
+              <h2 style="margin:0 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">Appointment details</h2>
+              <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">
+                ${[
+                  ["Booking reference", reference],
+                  ["Treatment", serviceName],
+                  ["Duration", `${booking.durationMinutes} minutes`],
+                  ["Date", formattedDate],
+                  ["Time", `${localTime} (Dublin time)`],
+                  ["Price", formattedPrice],
+                ].map(([label, value]) => detailRow(label, value)).join("")}
+              </table>
+              ${locationSection}
+              <h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">Need to change or cancel?</h2>
+              <p style="margin:0;color:#3c3340;font-size:15px;line-height:1.65;">Please contact us as soon as possible.${contactLines.length ? `<br>${contactLines.map(escapeHtml).join("<br>")}` : ""}</p>
+              ${contactUrl ? `<p style="margin:18px 0 0;">${customerEmailLink("Contact Siriranee", contactUrl)}</p>` : ""}
+              ${statusSection}
+            </td></tr>
+            <tr><td style="padding:17px 30px;background:#efe4f7;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">This operational email was sent because this address was provided for booking ${escapeHtml(reference)}. It is not a marketing email.</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  const text = `BOOKING CONFIRMED — ${businessName}
+
+Hi ${customerName},
+
+Your appointment with ${businessName} is confirmed. We look forward to welcoming you.
+
+Appointment details
+Booking reference: ${reference}
+Treatment: ${serviceName}
+Duration: ${booking.durationMinutes} minutes
+Date: ${formattedDate}
+Time: ${localTime} (Dublin time)
+Price: ${formattedPrice}
+${address ? `\nWhere to go\n${address}\n${arrivalGuidance ? `${arrivalGuidance}\n` : ""}${visitUrl ? `Plan your visit: ${visitUrl}\n` : ""}` : ""}
+Need to change or cancel?
+Please contact us as soon as possible.
+${contactLines.length ? `${contactLines.join("\n")}\n` : ""}${contactUrl ? `Contact: ${contactUrl}\n` : ""}
+${statusUrl ? `Check booking status: ${statusUrl}\nEnter booking reference ${reference}. For your privacy, the link does not contain your booking details.\n` : ""}
+This operational email was sent because this address was provided for booking ${reference}. It is not a marketing email.`;
+
+  return { subject, html, text };
 }

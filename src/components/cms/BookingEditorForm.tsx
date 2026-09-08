@@ -4,6 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import {
+  customerBookingConfirmationEmailFeedback,
+  type CustomerBookingConfirmationEmailOutcome,
+} from "@/domain/booking/confirmation-email";
+import {
   getAllowedBookingStatusTransitions,
   isTerminalBookingStatus,
 } from "@/domain/booking/status";
@@ -20,7 +24,10 @@ export function BookingEditorForm({
   const router = useRouter();
   const [version, setVersion] = useState(booking.version);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "warning" | "error";
+    text: string;
+  } | null>(null);
   const { dirty, markDirty, markSaved } = useUnsavedChanges();
   const statusOptions = [
     booking.status,
@@ -30,9 +37,24 @@ export function BookingEditorForm({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const nextStatus = data.get("status");
+    if (
+      booking.status !== "confirmed" &&
+      nextStatus === "confirmed" &&
+      !window.confirm(
+        booking.demo
+          ? `Confirm demo booking ${booking.reference}? Demo mode will not contact Resend.`
+          : booking.customer.email
+          ? `Confirm booking ${booking.reference} and email the customer now?`
+          : `Confirm booking ${booking.reference}? No customer email is recorded, so no confirmation email will be sent.`,
+      )
+    ) {
+      return;
+    }
+
     setSaving(true);
     setFeedback(null);
-    const data = new FormData(event.currentTarget);
 
     try {
       const response = await fetch(`/api/cms/bookings/${booking.id}`, {
@@ -47,7 +69,11 @@ export function BookingEditorForm({
           internalNotes: data.get("internalNotes"),
         }),
       });
-      const result = (await response.json()) as { error?: string; booking?: CmsBooking };
+      const result = (await response.json()) as {
+        error?: string;
+        booking?: CmsBooking;
+        confirmationEmail?: CustomerBookingConfirmationEmailOutcome;
+      };
 
       if (!response.ok || !result.booking) {
         setFeedback({ tone: "error", text: result.error ?? "The booking could not be saved." });
@@ -56,10 +82,18 @@ export function BookingEditorForm({
 
       setVersion(result.booking.version);
       markSaved();
-      setFeedback({ tone: "success", text: "Booking changes saved." });
+      setFeedback(
+        result.confirmationEmail
+          ? customerBookingConfirmationEmailFeedback(result.confirmationEmail)
+          : { tone: "success", text: "Booking changes saved." },
+      );
       router.refresh();
     } catch {
-      setFeedback({ tone: "error", text: "The CMS could not be reached. Please try again." });
+      setFeedback({
+        tone: "warning",
+        text: "The response was interrupted. Review the booking and Resend status before trying again.",
+      });
+      router.refresh();
     } finally {
       setSaving(false);
     }
@@ -74,7 +108,7 @@ export function BookingEditorForm({
             <select defaultValue={booking.status} name="status">
               {statusOptions.map((status) => <option key={status} value={status}>{status === "no-show" ? "No-show" : status.charAt(0).toUpperCase() + status.slice(1)}</option>)}
             </select>
-            <small>Only safe next statuses are offered. Final statuses cannot be reopened.</small>
+            <small>{booking.demo ? "Demo mode does not contact Resend. " : "Moving a pending booking to Confirmed sends the customer a confirmation email when an email address is recorded. "}Final statuses cannot be reopened.</small>
           </label>
           <label className={styles.field}>Date<input defaultValue={booking.localDate} disabled={appointmentLocked} name="localDate" required type="date" /></label>
           <label className={styles.field}>Dublin time<input defaultValue={booking.localTime} disabled={appointmentLocked} name="localTime" required step={300} type="time" /></label>
@@ -90,7 +124,7 @@ export function BookingEditorForm({
       </section>
 
       <div className={styles.saveBar}>
-        <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Booking version ${version}${dirty ? " · unsaved changes" : ""}`}</span>
+        <span aria-live="polite">{feedback ? <span className={styles[feedback.tone]} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Booking version ${version}${dirty ? " · unsaved changes" : ""}`}</span>
         <button disabled={saving} type="submit">{saving ? "Saving..." : "Save booking"}</button>
       </div>
     </form>

@@ -2,7 +2,9 @@ import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
 import { createAdminBooking } from "@/server/cms/booking-service";
 import { cmsErrorResponse, cmsNoStoreJson, readCmsJsonObject } from "@/server/cms/http";
+import { attemptCustomerBookingConfirmationEmail } from "@/server/cms/notification-service";
 import { listCmsBookings } from "@/server/cms/read-service";
+import { getCmsRepository } from "@/server/cms/repositories";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +26,17 @@ export async function POST(request: Request) {
       actor: user,
       requestId: getRequestId(request),
     });
-    return cmsNoStoreJson({ booking }, { status: 201 });
+    const confirmationEmail =
+      booking.status === "confirmed"
+        ? await attemptCustomerBookingConfirmationEmail(
+            getCmsRepository(),
+            booking,
+          )
+        : undefined;
+    return cmsNoStoreJson(
+      { booking, ...(confirmationEmail ? { confirmationEmail } : {}) },
+      { status: 201 },
+    );
   } catch (error) {
     return cmsErrorResponse(error);
   }

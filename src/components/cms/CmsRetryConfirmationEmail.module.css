@@ -1,0 +1,73 @@
+.wrap {
+  display: grid;
+  justify-items: start;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.wrap button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.48rem 0.7rem;
+  border: 1px solid var(--color-purple-300);
+  border-radius: 0.58rem;
+  background: var(--color-surface);
+  color: var(--color-purple-700);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.wrap button:hover:not(:disabled) {
+  border-color: var(--color-purple-700);
+  background: var(--color-purple-100);
+}
+
+.wrap button:focus-visible {
+  outline: 0.2rem solid var(--color-gold-500);
+  outline-offset: 0.12rem;
+}
+
+.wrap button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.wrap svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.wrap small {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.success {
+  color: var(--color-success);
+}
+
+.warning {
+  color: var(--color-warning);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.spinner {
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

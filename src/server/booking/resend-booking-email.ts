@@ -9,8 +9,13 @@ import {
   type CreateEmailResponse,
 } from "resend";
 
-import type { CmsBooking } from "@/domain/cms/types";
-import { renderOwnerBookingRequestedEmail } from "@/server/booking/booking-email";
+import { googleMapsDirectionsUrl } from "@/content/site";
+import type { CmsBooking, CmsSiteSettings } from "@/domain/cms/types";
+import {
+  renderCustomerBookingConfirmedEmail,
+  renderOwnerBookingRequestedEmail,
+  type CustomerBookingEmailBusiness,
+} from "@/server/booking/booking-email";
 
 const requiredEnvironmentNames = [
   "RESEND_API_KEY",
@@ -34,7 +39,7 @@ export type ResendBookingEmailReadiness = {
   readonly summary: string;
 };
 
-export type OwnerBookingEmailSendResult =
+export type BookingEmailSendResult =
   | {
       readonly status: "sent";
       readonly attempted: true;
@@ -46,12 +51,24 @@ export type OwnerBookingEmailSendResult =
       readonly errorCode: string;
     };
 
+export type OwnerBookingEmailSendResult = BookingEmailSendResult;
+
 export type OwnerBookingEmailSender = (
   booking: CmsBooking,
 ) => Promise<OwnerBookingEmailSendResult>;
 
 export type OwnerBookingEmailFingerprinter = (
   booking: CmsBooking,
+) => string | null;
+
+export type CustomerBookingEmailSender = (
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+) => Promise<BookingEmailSendResult>;
+
+export type CustomerBookingEmailFingerprinter = (
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
 ) => string | null;
 
 type ResendEmailClient = {
@@ -96,6 +113,40 @@ function isSenderAddress(value: string) {
   return Boolean(match?.[1]?.trim() && isEmailAddress(match[2].trim()));
 }
 
+function cleanPhone(value: string) {
+  const normalized = value.trim().replace(/[^\d+]/g, "");
+  return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized : "";
+}
+
+export function createCustomerBookingEmailBusiness(
+  site: CmsSiteSettings,
+): CustomerBookingEmailBusiness {
+  const address = [
+    site.streetAddress,
+    site.locality,
+    site.region,
+    site.postalCode,
+    site.country,
+  ]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+  const phoneE164 = site.phoneConfirmed ? cleanPhone(site.phoneE164) : "";
+  const phone = phoneE164 ? site.phoneDisplay.trim() || phoneE164 : "";
+  const email = isEmailAddress(site.email.trim()) ? site.email.trim() : "";
+
+  return {
+    name: site.name.trim() || "Siriranee Thai Massage",
+    address,
+    ...(phone ? { phone } : {}),
+    ...(email ? { email } : {}),
+    ...(site.arrivalGuidance.trim()
+      ? { arrivalGuidance: site.arrivalGuidance.trim() }
+      : {}),
+    directionsUrl: googleMapsDirectionsUrl,
+  };
+}
+
 type BookingEmailEnvironment = Readonly<Record<string, string | undefined>>;
 
 function getSiteOrigin(environment: BookingEmailEnvironment) {
@@ -106,7 +157,10 @@ function getSiteOrigin(environment: BookingEmailEnvironment) {
 
   try {
     const url = new URL(candidate);
-    if (url.protocol !== "https:" && url.hostname !== "localhost") {
+    const localHttp =
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1");
+    if (url.protocol !== "https:" && !localHttp) {
       return undefined;
     }
     return url.origin;
@@ -163,12 +217,12 @@ export function getResendBookingEmailReadiness(
 ): ResendBookingEmailReadiness {
   const result = inspectConfiguration(environment);
   const summary = result.ready
-    ? "Resend owner alerts are configured"
+    ? "Resend booking emails are configured"
     : result.invalid.length
-      ? "Resend owner alerts have invalid server configuration"
+      ? "Resend booking emails have invalid server configuration"
       : result.missing.length === requiredEnvironmentNames.length
-        ? "Resend owner alerts are not configured"
-        : "Resend owner alerts have incomplete server configuration";
+        ? "Resend booking emails are not configured"
+        : "Resend booking emails have incomplete server configuration";
 
   return {
     ready: result.ready,
@@ -224,6 +278,38 @@ function createOwnerBookingEmailRequest(
   return { options, payload };
 }
 
+function createCustomerBookingEmailRequest(
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  configuration: ResendBookingEmailConfiguration,
+) {
+  const customerEmail = clean(booking.customer.email).toLowerCase();
+  if (booking.status !== "confirmed" || !isEmailAddress(customerEmail)) {
+    return null;
+  }
+  const publicReplyTo = clean(business.email);
+  const message = renderCustomerBookingConfirmedEmail(booking, {
+    ...business,
+    siteOrigin: configuration.siteOrigin,
+  });
+  const payload: CreateEmailOptions = {
+    from: configuration.from,
+    to: [customerEmail],
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    ...(isEmailAddress(publicReplyTo) ? { replyTo: publicReplyTo } : {}),
+    tags: [
+      { name: "event", value: "booking-confirmed" },
+      { name: "audience", value: "customer" },
+    ],
+  };
+  const options: CreateEmailRequestOptions = {
+    idempotencyKey: `customer-booking-confirmed/${booking.id}`,
+  };
+  return { options, payload };
+}
+
 export function getOwnerBookingEmailDeliveryFingerprint(
   booking: CmsBooking,
   dependencies: Pick<
@@ -249,6 +335,34 @@ export function getOwnerBookingEmailDeliveryFingerprint(
         bookingVersion: booking.version,
       }),
     )
+    .digest("base64url");
+}
+
+export function getCustomerBookingEmailDeliveryFingerprint(
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  dependencies: Pick<
+    SendDependencies,
+    "configuration" | "environment" | "fingerprintSecret"
+  > = {},
+) {
+  const configuration = resolveConfiguration(dependencies).configuration;
+  const fingerprintSecret = clean(
+    dependencies.fingerprintSecret ??
+      (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
+  );
+  if (!configuration || !fingerprintSecret) return null;
+  const request = createCustomerBookingEmailRequest(
+    booking,
+    business,
+    configuration,
+  );
+  if (!request) return null;
+  const domainKey = createHmac("sha256", fingerprintSecret)
+    .update("siriranee/resend-customer-booking-email/fingerprint/v1")
+    .digest();
+  return createHmac("sha256", domainKey)
+    .update(JSON.stringify({ request, bookingStatus: booking.status }))
     .digest("base64url");
 }
 
@@ -316,7 +430,21 @@ export async function sendOwnerBookingRequestedEmail(
     };
   }
 
-  const request = createOwnerBookingEmailRequest(booking, configuration);
+  return sendResolvedBookingEmail(
+    createOwnerBookingEmailRequest(booking, configuration),
+    configuration,
+    dependencies,
+  );
+}
+
+async function sendResolvedBookingEmail(
+  request: {
+    readonly payload: CreateEmailOptions;
+    readonly options: CreateEmailRequestOptions;
+  },
+  configuration: ResendBookingEmailConfiguration,
+  dependencies: SendDependencies,
+): Promise<BookingEmailSendResult> {
   const client = dependencies.client ?? new Resend(configuration.apiKey);
 
   try {
@@ -351,4 +479,43 @@ export async function sendOwnerBookingRequestedEmail(
           : "resend-network-error",
     };
   }
+}
+
+export async function sendCustomerBookingConfirmedEmail(
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  dependencies: SendDependencies = {},
+): Promise<BookingEmailSendResult> {
+  const inspected = resolveConfiguration(dependencies);
+  const configuration = inspected.configuration;
+
+  if (!configuration) {
+    return {
+      status: "failed",
+      attempted: false,
+      errorCode: inspected.invalid.length
+        ? "resend-configuration-invalid"
+        : "resend-configuration-missing",
+    };
+  }
+
+  const request = createCustomerBookingEmailRequest(
+    booking,
+    business,
+    configuration,
+  );
+  if (!request) {
+    return {
+      status: "failed",
+      attempted: false,
+      errorCode:
+        booking.status === "confirmed"
+          ? booking.customer.email
+            ? "customer-email-invalid"
+            : "customer-email-missing"
+          : "booking-not-confirmed",
+    };
+  }
+
+  return sendResolvedBookingEmail(request, configuration, dependencies);
 }

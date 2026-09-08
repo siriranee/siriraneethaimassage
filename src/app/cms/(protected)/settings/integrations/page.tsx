@@ -29,8 +29,8 @@ export default async function CmsIntegrationsPage() {
     },
     {
       icon: Mail,
-      name: "Owner booking emails",
-      value: `${bookingEmail.summary}. New website requests are saved before Resend is called.`,
+      name: "Booking emails",
+      value: `${bookingEmail.summary}. New requests and confirmations are saved before Resend is called.`,
       configured: bookingEmail.ready,
       edit: "",
     },
