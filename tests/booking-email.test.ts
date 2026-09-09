@@ -222,3 +222,72 @@ test("customer confirmation email contains safe appointment and public business 
     );
   }
 });
+
+test("customer cancellation email clearly closes the appointment without exposing private booking data", async () => {
+  const { renderCustomerBookingCancelledEmail } = await import(
+    "@/server/booking/booking-email"
+  );
+  const message = renderCustomerBookingCancelledEmail(
+    booking({
+      status: "cancelled",
+      customer: {
+        name: "Nok <Example>\u202E",
+        phone: "+353 85 123 4567",
+        email: "nok@example.com",
+        notes: "Quiet room if possible.",
+      },
+    }),
+    {
+      name: "Siriranee Thai Massage",
+      address: "Floor 3, Harbour House, Harbour Road, Howth, Dublin, Ireland",
+      phone: "+353899484585",
+      email: "hello@siriranee.com",
+      siteOrigin: "https://siriranee.com",
+    },
+  );
+
+  for (const expected of [
+    "Your booking has been cancelled",
+    "This appointment is no longer active",
+    "SRN-20260910-ABC123",
+    "Traditional Thai Massage",
+    "60 minutes",
+    "Thursday 10 September 2026",
+    "10:00 (Dublin time)",
+    "€65.00",
+    "+353899484585",
+    "hello@siriranee.com",
+    "https://siriranee.com/book",
+    "https://siriranee.com/contact",
+    "https://siriranee.com/book/status?reference=SRN-20260910-ABC123",
+  ]) {
+    assert.match(
+      `${message.html}\n${message.text}`,
+      new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+  }
+  assert.equal(
+    message.subject,
+    "Booking cancelled · SRN-20260910-ABC123 · Siriranee Thai Massage",
+  );
+  assert.match(message.html, /Nok &lt;Example&gt;/);
+  assert.doesNotMatch(message.html, /\u202E|<Example>/);
+  assert.doesNotMatch(message.text, /\u202E/);
+
+  for (const forbidden of [
+    "nok@example.com",
+    "+353 85 123 4567",
+    "Quiet room if possible.",
+    "Never include this internal note.",
+    "11111111-2222-4333-8444-555555555555",
+    "secret-hold-hash",
+    "secret-idempotency-hash",
+    "secret-fingerprint-hash",
+    "Open booking in CMS",
+  ]) {
+    assert.doesNotMatch(
+      `${message.html}\n${message.text}`,
+      new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+  }
+});

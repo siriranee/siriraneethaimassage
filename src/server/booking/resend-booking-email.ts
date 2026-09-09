@@ -12,6 +12,7 @@ import {
 import { googleMapsDirectionsUrl } from "@/content/site";
 import type { CmsBooking, CmsSiteSettings } from "@/domain/cms/types";
 import {
+  renderCustomerBookingCancelledEmail,
   renderCustomerBookingConfirmedEmail,
   renderOwnerBookingRequestedEmail,
   type CustomerBookingEmailBusiness,
@@ -278,7 +279,7 @@ function createOwnerBookingEmailRequest(
   return { options, payload };
 }
 
-function createCustomerBookingEmailRequest(
+function createCustomerBookingConfirmationEmailRequest(
   booking: CmsBooking,
   business: CustomerBookingEmailBusiness,
   configuration: ResendBookingEmailConfiguration,
@@ -306,6 +307,38 @@ function createCustomerBookingEmailRequest(
   };
   const options: CreateEmailRequestOptions = {
     idempotencyKey: `customer-booking-confirmed/${booking.id}`,
+  };
+  return { options, payload };
+}
+
+function createCustomerBookingCancellationEmailRequest(
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  configuration: ResendBookingEmailConfiguration,
+) {
+  const customerEmail = clean(booking.customer.email).toLowerCase();
+  if (booking.status !== "cancelled" || !isEmailAddress(customerEmail)) {
+    return null;
+  }
+  const publicReplyTo = clean(business.email);
+  const message = renderCustomerBookingCancelledEmail(booking, {
+    ...business,
+    siteOrigin: configuration.siteOrigin,
+  });
+  const payload: CreateEmailOptions = {
+    from: configuration.from,
+    to: [customerEmail],
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    ...(isEmailAddress(publicReplyTo) ? { replyTo: publicReplyTo } : {}),
+    tags: [
+      { name: "event", value: "booking-cancelled" },
+      { name: "audience", value: "customer" },
+    ],
+  };
+  const options: CreateEmailRequestOptions = {
+    idempotencyKey: `customer-booking-cancelled/${booking.id}`,
   };
   return { options, payload };
 }
@@ -352,7 +385,7 @@ export function getCustomerBookingEmailDeliveryFingerprint(
       (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
   );
   if (!configuration || !fingerprintSecret) return null;
-  const request = createCustomerBookingEmailRequest(
+  const request = createCustomerBookingConfirmationEmailRequest(
     booking,
     business,
     configuration,
@@ -360,6 +393,34 @@ export function getCustomerBookingEmailDeliveryFingerprint(
   if (!request) return null;
   const domainKey = createHmac("sha256", fingerprintSecret)
     .update("siriranee/resend-customer-booking-email/fingerprint/v1")
+    .digest();
+  return createHmac("sha256", domainKey)
+    .update(JSON.stringify({ request, bookingStatus: booking.status }))
+    .digest("base64url");
+}
+
+export function getCustomerBookingCancellationEmailDeliveryFingerprint(
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  dependencies: Pick<
+    SendDependencies,
+    "configuration" | "environment" | "fingerprintSecret"
+  > = {},
+) {
+  const configuration = resolveConfiguration(dependencies).configuration;
+  const fingerprintSecret = clean(
+    dependencies.fingerprintSecret ??
+      (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
+  );
+  if (!configuration || !fingerprintSecret) return null;
+  const request = createCustomerBookingCancellationEmailRequest(
+    booking,
+    business,
+    configuration,
+  );
+  if (!request) return null;
+  const domainKey = createHmac("sha256", fingerprintSecret)
+    .update("siriranee/resend-customer-booking-cancellation-email/fingerprint/v1")
     .digest();
   return createHmac("sha256", domainKey)
     .update(JSON.stringify({ request, bookingStatus: booking.status }))
@@ -499,7 +560,7 @@ export async function sendCustomerBookingConfirmedEmail(
     };
   }
 
-  const request = createCustomerBookingEmailRequest(
+  const request = createCustomerBookingConfirmationEmailRequest(
     booking,
     business,
     configuration,
@@ -514,6 +575,45 @@ export async function sendCustomerBookingConfirmedEmail(
             ? "customer-email-invalid"
             : "customer-email-missing"
           : "booking-not-confirmed",
+    };
+  }
+
+  return sendResolvedBookingEmail(request, configuration, dependencies);
+}
+
+export async function sendCustomerBookingCancelledEmail(
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  dependencies: SendDependencies = {},
+): Promise<BookingEmailSendResult> {
+  const inspected = resolveConfiguration(dependencies);
+  const configuration = inspected.configuration;
+
+  if (!configuration) {
+    return {
+      status: "failed",
+      attempted: false,
+      errorCode: inspected.invalid.length
+        ? "resend-configuration-invalid"
+        : "resend-configuration-missing",
+    };
+  }
+
+  const request = createCustomerBookingCancellationEmailRequest(
+    booking,
+    business,
+    configuration,
+  );
+  if (!request) {
+    return {
+      status: "failed",
+      attempted: false,
+      errorCode:
+        booking.status === "cancelled"
+          ? booking.customer.email
+            ? "customer-email-invalid"
+            : "customer-email-missing"
+          : "booking-not-cancelled",
     };
   }
 

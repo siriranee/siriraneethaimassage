@@ -8,14 +8,19 @@ import type {
   CmsNotificationChannel,
   CmsNotificationKind,
 } from "@/domain/cms/types";
-import type { CustomerBookingConfirmationEmailOutcome } from "@/domain/booking/confirmation-email";
+import type {
+  CustomerBookingCancellationEmailOutcome,
+  CustomerBookingConfirmationEmailOutcome,
+} from "@/domain/booking/confirmation-email";
 import type { CustomerBookingEmailBusiness } from "@/server/booking/booking-email";
 import { createSafePublicContentState } from "@/server/cms/default-content";
 import type { CmsRepository } from "@/server/cms/repositories";
 import {
   createCustomerBookingEmailBusiness,
+  getCustomerBookingCancellationEmailDeliveryFingerprint,
   getCustomerBookingEmailDeliveryFingerprint,
   getOwnerBookingEmailDeliveryFingerprint,
+  sendCustomerBookingCancelledEmail,
   sendCustomerBookingConfirmedEmail,
   sendOwnerBookingRequestedEmail,
   type BookingEmailSendResult,
@@ -69,6 +74,12 @@ export function customerBookingConfirmationEmailNotificationId(
   return `customer-booking-confirmed:${bookingId}`;
 }
 
+export function customerBookingCancellationEmailNotificationId(
+  bookingId: string,
+) {
+  return `customer-booking-cancelled:${bookingId}`;
+}
+
 async function getCustomerBookingEmailBusiness(
   repository: CmsRepository,
 ): Promise<CustomerBookingEmailBusiness> {
@@ -112,13 +123,24 @@ export async function recordBookingNotificationPlan(
   const now = new Date().toISOString();
   const notifications: CmsBookingNotification[] = [];
   for (const channel of channels) {
-    if (channel === "email" && kind === "booking-confirmed") {
+    if (
+      channel === "email" &&
+      (kind === "booking-confirmed" || kind === "booking-cancelled")
+    ) {
       if (!booking.customer.email) continue;
       const business = await getCustomerBookingEmailBusiness(repository);
       const deliveryPayloadHash =
-        getCustomerBookingEmailDeliveryFingerprint(booking, business);
+        kind === "booking-confirmed"
+          ? getCustomerBookingEmailDeliveryFingerprint(booking, business)
+          : getCustomerBookingCancellationEmailDeliveryFingerprint(
+              booking,
+              business,
+            );
       const notification: CmsBookingNotification = {
-        id: customerBookingConfirmationEmailNotificationId(booking.id),
+        id:
+          kind === "booking-confirmed"
+            ? customerBookingConfirmationEmailNotificationId(booking.id)
+            : customerBookingCancellationEmailNotificationId(booking.id),
         bookingId: booking.id,
         bookingReference: booking.reference,
         channel,
@@ -445,6 +467,34 @@ export async function deliverCustomerBookingConfirmationEmail(
   );
 }
 
+export async function deliverCustomerBookingCancellationEmail(
+  repository: CmsRepository,
+  booking: CmsBooking,
+  options: CustomerBookingEmailDeliveryOptions = {},
+) {
+  const business =
+    options.business ?? (await getCustomerBookingEmailBusiness(repository));
+  const sender = options.sender ?? sendCustomerBookingCancelledEmail;
+  const fingerprinter =
+    options.fingerprinter ??
+    getCustomerBookingCancellationEmailDeliveryFingerprint;
+
+  return deliverBookingEmail(
+    repository,
+    booking,
+    customerBookingCancellationEmailNotificationId(booking.id),
+    (current) => sender(current, business),
+    (current) => fingerprinter(current, business),
+    "customer booking cancellation email",
+    () => repository.getBooking(booking.id),
+    (latest) => {
+      if (latest.status !== "cancelled") return "booking-not-cancelled";
+      if (!latest.customer.email) return "customer-email-missing";
+      return null;
+    },
+  );
+}
+
 export async function attemptCustomerBookingConfirmationEmail(
   repository: CmsRepository,
   booking: CmsBooking,
@@ -500,6 +550,61 @@ export async function attemptCustomerBookingConfirmationEmail(
   }
 }
 
+export async function attemptCustomerBookingCancellationEmail(
+  repository: CmsRepository,
+  booking: CmsBooking,
+  options: CustomerBookingEmailDeliveryOptions & {
+    readonly retryDelayMs?: number;
+  } = {},
+): Promise<CustomerBookingCancellationEmailOutcome> {
+  if (booking.status !== "cancelled") {
+    return { status: "skipped", reason: "booking-not-cancelled" };
+  }
+  if (!booking.customer.email) {
+    return { status: "skipped", reason: "missing-customer-email" };
+  }
+  if (repository.mode === "mock" && !options.sender) {
+    return { status: "skipped", reason: "mock-mode" };
+  }
+
+  try {
+    let result = await deliverCustomerBookingCancellationEmail(
+      repository,
+      booking,
+      options,
+    );
+    if (shouldRetryCustomerBookingEmail(result)) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, Math.max(0, options.retryDelayMs ?? 1_000));
+      });
+      result = await deliverCustomerBookingCancellationEmail(
+        repository,
+        booking,
+        options,
+      );
+    }
+
+    if (result?.status === "sent") return { status: "sent" };
+    const notification = await repository.getNotification(
+      customerBookingCancellationEmailNotificationId(booking.id),
+    );
+    if (notification?.status === "sent") return { status: "sent" };
+    if (
+      notification?.status === "indeterminate" ||
+      notification?.status === "sending"
+    ) {
+      return { status: "indeterminate" };
+    }
+    if (notification?.status === "queued") return { status: "pending" };
+    return { status: "failed" };
+  } catch {
+    console.error(
+      `Failed to process the customer booking cancellation email for booking ${booking.id}.`,
+    );
+    return { status: "failed" };
+  }
+}
+
 export function canRetryCustomerBookingConfirmationEmail(
   notification: CmsBookingNotification,
 ) {
@@ -507,6 +612,17 @@ export function canRetryCustomerBookingConfirmationEmail(
     notification.audience === "customer" &&
     notification.channel === "email" &&
     notification.kind === "booking-confirmed" &&
+    canAttemptBookingEmail(notification, Date.now())
+  );
+}
+
+export function canRetryCustomerBookingCancellationEmail(
+  notification: CmsBookingNotification,
+) {
+  return (
+    notification.audience === "customer" &&
+    notification.channel === "email" &&
+    notification.kind === "booking-cancelled" &&
     canAttemptBookingEmail(notification, Date.now())
   );
 }

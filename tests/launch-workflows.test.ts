@@ -88,7 +88,9 @@ test("isolated launch verification covers services, ten bookings and administrat
     { CmsValidationError },
     { CmsConflictError, getCmsRepository },
     {
+      attemptCustomerBookingCancellationEmail,
       attemptCustomerBookingConfirmationEmail,
+      customerBookingCancellationEmailNotificationId,
       customerBookingConfirmationEmailNotificationId,
     },
     {
@@ -652,6 +654,56 @@ test("isolated launch verification covers services, ten bookings and administrat
     JSON.stringify(customerNotification),
     /demo\.public@example\.invalid|Demo Public Guest|Fictional public booking/,
   );
+
+  const cancelledPublicBooking = await updateAdminBooking(
+    confirmedPublicBooking.id,
+    {
+      status: "cancelled",
+      internalNotes: "",
+      changeReason: "other-operational",
+    },
+    confirmedPublicBooking.version,
+    context,
+  );
+  assert.equal(cancelledPublicBooking.status, "cancelled");
+  const cancellationNotificationId =
+    customerBookingCancellationEmailNotificationId(publicBooking.id);
+  assert.equal(
+    (await repository.listNotifications(publicBooking.id, 30)).filter(
+      (notification) => notification.id === cancellationNotificationId,
+    ).length,
+    1,
+  );
+
+  let cancellationEmailAttempts = 0;
+  assert.deepEqual(
+    await attemptCustomerBookingCancellationEmail(
+      productionModeRepository,
+      cancelledPublicBooking,
+      {
+        sender: async () => {
+          cancellationEmailAttempts += 1;
+          return {
+            status: "sent" as const,
+            attempted: true as const,
+            providerMessageId: "isolated-customer-cancellation-id",
+          };
+        },
+      },
+    ),
+    { status: "sent" },
+  );
+  assert.equal(cancellationEmailAttempts, 1);
+  const cancellationNotification = await repository.getNotification(
+    cancellationNotificationId,
+  );
+  assert.equal(cancellationNotification?.status, "sent");
+  assert.equal(cancellationNotification?.attemptCount, 1);
+  assert.equal(
+    cancellationNotification?.providerMessageId,
+    "isolated-customer-cancellation-id",
+  );
+  assert.equal(customerNotification?.status, "sent");
 
   const audits = await repository.listAudit(100);
   assert.equal(

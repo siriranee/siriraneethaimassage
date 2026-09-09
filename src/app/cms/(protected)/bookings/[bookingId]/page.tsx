@@ -8,12 +8,16 @@ import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import { CmsRetryConfirmationEmail } from "@/components/cms/CmsRetryConfirmationEmail";
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import {
+  customerBookingCancellationEmailFeedback,
   customerBookingConfirmationEmailFeedback,
 } from "@/domain/booking/confirmation-email";
 import { isPendingCapacityExpired } from "@/domain/booking/status";
 import { canCmsRole } from "@/domain/cms/permissions";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
-import { canRetryCustomerBookingConfirmationEmail } from "@/server/cms/notification-service";
+import {
+  canRetryCustomerBookingCancellationEmail,
+  canRetryCustomerBookingConfirmationEmail,
+} from "@/server/cms/notification-service";
 import { getCmsBooking, listCmsBookingTimeline, listCmsNotifications } from "@/server/cms/read-service";
 
 import styles from "@/components/cms/CmsViews.module.css";
@@ -39,6 +43,13 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
       notification.kind === "booking-confirmed" &&
       notification.provider === "resend",
   );
+  const cancellationNotification = notifications.find(
+    (notification) =>
+      notification.audience === "customer" &&
+      notification.channel === "email" &&
+      notification.kind === "booking-cancelled" &&
+      notification.provider === "resend",
+  );
   const confirmationFeedback =
     booking.status !== "confirmed"
       ? null
@@ -60,6 +71,28 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
               reason: "missing-customer-email",
             })
           : null;
+  const cancellationFeedback =
+    booking.status !== "cancelled"
+      ? null
+      : cancellationNotification
+        ? customerBookingCancellationEmailFeedback(
+            booking.demo
+              ? { status: "skipped", reason: "mock-mode" }
+              : cancellationNotification.status === "sent"
+                ? { status: "sent" }
+                : cancellationNotification.status === "queued"
+                  ? { status: "pending" }
+                  : cancellationNotification.status === "failed"
+                    ? { status: "failed" }
+                    : { status: "indeterminate" },
+          )
+        : !booking.customer.email
+          ? customerBookingCancellationEmailFeedback({
+              status: "skipped",
+              reason: "missing-customer-email",
+            })
+          : null;
+  const customerEmailFeedback = cancellationFeedback ?? confirmationFeedback;
 
   return (
     <>
@@ -87,16 +120,18 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
         </CmsNotice>
       ) : null}
 
-      {confirmationFeedback ? (
+      {customerEmailFeedback ? (
         <CmsNotice
-          tone={confirmationFeedback.tone}
+          tone={customerEmailFeedback.tone}
           title={
-            confirmationFeedback.tone === "success"
-              ? "Confirmation email accepted"
+            customerEmailFeedback.tone === "success"
+              ? booking.status === "cancelled"
+                ? "Cancellation email accepted"
+                : "Confirmation email accepted"
               : "Booking saved; email needs attention"
           }
         >
-          {confirmationFeedback.text}
+          {customerEmailFeedback.text}
         </CmsNotice>
       ) : null}
 
@@ -169,6 +204,10 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
                           notification.channel === "email" &&
                           notification.kind === "booking-confirmed"
                         ? "Customer confirmation email"
+                      : notification.audience === "customer" &&
+                          notification.channel === "email" &&
+                          notification.kind === "booking-cancelled"
+                        ? "Customer cancellation email"
                       : `${notification.kind.replaceAll("-", " ")} · ${notification.channel}`}
                   </strong>
                   <span>
@@ -195,6 +234,17 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
                         notification.status === "indeterminate" ||
                         notification.status === "sending"
                       }
+                    />
+                  ) : !booking.demo &&
+                    booking.status === "cancelled" &&
+                    canRetryCustomerBookingCancellationEmail(notification) ? (
+                    <CmsRetryConfirmationEmail
+                      bookingId={booking.id}
+                      deliveryUncertain={
+                        notification.status === "indeterminate" ||
+                        notification.status === "sending"
+                      }
+                      kind="cancellation"
                     />
                   ) : null}
                 </div>

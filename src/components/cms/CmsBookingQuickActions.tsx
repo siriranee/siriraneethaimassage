@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
+  customerBookingCancellationEmailFeedback,
   customerBookingConfirmationEmailFeedback,
+  type CustomerBookingCancellationEmailOutcome,
   type CustomerBookingConfirmationEmailOutcome,
 } from "@/domain/booking/confirmation-email";
 import type { BookingStatus, CmsBooking } from "@/domain/cms/types";
@@ -53,7 +55,13 @@ export function CmsBookingQuickActions({
     }
     if (
       nextStatus === "cancelled" &&
-      !window.confirm(`Cancel booking ${booking.reference}? This cannot be undone.`)
+      !window.confirm(
+        isMock
+          ? `Cancel demo booking ${booking.reference}? Demo mode will not contact Resend. This cannot be undone.`
+          : hasCustomerEmail
+            ? `Cancel booking ${booking.reference} and email the customer now? This cannot be undone.`
+            : `Cancel booking ${booking.reference}? No customer email is recorded, so no cancellation email will be sent. This cannot be undone.`,
+      )
     ) {
       return;
     }
@@ -76,6 +84,7 @@ export function CmsBookingQuickActions({
       const result = (await response.json()) as {
         readonly booking?: CmsBooking;
         readonly confirmationEmail?: CustomerBookingConfirmationEmailOutcome;
+        readonly cancellationEmail?: CustomerBookingCancellationEmailOutcome;
         readonly error?: string;
       };
 
@@ -92,6 +101,8 @@ export function CmsBookingQuickActions({
       setFeedback(
         result.confirmationEmail
           ? customerBookingConfirmationEmailFeedback(result.confirmationEmail)
+          : result.cancellationEmail
+            ? customerBookingCancellationEmailFeedback(result.cancellationEmail)
           : {
               tone: "success",
               text:
@@ -148,11 +159,23 @@ export function CmsBookingQuickActions({
           ) : null}
           {canCancel ? (
             <button
-              aria-label={`Cancel booking ${booking.reference}`}
+              aria-label={
+                isMock
+                  ? `Cancel demo booking ${booking.reference}; Resend will not be contacted`
+                  : hasCustomerEmail
+                    ? `Cancel booking ${booking.reference} and email customer`
+                    : `Cancel booking ${booking.reference}; no customer email is recorded`
+              }
               className={styles.cancel}
               disabled={Boolean(savingStatus)}
               onClick={() => void updateStatus("cancelled")}
-              title="Cancel booking"
+              title={
+                isMock
+                  ? "Cancel demo booking without contacting Resend"
+                  : hasCustomerEmail
+                    ? "Cancel booking and email customer"
+                    : "Cancel booking without customer email"
+              }
               type="button"
             >
               {savingStatus === "cancelled" ? (

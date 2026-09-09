@@ -512,3 +512,110 @@ This operational email was sent because this address was provided for booking ${
 
   return { subject, html, text };
 }
+
+export function renderCustomerBookingCancelledEmail(
+  booking: CustomerBookingEmailInput,
+  business: CustomerBookingEmailBusiness,
+): BookingEmailMessage {
+  const customerName = cleanDisplayText(booking.customer.name);
+  const reference = cleanDisplayText(booking.reference);
+  const serviceName = cleanDisplayText(booking.serviceName);
+  const localTime = cleanDisplayText(booking.localTime);
+  const businessName = cleanDisplayText(business.name) || "Siriranee Thai Massage";
+  const phone = cleanDisplayText(business.phone ?? "");
+  const email = cleanDisplayText(business.email ?? "");
+  const formattedDate = formatBookingDate(booking.localDate, "en-IE");
+  const formattedPrice = formatPrice(
+    booking.priceCents,
+    booking.currency,
+    "en-IE",
+  );
+  const origin = safeHttpUrl(business.siteOrigin)?.replace(/\/+$/, "");
+  const newBookingUrl = origin ? `${origin}/book` : undefined;
+  const contactUrl = origin ? `${origin}/contact` : undefined;
+  const statusUrl = origin
+    ? `${origin}/book/status?reference=${encodeURIComponent(reference)}`
+    : undefined;
+  const subject = `Booking cancelled · ${reference} · ${businessName}`;
+  const preheader = `Your booking for ${formattedDate} at ${localTime} has been cancelled.`;
+  const contactLines = [
+    phone ? `Phone: ${phone}` : "",
+    email ? `Email: ${email}` : "",
+  ].filter(Boolean);
+
+  const html = `<!doctype html>
+<html lang="en-IE">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light only">
+    <title>${escapeHtml(subject)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f9f4ea;color:#2b2028;font-family:Arial,Tahoma,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;background:#f9f4ea;">
+      <tr>
+        <td align="center" style="padding:24px 12px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:640px;border:1px solid #e6d9be;border-radius:18px;border-collapse:separate;overflow:hidden;background:#fffdf7;box-shadow:0 12px 36px rgba(43,32,40,.10);">
+            <tr><td style="padding:18px 30px;background:#5c2288;color:#fffdf7;font-size:17px;font-weight:800;line-height:1.4;">${escapeHtml(businessName)}</td></tr>
+            <tr><td style="padding:30px 30px 32px;">
+              <p style="margin:0 0 7px;color:#8a2d2d;font-size:12px;font-weight:800;letter-spacing:.08em;line-height:1.4;text-transform:uppercase;">Booking update</p>
+              <h1 style="margin:0;color:#5c2288;font-size:28px;line-height:1.25;">Your booking has been cancelled</h1>
+              <p dir="auto" style="margin:12px 0 20px;color:#3c3340;font-size:16px;line-height:1.65;">Hi ${escapeHtml(customerName)}, your booking with ${escapeHtml(businessName)} has been cancelled. This appointment is no longer active.</p>
+              <div style="margin:0 0 24px;padding:14px 16px;border:1px solid #d7a4a4;border-radius:12px;background:#fbecec;">
+                <span style="display:block;margin-bottom:3px;color:#8a2d2d;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">Status</span>
+                <strong style="color:#762525;font-size:18px;line-height:1.35;">Cancelled</strong>
+              </div>
+              <h2 style="margin:0 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">Cancelled appointment</h2>
+              <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">
+                ${[
+                  ["Booking reference", reference],
+                  ["Treatment", serviceName],
+                  ["Duration", `${booking.durationMinutes} minutes`],
+                  ["Date", formattedDate],
+                  ["Time", `${localTime} (Dublin time)`],
+                  ["Price", formattedPrice],
+                ].map(([label, value]) => detailRow(label, value)).join("")}
+              </table>
+              ${newBookingUrl ? `<h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">Would you like another appointment?</h2>
+              <p style="margin:0 0 18px;color:#3c3340;font-size:15px;line-height:1.65;">You can send a new booking request whenever you are ready.</p>
+              <p style="margin:0;">${customerEmailLink("Make a new booking", newBookingUrl)}</p>` : ""}
+              <h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">Questions?</h2>
+              <p style="margin:0;color:#3c3340;font-size:15px;line-height:1.65;">Please contact us if you believe this cancellation was made in error.${contactLines.length ? `<br>${contactLines.map(escapeHtml).join("<br>")}` : ""}</p>
+              ${contactUrl ? `<p style="margin:18px 0 0;">${customerEmailLink("Contact Siriranee", contactUrl)}</p>` : ""}
+              ${statusUrl ? `<div style="margin:26px 0 0;padding:18px;border:1px solid #d8c7d7;border-radius:14px;background:#f7f0fa;">
+                <h2 style="margin:0 0 8px;color:#5c2288;font-size:18px;line-height:1.4;">Check your booking status</h2>
+                <p style="margin:0 0 16px;color:#3c3340;font-size:14px;line-height:1.6;">Your booking reference <strong>${escapeHtml(reference)}</strong> is included in this link for convenience. No personal or appointment details are included.</p>
+                ${customerEmailLink("Check booking status", statusUrl)}
+              </div>` : ""}
+            </td></tr>
+            <tr><td style="padding:17px 30px;background:#efe4f7;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">This operational email was sent because this address was provided for booking ${escapeHtml(reference)}. It is not a marketing email.</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  const text = `BOOKING CANCELLED — ${businessName}
+
+Hi ${customerName},
+
+Your booking with ${businessName} has been cancelled. This appointment is no longer active.
+
+Cancelled appointment
+Booking reference: ${reference}
+Treatment: ${serviceName}
+Duration: ${booking.durationMinutes} minutes
+Date: ${formattedDate}
+Time: ${localTime} (Dublin time)
+Price: ${formattedPrice}
+${newBookingUrl ? `\nMake a new booking: ${newBookingUrl}\n` : ""}
+Questions?
+Please contact us if you believe this cancellation was made in error.
+${contactLines.length ? `${contactLines.join("\n")}\n` : ""}${contactUrl ? `Contact: ${contactUrl}\n` : ""}
+${statusUrl ? `Check booking status: ${statusUrl}\nThe link includes booking reference ${reference}, but no personal or appointment details.\n` : ""}
+This operational email was sent because this address was provided for booking ${reference}. It is not a marketing email.`;
+
+  return { subject, html, text };
+}

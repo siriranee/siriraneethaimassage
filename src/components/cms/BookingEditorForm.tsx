@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import {
+  customerBookingCancellationEmailFeedback,
   customerBookingConfirmationEmailFeedback,
+  type CustomerBookingCancellationEmailOutcome,
   type CustomerBookingConfirmationEmailOutcome,
 } from "@/domain/booking/confirmation-email";
 import {
@@ -52,6 +54,19 @@ export function BookingEditorForm({
     ) {
       return;
     }
+    if (
+      booking.status !== "cancelled" &&
+      nextStatus === "cancelled" &&
+      !window.confirm(
+        booking.demo
+          ? `Cancel demo booking ${booking.reference}? Demo mode will not contact Resend. This cannot be undone.`
+          : booking.customer.email
+            ? `Cancel booking ${booking.reference} and email the customer now? This cannot be undone.`
+            : `Cancel booking ${booking.reference}? No customer email is recorded, so no cancellation email will be sent. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
 
     setSaving(true);
     setFeedback(null);
@@ -73,6 +88,7 @@ export function BookingEditorForm({
         error?: string;
         booking?: CmsBooking;
         confirmationEmail?: CustomerBookingConfirmationEmailOutcome;
+        cancellationEmail?: CustomerBookingCancellationEmailOutcome;
       };
 
       if (!response.ok || !result.booking) {
@@ -85,6 +101,8 @@ export function BookingEditorForm({
       setFeedback(
         result.confirmationEmail
           ? customerBookingConfirmationEmailFeedback(result.confirmationEmail)
+          : result.cancellationEmail
+            ? customerBookingCancellationEmailFeedback(result.cancellationEmail)
           : { tone: "success", text: "Booking changes saved." },
       );
       router.refresh();
@@ -108,7 +126,7 @@ export function BookingEditorForm({
             <select defaultValue={booking.status} name="status">
               {statusOptions.map((status) => <option key={status} value={status}>{status === "no-show" ? "No-show" : status.charAt(0).toUpperCase() + status.slice(1)}</option>)}
             </select>
-            <small>{booking.demo ? "Demo mode does not contact Resend. " : "Moving a pending booking to Confirmed sends the customer a confirmation email when an email address is recorded. "}Final statuses cannot be reopened.</small>
+            <small>{booking.demo ? "Demo mode does not contact Resend. " : "Confirming or cancelling a booking emails the customer when an email address is recorded. "}Final statuses cannot be reopened.</small>
           </label>
           <label className={styles.field}>Date<input defaultValue={booking.localDate} disabled={appointmentLocked} name="localDate" required type="date" /></label>
           <label className={styles.field}>Dublin time<input defaultValue={booking.localTime} disabled={appointmentLocked} name="localTime" required step={300} type="time" /></label>

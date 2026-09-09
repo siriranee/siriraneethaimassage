@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
+  customerBookingCancellationEmailFeedback,
   customerBookingConfirmationEmailFeedback,
+  type CustomerBookingCancellationEmailOutcome,
   type CustomerBookingConfirmationEmailOutcome,
 } from "@/domain/booking/confirmation-email";
 
@@ -14,9 +16,11 @@ import styles from "./CmsRetryConfirmationEmail.module.css";
 export function CmsRetryConfirmationEmail({
   bookingId,
   deliveryUncertain,
+  kind = "confirmation",
 }: Readonly<{
   bookingId: string;
   deliveryUncertain: boolean;
+  kind?: "confirmation" | "cancellation";
 }>) {
   const router = useRouter();
   const [sending, setSending] = useState(false);
@@ -39,23 +43,35 @@ export function CmsRetryConfirmationEmail({
     setFeedback(null);
     try {
       const response = await fetch(
-        `/api/cms/bookings/${bookingId}/confirmation-email`,
+        `/api/cms/bookings/${bookingId}/${kind}-email`,
         { method: "POST" },
       );
       const result = (await response.json()) as {
         readonly confirmationEmail?: CustomerBookingConfirmationEmailOutcome;
+        readonly cancellationEmail?: CustomerBookingCancellationEmailOutcome;
         readonly error?: string;
       };
-      if (!response.ok || !result.confirmationEmail) {
+      const outcome =
+        kind === "confirmation"
+          ? result.confirmationEmail
+          : result.cancellationEmail;
+      if (!response.ok || !outcome) {
         setFeedback({
           tone: "error",
-          text: result.error ?? "The confirmation email could not be retried.",
+          text:
+            result.error ?? `The ${kind} email could not be retried.`,
         });
         return;
       }
 
       setFeedback(
-        customerBookingConfirmationEmailFeedback(result.confirmationEmail),
+        kind === "confirmation"
+          ? customerBookingConfirmationEmailFeedback(
+              outcome as CustomerBookingConfirmationEmailOutcome,
+            )
+          : customerBookingCancellationEmailFeedback(
+              outcome as CustomerBookingCancellationEmailOutcome,
+            ),
       );
       router.refresh();
     } catch {
@@ -77,7 +93,7 @@ export function CmsRetryConfirmationEmail({
         ) : (
           <RotateCw aria-hidden="true" />
         )}
-        {sending ? "Retrying..." : "Retry confirmation email"}
+        {sending ? "Retrying..." : `Retry ${kind} email`}
       </button>
       {feedback ? (
         <small

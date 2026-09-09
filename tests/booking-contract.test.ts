@@ -89,7 +89,7 @@ test("CMS booking views use cards with accessible icon-only status actions", asy
   assert.match(calendar, /booking\.customerNotes \|\| "No notes provided"/);
   assert.match(quickActions, /Confirm booking \$\{booking\.reference\} and email customer/);
   assert.match(quickActions, /No customer email is recorded/);
-  assert.match(quickActions, /aria-label=\{`Cancel booking \$\{booking\.reference\}`\}/);
+  assert.match(quickActions, /Cancel booking \$\{booking\.reference\} and email customer/);
   assert.match(quickActions, /<Check aria-hidden="true"/);
   assert.match(quickActions, /<X aria-hidden="true"/);
   assert.match(quickActions, /window\.confirm/);
@@ -253,7 +253,7 @@ test("customer confirmation email is dispatched after commit with safe CMS feedb
   assert.match(feedback, /Email delivery is uncertain/);
   assert.match(feedback, /confirmation email has not been sent yet/i);
   assert.match(quickActions, /and email the customer now/);
-  assert.match(editor, /Moving a pending booking to Confirmed sends the customer/);
+  assert.match(editor, /Confirming or cancelling a booking emails the customer/);
   assert.match(adminForm, /Create & confirm booking/);
   assert.match(adminForm, /Creating as Confirmed immediately sends a confirmation email/);
   assert.match(quickActions, /Demo mode will not contact Resend/);
@@ -267,6 +267,75 @@ test("customer confirmation email is dispatched after commit with safe CMS feedb
     bookingDetailPage,
     /key=\{`editor:\$\{booking\.id\}:\$\{booking\.version\}`\}/,
   );
+});
+
+test("customer cancellation email is dispatched after commit with distinct retry controls", async () => {
+  const [
+    bookingService,
+    bookingDetailPage,
+    updateRoute,
+    retryRoute,
+    notifications,
+    quickActions,
+    editor,
+    retryButton,
+    feedback,
+  ] = await Promise.all([
+    source("src/server/cms/booking-service.ts"),
+    source("src/app/cms/(protected)/bookings/[bookingId]/page.tsx"),
+    source("src/app/api/cms/bookings/[bookingId]/route.ts"),
+    source(
+      "src/app/api/cms/bookings/[bookingId]/cancellation-email/route.ts",
+    ),
+    source("src/server/cms/notification-service.ts"),
+    source("src/components/cms/CmsBookingQuickActions.tsx"),
+    source("src/components/cms/BookingEditorForm.tsx"),
+    source("src/components/cms/CmsRetryConfirmationEmail.tsx"),
+    source("src/domain/booking/confirmation-email.ts"),
+  ]);
+
+  assert.doesNotMatch(
+    bookingService,
+    /attemptCustomerBookingCancellationEmail/,
+  );
+  assert.ok(
+    updateRoute.indexOf("await updateAdminBooking(") <
+      updateRoute.indexOf("await attemptCustomerBookingCancellationEmail("),
+  );
+  assert.match(updateRoute, /cancellationEmail/);
+  assert.match(
+    notifications,
+    /customerBookingCancellationEmailNotificationId\(booking\.id\)/,
+  );
+  assert.match(
+    notifications,
+    /kind === "booking-confirmed" \|\| kind === "booking-cancelled"/,
+  );
+  assert.match(
+    notifications,
+    /latest\.status !== "cancelled".*booking-not-cancelled/,
+  );
+
+  assert.match(retryRoute, /isSameOriginMutation\(request\)/);
+  assert.match(retryRoute, /requireCmsApiUser\("bookings:write"\)/);
+  assert.match(retryRoute, /No cancellation email is available to retry/);
+  assert.match(
+    retryRoute,
+    /Only a cancelled booking can receive a cancellation email/,
+  );
+  assert.match(retryButton, /`\/api\/cms\/bookings\/\$\{bookingId\}\/\$\{kind\}-email`/);
+  assert.match(retryButton, /Retry \$\{kind\} email/);
+  assert.match(quickActions, /and email the customer now/);
+  assert.match(quickActions, /no cancellation email will be sent/i);
+  assert.match(editor, /Confirming or cancelling a booking emails the customer/);
+  assert.match(feedback, /Cancellation email accepted by Resend/);
+  assert.match(feedback, /cancellation email has not been sent yet/i);
+  assert.match(bookingDetailPage, /Customer cancellation email/);
+  assert.match(
+    bookingDetailPage,
+    /canRetryCustomerBookingCancellationEmail\(notification\)/,
+  );
+  assert.match(bookingDetailPage, /kind="cancellation"/);
 });
 
 test("contact handoff resolves service and price from the published snapshot", async () => {

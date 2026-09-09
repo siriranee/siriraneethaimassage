@@ -2,7 +2,10 @@ import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
 import { deleteAdminBooking, updateAdminBooking } from "@/server/cms/booking-service";
 import { cmsErrorResponse, cmsNoStoreJson, readCmsJsonObject } from "@/server/cms/http";
-import { attemptCustomerBookingConfirmationEmail } from "@/server/cms/notification-service";
+import {
+  attemptCustomerBookingCancellationEmail,
+  attemptCustomerBookingConfirmationEmail,
+} from "@/server/cms/notification-service";
 import { getCmsBooking } from "@/server/cms/read-service";
 import { getCmsRepository } from "@/server/cms/repositories";
 
@@ -46,9 +49,17 @@ export async function PATCH(request: Request, context: RouteContext) {
             booking,
           )
         : undefined;
+    const cancellationEmail =
+      current?.status !== "cancelled" && booking.status === "cancelled"
+        ? await attemptCustomerBookingCancellationEmail(
+            getCmsRepository(),
+            booking,
+          )
+        : undefined;
     return cmsNoStoreJson({
       booking,
       ...(confirmationEmail ? { confirmationEmail } : {}),
+      ...(cancellationEmail ? { cancellationEmail } : {}),
     });
   } catch (error) {
     return cmsErrorResponse(error);
