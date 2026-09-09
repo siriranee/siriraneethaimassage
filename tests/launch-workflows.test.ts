@@ -219,7 +219,10 @@ test("isolated launch verification covers services, ten bookings and administrat
           source: "administrator",
           internalNotes: "Ephemeral launch fixture; never persist to live providers.",
         },
-        context,
+        {
+          ...context,
+          idempotencyKey: `isolated-admin-booking-${String(index).padStart(4, "0")}`,
+        },
       ),
     );
   }
@@ -229,6 +232,34 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.equal(new Set(bookings.map((booking) => booking.reference)).size, 10);
   assert.ok(bookings.every((booking) => booking.demo));
   assert.ok(bookings.every((booking) => booking.assignedStaffId === ""));
+  const repeatedBookingInput = {
+    customerName: "Demo Launch Guest 1",
+    phone: "+353 85 000 0000",
+    email: "demo.launch.1@example.invalid",
+    customerNotes: "Fictional customer created by isolated launch tests.",
+    serviceId: services[0].id,
+    durationMinutes: 60,
+    localDate,
+    localTime: times[0],
+    status: "confirmed",
+    source: "administrator",
+    internalNotes: "Ephemeral launch fixture; never persist to live providers.",
+  };
+  const repeatedBooking = await createAdminBooking(
+    repeatedBookingInput,
+    { ...context, idempotencyKey: "isolated-admin-booking-0000" },
+  );
+  assert.equal(repeatedBooking.id, bookings[0].id);
+  await assert.rejects(
+    createAdminBooking(
+      {
+        ...repeatedBookingInput,
+        customerName: "Demo Different Guest",
+      },
+      { ...context, idempotencyKey: "isolated-admin-booking-0000" },
+    ),
+    CmsConflictError,
+  );
   assert.deepEqual(
     (await repository.listBookings({ from: localDate, to: localDate })).map(
       (booking) => booking.localTime,

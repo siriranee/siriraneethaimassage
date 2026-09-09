@@ -105,7 +105,7 @@ test("Mongo status lookup projects no encrypted customer or appointment data", a
   );
 });
 
-test("status endpoint and booking page keep identifiers out of URLs", async () => {
+test("status page prefills an emailed reference while the lookup remains a POST", async () => {
   const [route, lookup, bookPage, statusPage] = await Promise.all([
     source("src/app/api/public/bookings/status/route.ts"),
     source("src/components/booking/BookingStatusLookup.tsx"),
@@ -120,10 +120,14 @@ test("status endpoint and booking page keep identifiers out of URLs", async () =
   assert.match(route, /Cache-Control["'],\s*["']no-store/);
   assert.match(lookup, /method:\s*"POST"/);
   assert.match(lookup, /JSON\.stringify\(\{ identifier \}\)/);
+  assert.match(lookup, /defaultValue=\{initialIdentifier\}/);
   assert.doesNotMatch(
     lookup,
     /name="(?:customerName|phone|email|notes|localDate|localTime)"/,
   );
   assert.match(bookPage, /href="\/book\/status"/);
+  assert.match(statusPage, /searchParams:\s*Promise/);
+  assert.match(statusPage, /parsePublicBookingIdentifier/);
+  assert.match(statusPage, /initialIdentifier=\{initialIdentifier\}/);
   assert.match(statusPage, /noIndex:\s*true/);
 });

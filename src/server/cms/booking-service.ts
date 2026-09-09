@@ -35,6 +35,7 @@ import {
 type MutationContext = {
   readonly actor: CmsUser;
   readonly requestId?: string;
+  readonly idempotencyKey?: string;
 };
 
 type BookingInput = {
@@ -68,6 +69,19 @@ function assertNoStaffAssignment(source: Record<string, unknown>) {
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+function hash(value: string) {
+  return createHash("sha256").update(value).digest("base64url");
+}
+
+function isDuplicateKeyError(error: unknown) {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "code" in error &&
+    Number((error as { code?: unknown }).code) === 11000
+  );
+}
 
 function requiredText(value: unknown, field: string, minimum: number, maximum: number) {
   const parsed = typeof value === "string" ? value.trim() : "";
@@ -250,13 +264,39 @@ export async function createAdminBooking(
   const repository = getCmsRepository();
   assertPersistenceReady(repository);
 
+  const suppliedIdempotencyKey = context.idempotencyKey?.trim();
+  if (
+    context.idempotencyKey !== undefined &&
+    (!suppliedIdempotencyKey ||
+      suppliedIdempotencyKey.length < 16 ||
+      suppliedIdempotencyKey.length > 200)
+  ) {
+    throw new CmsValidationError("The booking request identifier is invalid.");
+  }
+  const idempotencyKeyHash = hash(
+    `cms-admin-booking|${context.actor.id}|${suppliedIdempotencyKey ?? randomUUID()}`,
+  );
+  const requestFingerprintHash = hash(JSON.stringify(input));
+
   if (repository.mode === "mock" && !/^demo\b/i.test(input.customerName)) {
     throw new CmsValidationError(
       'Local mock bookings must use a fictional name beginning with "Demo".',
     );
   }
 
-  return repository.transaction(async (transaction) => {
+  const create = () => repository.transaction(async (transaction) => {
+    const existing = await transaction.findBookingByIdempotencyHash(
+      idempotencyKeyHash,
+    );
+    if (existing) {
+      if (existing.requestFingerprintHash !== requestFingerprintHash) {
+        throw new CmsConflictError(
+          "This booking request identifier was already used for different details.",
+        );
+      }
+      return existing;
+    }
+
     await transaction.lockBookingDate(input.localDate);
     const { price, service, slot } = await findSlot(transaction, input);
     const now = new Date().toISOString();
@@ -288,8 +328,8 @@ export async function createAdminBooking(
       privacyAcceptedAt: "",
       privacyNoticeVersion: "admin-captured",
       holdTokenHash: "",
-      idempotencyKeyHash: createHash("sha256").update(randomUUID()).digest("base64url"),
-      requestFingerprintHash: "",
+      idempotencyKeyHash,
+      requestFingerprintHash,
       demo: repository.mode === "mock",
       version: 1,
       createdAt: now,
@@ -312,6 +352,24 @@ export async function createAdminBooking(
     });
     return booking;
   });
+
+  try {
+    return await create();
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) throw error;
+
+    const existing = await repository.findBookingByIdempotencyHash(
+      idempotencyKeyHash,
+    );
+    if (
+      existing &&
+      existing.requestFingerprintHash === requestFingerprintHash
+    ) {
+      return existing;
+    }
+
+    throw error;
+  }
 }
 
 export async function updateAdminBooking(

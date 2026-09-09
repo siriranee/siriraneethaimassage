@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     const booking = await createAdminBooking(await readCmsJsonObject(request), {
       actor: user,
       requestId: getRequestId(request),
+      idempotencyKey: request.headers.get("idempotency-key") ?? undefined,
     });
     const confirmationEmail =
       booking.status === "confirmed"

@@ -190,7 +190,7 @@ test("customer confirmation email contains safe appointment and public business 
     "hello@siriranee.com",
     "https://siriranee.com/visit",
     "https://siriranee.com/contact",
-    "https://siriranee.com/book/status",
+    "https://siriranee.com/book/status?reference=SRN-20260910-ABC123",
   ]) {
     assert.match(
       `${message.html}\n${message.text}`,
@@ -200,7 +200,10 @@ test("customer confirmation email contains safe appointment and public business 
   assert.match(message.html, /Nok &lt;Example&gt;/);
   assert.doesNotMatch(message.html, /\u202E|<Example>/);
   assert.doesNotMatch(message.text, /\u202E/);
-  assert.doesNotMatch(message.html, /book\/status\?/);
+  assert.match(
+    message.html,
+    /href="https:\/\/siriranee\.com\/book\/status\?reference=SRN-20260910-ABC123"/,
+  );
 
   for (const forbidden of [
     "nok@example.com",

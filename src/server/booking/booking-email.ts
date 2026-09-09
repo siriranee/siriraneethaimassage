@@ -417,7 +417,9 @@ export function renderCustomerBookingConfirmedEmail(
   const directionsUrl = safeHttpUrl(business.directionsUrl);
   const visitUrl = origin ? `${origin}/visit` : directionsUrl;
   const contactUrl = origin ? `${origin}/contact` : undefined;
-  const statusUrl = origin ? `${origin}/book/status` : undefined;
+  const statusUrl = origin
+    ? `${origin}/book/status?reference=${encodeURIComponent(reference)}`
+    : undefined;
   const subject = `Booking confirmed · ${reference} · ${businessName}`;
   const preheader = `Your appointment on ${formattedDate} at ${localTime} is confirmed.`;
   const contactLines = [
@@ -435,7 +437,7 @@ export function renderCustomerBookingConfirmedEmail(
   const statusSection = statusUrl
     ? `<div style="margin:26px 0 0;padding:18px;border:1px solid #d8c7d7;border-radius:14px;background:#f7f0fa;">
         <h2 style="margin:0 0 8px;color:#5c2288;font-size:18px;line-height:1.4;">Check your booking status</h2>
-        <p style="margin:0 0 16px;color:#3c3340;font-size:14px;line-height:1.6;">Enter booking reference <strong>${escapeHtml(reference)}</strong>. For your privacy, the link does not contain your booking details.</p>
+        <p style="margin:0 0 16px;color:#3c3340;font-size:14px;line-height:1.6;">Your booking reference <strong>${escapeHtml(reference)}</strong> is included in this link for convenience. No personal or appointment details are included.</p>
         ${customerEmailLink("Check booking status", statusUrl)}
       </div>`
     : "";
@@ -505,7 +507,7 @@ ${address ? `\nWhere to go\n${address}\n${arrivalGuidance ? `${arrivalGuidance}\
 Need to change or cancel?
 Please contact us as soon as possible.
 ${contactLines.length ? `${contactLines.join("\n")}\n` : ""}${contactUrl ? `Contact: ${contactUrl}\n` : ""}
-${statusUrl ? `Check booking status: ${statusUrl}\nEnter booking reference ${reference}. For your privacy, the link does not contain your booking details.\n` : ""}
+${statusUrl ? `Check booking status: ${statusUrl}\nThe link includes booking reference ${reference}, but no personal or appointment details.\n` : ""}
 This operational email was sent because this address was provided for booking ${reference}. It is not a marketing email.`;
 
   return { subject, html, text };

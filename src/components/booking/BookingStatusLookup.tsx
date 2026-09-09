@@ -16,7 +16,11 @@ type LookupResponse = {
   readonly fields?: Readonly<Record<string, string>>;
 };
 
-export function BookingStatusLookup() {
+export function BookingStatusLookup({
+  initialIdentifier = "",
+}: Readonly<{
+  initialIdentifier?: string;
+}>) {
   const [state, setState] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
@@ -108,6 +112,7 @@ export function BookingStatusLookup() {
             aria-invalid={Boolean(fieldError)}
             autoCapitalize="characters"
             autoComplete="off"
+            defaultValue={initialIdentifier}
             id="booking-status-identifier"
             maxLength={120}
             minLength={16}
@@ -127,8 +132,8 @@ export function BookingStatusLookup() {
           </button>
         </div>
         <p className={styles.hint} id="booking-status-hint">
-          References are not case-sensitive. Your identifier is sent securely and
-          is not placed in the page URL.
+          References are not case-sensitive. Confirmation links may prefill the
+          reference, while the status check itself is submitted securely.
         </p>
         {fieldError ? (
           <p className={styles.fieldError} id="booking-status-error">

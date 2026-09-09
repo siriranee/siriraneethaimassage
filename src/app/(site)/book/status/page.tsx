@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { BookingStatusLookup } from "@/components/booking/BookingStatusLookup";
+import { parsePublicBookingIdentifier } from "@/domain/booking/public-status";
 import { PageHero } from "@/components/marketing/PageHero";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
@@ -17,7 +18,18 @@ export const metadata: Metadata = createMetadata({
   noIndex: true,
 });
 
-export default function BookingStatusPage() {
+export default async function BookingStatusPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reference?: string | string[] }>;
+}) {
+  const referenceValue = (await searchParams).reference;
+  const parsedReference = parsePublicBookingIdentifier(
+    typeof referenceValue === "string" ? referenceValue : "",
+  );
+  const initialIdentifier =
+    parsedReference?.kind === "reference" ? parsedReference.value : "";
+
   return (
     <div className={styles.main}>
       <PageHero
@@ -32,7 +44,7 @@ export default function BookingStatusPage() {
           <Link className={styles.backLink} href="/book">
             <ArrowLeft aria-hidden="true" /> Back to booking
           </Link>
-          <BookingStatusLookup />
+          <BookingStatusLookup initialIdentifier={initialIdentifier} />
         </div>
       </section>
     </div>

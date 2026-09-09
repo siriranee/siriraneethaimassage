@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import type { AvailabilitySlot } from "@/domain/booking/availability";
 
@@ -13,6 +13,18 @@ type Variant = {
   readonly durationMinutes: number;
   readonly priceCents: number;
 };
+
+function createIdempotencyKey() {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  const values = crypto.getRandomValues(new Uint32Array(4));
+  return Array.from(
+    values,
+    (value) => value.toString(16).padStart(8, "0"),
+  ).join("");
+}
 
 export function AdminBookingForm({
   defaultDate,
@@ -34,6 +46,7 @@ export function AdminBookingForm({
   const [availabilityMessage, setAvailabilityMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const idempotencyKeyRef = useRef("");
   const [bookingStatus, setBookingStatus] = useState<"pending" | "confirmed">(
     "pending",
   );
@@ -113,11 +126,15 @@ export function AdminBookingForm({
 
     setSaving(true);
     setFeedback("");
+    idempotencyKeyRef.current ||= createIdempotencyKey();
 
     try {
       const response = await fetch("/api/cms/bookings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKeyRef.current,
+        },
         body: JSON.stringify({
           customerName: data.get("customerName"),
           phone: data.get("phone"),
@@ -138,6 +155,7 @@ export function AdminBookingForm({
       };
 
       if (!response.ok || !result.booking) {
+        idempotencyKeyRef.current = "";
         setFeedback(result.error ?? "The booking could not be saved.");
         return;
       }

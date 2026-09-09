@@ -225,6 +225,12 @@ test("customer confirmation email is dispatched after commit with safe CMS feedb
   );
   assert.match(updateRoute, /confirmationEmail/);
   assert.match(createRoute, /confirmationEmail/);
+  assert.match(adminForm, /"Idempotency-Key": idempotencyKeyRef\.current/);
+  assert.match(createRoute, /request\.headers\.get\("idempotency-key"\)/);
+  assert.match(
+    bookingService,
+    /findBookingByIdempotencyHash\([\s\S]*?requestFingerprintHash/,
+  );
   assert.match(
     notifications,
     /customerBookingConfirmationEmailNotificationId\(booking\.id\)/,
