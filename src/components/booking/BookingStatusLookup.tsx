@@ -1,7 +1,13 @@
 "use client";
 
 import { CircleCheck, RotateCw, Search, ShieldCheck } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   isPublicBookingStatusSnapshot,
@@ -29,6 +35,7 @@ export function BookingStatusLookup({
   const [bookingStatus, setBookingStatus] =
     useState<PublicBookingStatusSnapshot | null>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);
+  const automaticLookupRef = useRef("");
 
   useEffect(() => {
     if (state === "success" || state === "error") {
@@ -36,12 +43,7 @@ export function BookingStatusLookup({
     }
   }, [state]);
 
-  async function checkStatus(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (state === "loading") return;
-
-    const form = event.currentTarget;
-    const identifier = String(new FormData(form).get("identifier") ?? "");
+  const checkIdentifier = useCallback(async (identifier: string) => {
     setState("loading");
     setMessage("Checking your booking status...");
     setFieldError("");
@@ -79,6 +81,27 @@ export function BookingStatusLookup({
       );
       setState("error");
     }
+  }, []);
+
+  useEffect(() => {
+    if (
+      !initialIdentifier ||
+      automaticLookupRef.current === initialIdentifier
+    ) {
+      return;
+    }
+
+    automaticLookupRef.current = initialIdentifier;
+    void checkIdentifier(initialIdentifier);
+  }, [checkIdentifier, initialIdentifier]);
+
+  async function checkStatus(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (state === "loading") return;
+
+    const form = event.currentTarget;
+    const identifier = String(new FormData(form).get("identifier") ?? "");
+    await checkIdentifier(identifier);
   }
 
   return (

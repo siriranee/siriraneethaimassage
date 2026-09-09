@@ -121,6 +121,8 @@ test("status page prefills an emailed reference while the lookup remains a POST"
   assert.match(lookup, /method:\s*"POST"/);
   assert.match(lookup, /JSON\.stringify\(\{ identifier \}\)/);
   assert.match(lookup, /defaultValue=\{initialIdentifier\}/);
+  assert.match(lookup, /automaticLookupRef\.current = initialIdentifier/);
+  assert.match(lookup, /void checkIdentifier\(initialIdentifier\)/);
   assert.doesNotMatch(
     lookup,
     /name="(?:customerName|phone|email|notes|localDate|localTime)"/,
