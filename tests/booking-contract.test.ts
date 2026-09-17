@@ -87,9 +87,10 @@ test("booking management surfaces support therapist assignment and visibility", 
 });
 
 test("CMS booking views use cards with accessible icon-only status actions", async () => {
-  const [bookingsPage, bookingDetailPage, dashboardPage, calendarPage, calendar, quickActions, viewStyles] =
+  const [bookingsPage, bookingList, bookingDetailPage, dashboardPage, calendarPage, calendar, quickActions, viewStyles] =
     await Promise.all([
       source("src/app/cms/(protected)/bookings/page.tsx"),
+      source("src/components/cms/CmsBookingCardList.tsx"),
       source("src/app/cms/(protected)/bookings/[bookingId]/page.tsx"),
       source("src/app/cms/(protected)/page.tsx"),
       source("src/app/cms/(protected)/calendar/page.tsx"),
@@ -99,7 +100,14 @@ test("CMS booking views use cards with accessible icon-only status actions", asy
     ]);
 
   assert.doesNotMatch(bookingsPage, /<table|desktopTable|mobileRecords/);
-  assert.match(bookingsPage, /className=\{styles\.bookingGrid\}/);
+  assert.match(bookingsPage, /order:\s*"startsAt-desc"/);
+  assert.match(bookingsPage, /<CmsBookingCardList key=\{bookingListKey\}>/);
+  assert.match(bookingList, /const BOOKING_BATCH_SIZE = 10/);
+  assert.match(bookingList, /cards\.slice\(0, shownCount\)/);
+  assert.match(bookingList, /current \+ BOOKING_BATCH_SIZE/);
+  assert.match(bookingList, /remainingCount > 0/);
+  assert.match(bookingList, /aria-controls="cms-booking-grid"/);
+  assert.match(bookingList, /className=\{styles\.bookingGrid\}/);
   assert.doesNotMatch(dashboardPage, /<table|desktopTable|mobileRecords/);
   assert.match(dashboardPage, /className=\{styles\.bookingGrid\}/);
   assert.match(dashboardPage, /<CmsBookingQuickActions/);

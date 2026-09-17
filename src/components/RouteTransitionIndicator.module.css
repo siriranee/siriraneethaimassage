@@ -1,0 +1,66 @@
+.indicator {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 200;
+  height: 0.25rem;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 80ms ease;
+}
+
+.track {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: rgb(var(--color-purple-100-rgb) / 0.42);
+}
+
+.track::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -38%;
+  width: 38%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--color-purple-500),
+    var(--color-gold-500),
+    var(--color-purple-500)
+  );
+  box-shadow: 0 0 0.8rem rgb(var(--color-purple-600-rgb) / 0.5);
+  content: "";
+}
+
+:global(html[data-route-transition]) .indicator {
+  opacity: 1;
+}
+
+:global(html[data-route-transition]) .track::after {
+  animation: moveIndicator 1.05s ease-in-out infinite;
+}
+
+:global(html[data-route-transition="cms"]) .track {
+  background: rgb(var(--color-purple-950-rgb) / 0.2);
+}
+
+@keyframes moveIndicator {
+  to {
+    transform: translateX(365%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indicator {
+    transition: none;
+  }
+
+  :global(html[data-route-transition]) .track::after {
+    left: 0;
+    width: 100%;
+    animation: none;
+  }
+}

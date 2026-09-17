@@ -114,41 +114,193 @@ test("therapist deactivation and booking creation are rejected in both serialize
   assert.equal((await fixture.repository.listBookings()).length, 0);
 });
 
-test("therapist removal archives safely, preserves private contact data and blocks future assignments", async () => {
+test("therapist deletion removes every assigned booking atomically and preserves unrelated records", async () => {
   const { createAdminBooking } = await import("@/server/cms/booking-service");
-  const { archiveCmsTeamMember } = await import("@/server/cms/content-service");
+  const { deleteCmsTeamMember, getCmsTeamDeletionImpact } = await import(
+    "@/server/cms/content-service"
+  );
+  const fixture = await setup();
+  const initialContent = await fixture.repository.getContent();
+  const otherTherapist = {
+    ...fixture.therapist,
+    id: "unrelated-therapist",
+    slug: "unrelated-therapist",
+    name: "Unrelated Therapist",
+    fullName: "Unrelated Therapist",
+  };
+  const contentWithOther = {
+    ...initialContent,
+    revision: initialContent.revision + 1,
+    team: [...initialContent.team, otherTherapist],
+  };
+  await fixture.repository.saveContent(contentWithOther, initialContent.revision);
+  await fixture.repository.savePublication({
+    id: "deletion-test-publication",
+    revision: contentWithOther.revision,
+    publishedAt: new Date().toISOString(),
+    publishedBy: fixture.actor.id,
+    snapshot: contentWithOther,
+  });
 
-  let fixture = await setup();
-  await createAdminBooking(fixture.input, fixture.context);
+  const assigned = await createAdminBooking(fixture.input, fixture.context);
+  const historical = {
+    ...assigned,
+    id: "historical-assigned-booking",
+    reference: "SRN-20000101-DELETE",
+    status: "cancelled" as const,
+    startsAt: "2000-01-01T12:00:00.000Z",
+    endsAt: "2000-01-01T13:00:00.000Z",
+    localDate: "2000-01-01",
+    idempotencyKeyHash: "historical-delete-idempotency",
+    requestFingerprintHash: "historical-delete-fingerprint",
+  };
+  const unrelated = {
+    ...assigned,
+    id: "unrelated-booking",
+    reference: "SRN-20990101-KEEP",
+    assignedStaffId: otherTherapist.id,
+    assignedStaffName: otherTherapist.name,
+    idempotencyKeyHash: "unrelated-idempotency",
+    requestFingerprintHash: "unrelated-fingerprint",
+  };
+  await fixture.repository.saveBooking(historical);
+  await fixture.repository.saveBooking(unrelated);
+
+  const notificationBase = {
+    channel: "email" as const,
+    audience: "therapist" as const,
+    bookingVersion: 1,
+    kind: "booking-assigned" as const,
+    status: "sent" as const,
+    provider: "resend" as const,
+    attemptCount: 1,
+    lastError: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await fixture.repository.saveNotification({
+    ...notificationBase,
+    id: "assigned-booking-notification",
+    bookingId: assigned.id,
+    bookingReference: assigned.reference,
+    targetTeamMemberId: fixture.therapist.id,
+    providerMessageId: "assigned-provider-message",
+  });
+  await fixture.repository.saveNotification({
+    ...notificationBase,
+    id: "unrelated-booking-notification",
+    bookingId: unrelated.id,
+    bookingReference: unrelated.reference,
+    targetTeamMemberId: otherTherapist.id,
+    providerMessageId: "unrelated-provider-message",
+  });
+  await fixture.repository.saveHold({
+    id: "assigned-therapist-hold",
+    tokenHash: "assigned-hold-token",
+    serviceId: fixture.service.id,
+    durationMinutes: 60,
+    startsAt: assigned.startsAt,
+    endsAt: assigned.endsAt,
+    localDate: assigned.localDate,
+    assignedStaffId: fixture.therapist.id,
+    status: "active",
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    createdAt: new Date().toISOString(),
+  });
+
+  const expectedReferences = [historical.reference, assigned.reference];
+  assert.deepEqual(
+    await getCmsTeamDeletionImpact(fixture.therapist.id),
+    { bookingCount: 2, bookingReferences: expectedReferences },
+  );
   await assert.rejects(
-    archiveCmsTeamMember(
+    deleteCmsTeamMember(
       fixture.therapist.id,
-      fixture.therapist.version,
+      fixture.therapist.version + 1,
       fixture.context,
     ),
-    /Reassign future booking/,
+    /changed by another request/,
   );
+  assert.ok(await fixture.repository.getBooking(assigned.id));
 
-  fixture = await setup();
-  const removed = await archiveCmsTeamMember(
+  const deleted = await deleteCmsTeamMember(
     fixture.therapist.id,
     fixture.therapist.version,
     fixture.context,
   );
-  assert.equal(removed.archived, true);
-  assert.equal(removed.operationalActive, false);
-  assert.equal(removed.publicProfile, false);
-  assert.equal(removed.notificationEmail, "demo.therapist@example.invalid");
+  assert.deepEqual(deleted, {
+    memberId: fixture.therapist.id,
+    name: fixture.therapist.name,
+    bookingCount: 2,
+    bookingReferences: expectedReferences,
+  });
+  assert.equal((await fixture.repository.getContent()).team.some(
+    (member) => member.id === fixture.therapist.id,
+  ), false);
+  assert.equal((await fixture.repository.getContent()).team.some(
+    (member) => member.id === otherTherapist.id,
+  ), true);
+  assert.equal(await fixture.repository.getBooking(assigned.id), null);
+  assert.equal(await fixture.repository.getBooking(historical.id), null);
+  assert.equal((await fixture.repository.getBooking(unrelated.id))?.assignedStaffId, otherTherapist.id);
+  assert.deepEqual(await fixture.repository.listNotifications(assigned.id), []);
+  assert.equal((await fixture.repository.listNotifications(unrelated.id)).length, 1);
+  // Separate therapist contact and short-lived capacity holds are retained until
+  // the owner explicitly authorizes deleting those records too.
   assert.equal(
     (await fixture.repository.getTherapistContact(fixture.therapist.id))
       ?.notificationEmail,
     "demo.therapist@example.invalid",
   );
+  assert.ok(await fixture.repository.findHoldByTokenHash("assigned-hold-token"));
   const published = await fixture.repository.getPublishedContent();
-  const publishedTherapist = published?.snapshot.team.find(
+  assert.equal(published?.snapshot.team.some(
     (member) => member.id === fixture.therapist.id,
+  ), false);
+  assert.equal(published?.snapshot.team.some(
+    (member) => member.id === otherTherapist.id,
+  ), true);
+  const audits = await fixture.repository.listAuditForEntity(
+    "team-member",
+    fixture.therapist.id,
   );
-  assert.equal(publishedTherapist?.archived, true);
-  assert.equal(publishedTherapist?.operationalActive, false);
-  assert.equal(publishedTherapist?.publicProfile, false);
+  assert.equal(audits[0]?.action, "team.deleted");
+  assert.match(audits[0]?.summary ?? "", /2 related bookings/);
+  assert.deepEqual(
+    await getCmsTeamDeletionImpact(fixture.therapist.id),
+    { bookingCount: 0, bookingReferences: [] },
+  );
+});
+
+test("an archived therapist can still be permanently deleted with assigned bookings", async () => {
+  const { createAdminBooking } = await import("@/server/cms/booking-service");
+  const { deleteCmsTeamMember } = await import("@/server/cms/content-service");
+  const fixture = await setup();
+  const assigned = await createAdminBooking(fixture.input, fixture.context);
+  const current = await fixture.repository.getContent();
+  const archived = {
+    ...fixture.therapist,
+    publicProfile: false,
+    operationalActive: false,
+    archived: true,
+    version: fixture.therapist.version + 1,
+  };
+  await fixture.repository.saveContent({
+    ...current,
+    revision: current.revision + 1,
+    team: current.team.map((member) =>
+      member.id === archived.id ? archived : member,
+    ),
+  }, current.revision);
+
+  const deleted = await deleteCmsTeamMember(
+    archived.id,
+    archived.version,
+    fixture.context,
+  );
+  assert.equal(deleted.memberId, archived.id);
+  assert.equal(deleted.bookingCount, 1);
+  assert.deepEqual(deleted.bookingReferences, [assigned.reference]);
+  assert.equal(await fixture.repository.getBooking(assigned.id), null);
+  assert.equal((await fixture.repository.getContent()).team.length, 0);
 });

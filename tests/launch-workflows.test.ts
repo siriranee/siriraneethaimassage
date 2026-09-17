@@ -344,6 +344,16 @@ test("isolated launch verification covers services, ten bookings and administrat
     ),
     times,
   );
+  assert.deepEqual(
+    (
+      await repository.listBookings({
+        from: localDate,
+        to: localDate,
+        order: "startsAt-desc",
+      })
+    ).map((booking) => booking.localTime),
+    [...times].reverse(),
+  );
   assert.equal(
     (await repository.listBookingOccupancy(localDate, localDate)).length,
     10,

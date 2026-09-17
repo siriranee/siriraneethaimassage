@@ -30,6 +30,7 @@ import type {
   CmsPublication,
   CmsSession,
   CmsTherapistContact,
+  CmsTherapistDeletionImpact,
   CmsUser,
 } from "@/domain/cms/types";
 import {
@@ -201,6 +202,20 @@ function bookingIncludesSearch(booking: CmsBooking, search: string) {
     .includes(search.toLowerCase());
 }
 
+function therapistDeletionImpact(
+  bookings: readonly Document[],
+): CmsTherapistDeletionImpact {
+  return {
+    bookingCount: bookings.length,
+    bookingReferences: bookings
+      .slice(0, 5)
+      .map((booking) =>
+        typeof booking.reference === "string" && booking.reference.trim()
+          ? booking.reference
+          : String(booking._id),
+      ),
+  };
+}
 
 export class MongoCmsRepository implements CmsRepository {
   readonly mode = "mongodb" as const;
@@ -213,6 +228,21 @@ export class MongoCmsRepository implements CmsRepository {
 
   private async db(): Promise<Db> {
     return getMongoDatabase();
+  }
+
+  private async therapistDeletionBookings(therapistId: string) {
+    const db = await this.db();
+    return db
+      .collection<CmsMongoDocument>(collections.bookings)
+      .find(
+        { assignedStaffId: therapistId },
+        {
+          ...this.options(),
+          projection: { _id: 1, reference: 1, startsAt: 1 },
+        },
+      )
+      .sort({ startsAt: 1, _id: 1 })
+      .toArray();
   }
 
   async transaction<T>(
@@ -377,6 +407,39 @@ export class MongoCmsRepository implements CmsRepository {
     );
     if (result.matchedCount !== 1) throw new CmsConflictError();
     return contact;
+  }
+
+  async getTherapistDeletionImpact(therapistId: string) {
+    return therapistDeletionImpact(
+      await this.therapistDeletionBookings(therapistId),
+    );
+  }
+
+  async deleteTherapistCascade(therapistId: string) {
+    if (!this.session) {
+      throw new Error("Therapist deletion requires a transaction.");
+    }
+
+    const db = await this.db();
+    const bookings = await this.therapistDeletionBookings(therapistId);
+    const impact = therapistDeletionImpact(bookings);
+    const bookingIds = bookings.map((booking) => String(booking._id));
+
+    if (bookingIds.length) {
+      await db
+        .collection<CmsMongoDocument>(collections.notifications)
+        .deleteMany({ bookingId: { $in: bookingIds } }, this.options());
+    }
+    const bookingDeletion = await db
+      .collection<CmsMongoDocument>(collections.bookings)
+      .deleteMany({ assignedStaffId: therapistId }, this.options());
+    if (bookingDeletion.deletedCount !== impact.bookingCount) {
+      throw new CmsConflictError(
+        "The therapist's bookings changed while deletion was in progress.",
+      );
+    }
+
+    return impact;
   }
 
   async getMediaAsset(publicId: string) {
@@ -728,6 +791,7 @@ export class MongoCmsRepository implements CmsRepository {
     const db = await this.db();
     const filter: Filter<CmsMongoDocument> = {};
     const nowIso = new Date().toISOString();
+    const sortDirection = query.order === "startsAt-desc" ? -1 : 1;
 
     if (query.from || query.to) {
       filter.localDate = {
@@ -768,7 +832,7 @@ export class MongoCmsRepository implements CmsRepository {
     const rows = await db
       .collection<CmsMongoDocument>(collections.bookings)
       .find(filter, this.options())
-      .sort({ startsAt: 1 })
+      .sort({ startsAt: sortDirection, _id: sortDirection })
       .limit(1000)
       .toArray();
 

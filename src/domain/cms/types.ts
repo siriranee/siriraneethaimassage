@@ -198,6 +198,11 @@ export type CmsTeamEditorRecord = CmsTeamRecord & {
   readonly contactVersion: number;
 };
 
+export type CmsTherapistDeletionImpact = {
+  readonly bookingCount: number;
+  readonly bookingReferences: readonly string[];
+};
+
 export type CmsPromotionRecord = {
   readonly id: string;
   readonly title: string;
@@ -471,6 +476,7 @@ export type CmsBookingQuery = {
   readonly therapistId?: string;
   readonly attention?: "expired" | "unassigned";
   readonly search?: string;
+  readonly order?: "startsAt-asc" | "startsAt-desc";
 };
 
 export type CmsDashboardSummary = {

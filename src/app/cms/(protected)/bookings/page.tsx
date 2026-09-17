@@ -1,6 +1,7 @@
 import { Plus, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 
+import { CmsBookingCardList } from "@/components/cms/CmsBookingCardList";
 import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
 import { CmsBookingEmailAttentionNotice } from "@/components/cms/CmsBookingEmailAttentionNotice";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
@@ -73,7 +74,17 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
   const from = safeDate(single(params.from));
   const to = safeDate(single(params.to));
   const [bookings, content, emailAttention] = await Promise.all([
-    listCmsBookings({ search: search || undefined, status, source, serviceId, therapistId, attention, from, to }),
+    listCmsBookings({
+      search: search || undefined,
+      status,
+      source,
+      serviceId,
+      therapistId,
+      attention,
+      from,
+      to,
+      order: "startsAt-desc",
+    }),
     getCmsContent(),
     listCmsBookingEmailAttention(),
   ]);
@@ -82,6 +93,16 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
   const hasActiveFilters = Boolean(
     search || status || source || serviceId || therapistId || attention || from || to,
   );
+  const bookingListKey = JSON.stringify({
+    search,
+    status,
+    source,
+    serviceId,
+    therapistId,
+    attention,
+    from,
+    to,
+  });
 
   return (
     <>
@@ -128,7 +149,7 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
         </details>
 
         {bookings.length ? (
-          <div aria-label="Siriranee bookings" className={styles.bookingGrid}>
+          <CmsBookingCardList key={bookingListKey}>
             {bookings.map((booking) => (
               <article className={styles.bookingCard} key={booking.id}>
                 <header className={styles.bookingCardHeader}>
@@ -172,7 +193,7 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
                 </footer>
               </article>
             ))}
-          </div>
+          </CmsBookingCardList>
         ) : (
           <CmsEmptyState title="No bookings found">
             Try a different search or status filter, or add a booking received by phone or WhatsApp.

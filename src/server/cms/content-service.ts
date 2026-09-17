@@ -13,6 +13,7 @@ import {
   type CmsTeamEditorRecord,
   type CmsTeamRecord,
   type CmsTherapistContact,
+  type CmsTherapistDeletionImpact,
   type CmsUser,
   type CmsVoucherRecord,
 } from "@/domain/cms/types";
@@ -60,9 +61,16 @@ type CmsPublicationTarget =
   | {
       readonly section:
         | "services"
-        | "team"
-        | "promotions"
-        | "vouchers";
+        | "promotions";
+      readonly entityId: string;
+    }
+  | {
+      readonly section: "team";
+      readonly entityId: string;
+      readonly deletedTeam?: true;
+    }
+  | {
+      readonly section: "vouchers";
       readonly entityId: string;
       readonly deletedVoucher?: true;
     }
@@ -158,6 +166,14 @@ function createImmediatePublicationSnapshot(
         bookingSettings: structuredClone(content.bookingSettings),
       };
     case "team": {
+      if (target.deletedTeam) {
+        return {
+          ...snapshotBase,
+          team: snapshotBase.team.filter(
+            (item) => item.id !== target.entityId,
+          ),
+        };
+      }
       const member = content.team.find(
         (item) => item.id === target.entityId,
       );
@@ -751,6 +767,12 @@ export async function getCmsTeamEditorRecord(
   );
 }
 
+export async function getCmsTeamDeletionImpact(
+  memberId: string,
+): Promise<CmsTherapistDeletionImpact> {
+  return getCmsRepository().getTherapistDeletionImpact(memberId);
+}
+
 export async function updateCmsTeamMember(
   memberId: string,
   input: unknown,
@@ -867,11 +889,11 @@ export async function updateCmsTeamMember(
   });
 }
 
-export async function archiveCmsTeamMember(
+export async function deleteCmsTeamMember(
   memberId: string,
   expectedVersion: number,
   context: MutationContext,
-): Promise<CmsTeamEditorRecord> {
+) {
   const repository = getCmsRepository();
 
   return repository.transaction(async (transaction) => {
@@ -881,37 +903,15 @@ export async function archiveCmsTeamMember(
     const existing = current.team.find((member) => member.id === memberId);
     if (!existing) throw new Error("Team member not found.");
     if (existing.version !== expectedVersion) throw new CmsConflictError();
-    if (existing.archived) {
-      throw new CmsConflictError("This therapist has already been removed.");
-    }
 
     const now = new Date().toISOString();
-    const futureAssignedBookings =
-      await transaction.listFutureActiveTherapistBookings(memberId, now);
-    if (futureAssignedBookings[0]) {
-      throw new CmsConflictError(
-        `Reassign future booking ${futureAssignedBookings[0].reference} before removing this therapist.`,
-      );
-    }
-
-    const archived: CmsTeamRecord = {
-      ...existing,
-      publicProfile: false,
-      operationalActive: false,
-      archived: true,
-      version: existing.version + 1,
-      updatedAt: now,
-    };
     const next: CmsContentState = {
       ...current,
       revision: current.revision + 1,
-      team: current.team.map((member) =>
-        member.id === memberId ? archived : member,
-      ),
+      team: current.team.filter((member) => member.id !== memberId),
       updatedAt: now,
       updatedBy: context.actor.id,
     };
-    const contact = await transaction.getTherapistContact(memberId);
 
     await commitCmsMediaForContentMutation(transaction, {
       current,
@@ -921,23 +921,27 @@ export async function archiveCmsTeamMember(
       requestId: context.requestId,
     });
     await transaction.saveContent(next, storedCurrent.revision);
+    const impact = await transaction.deleteTherapistCascade(memberId);
     await publishContentImmediately(
       transaction,
       next,
-      { section: "team", entityId: memberId },
+      { section: "team", entityId: memberId, deletedTeam: true },
       context,
     );
     await appendCmsAudit(transaction, {
       actor: context.actor,
-      action: "team.archived",
+      action: "team.deleted",
       entityType: "team-member",
       entityId: memberId,
-      summary:
-        "Removed a therapist from public and operational booking choices while preserving their historical record.",
+      summary: `Permanently deleted therapist ${existing.name} and ${impact.bookingCount} related booking${impact.bookingCount === 1 ? "" : "s"}.`,
       requestId: context.requestId,
     });
 
-    return teamEditorRecord(archived, contact);
+    return {
+      memberId: existing.id,
+      name: existing.name,
+      ...impact,
+    } as const;
   });
 }
 

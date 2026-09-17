@@ -1,7 +1,7 @@
 import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
 import {
-  archiveCmsTeamMember,
+  deleteCmsTeamMember,
   getCmsTeamEditorRecord,
   updateCmsTeamMember,
 } from "@/server/cms/content-service";
@@ -129,12 +129,12 @@ export async function DELETE(request: Request, context: RouteContext) {
   try {
     const body = await readCmsJsonObject(request);
     const { memberId } = await context.params;
-    const member = await archiveCmsTeamMember(
+    const deleted = await deleteCmsTeamMember(
       memberId,
       Number(body.expectedVersion),
       { actor: user, requestId: getRequestId(request) },
     );
-    return cmsNoStoreJson({ member });
+    return cmsNoStoreJson({ deleted });
   } catch (error) {
     return cmsErrorResponse(error);
   }

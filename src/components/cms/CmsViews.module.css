@@ -161,6 +161,54 @@
   background: var(--color-purple-50);
 }
 
+.bookingList {
+  background: var(--color-purple-50);
+}
+
+.bookingListControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1rem 1rem;
+}
+
+.bookingListCount {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.bookingListCount strong {
+  color: var(--color-purple-900);
+  font-weight: 850;
+}
+
+.showMoreBookings {
+  min-height: 2.75rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--color-purple-700);
+  border-radius: 0.65rem;
+  background: var(--color-surface);
+  color: var(--color-purple-700);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.showMoreBookings:hover {
+  background: var(--color-purple-700);
+  color: var(--color-on-brand);
+}
+
+.showMoreBookings:focus-visible {
+  outline: 3px solid rgb(var(--color-purple-700-rgb) / 0.25);
+  outline-offset: 2px;
+}
+
 .bookingCard {
   display: grid;
   min-width: 0;
@@ -739,6 +787,15 @@
 
   .bookingGrid {
     grid-template-columns: 1fr;
+  }
+
+  .bookingListControls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .showMoreBookings {
+    width: 100%;
   }
 
   .bookingCard {

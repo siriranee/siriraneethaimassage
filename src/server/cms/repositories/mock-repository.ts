@@ -15,6 +15,7 @@ import type {
   CmsPublication,
   CmsSession,
   CmsTherapistContact,
+  CmsTherapistDeletionImpact,
   CmsUser,
 } from "@/domain/cms/types";
 import type { PublicBookingIdentifier } from "@/domain/booking/public-status";
@@ -75,6 +76,17 @@ function normaliseHold(hold: CmsBookingHold): CmsBookingHold {
     ...hold,
     assignedStaffId:
       typeof hold.assignedStaffId === "string" ? hold.assignedStaffId : "",
+  };
+}
+
+function therapistDeletionImpact(
+  bookings: readonly CmsBooking[],
+): CmsTherapistDeletionImpact {
+  return {
+    bookingCount: bookings.length,
+    bookingReferences: bookings
+      .slice(0, 5)
+      .map((booking) => booking.reference),
   };
 }
 
@@ -231,6 +243,43 @@ export class MockCmsRepository implements CmsRepository {
 
     this.state.therapistContacts[index] = clone(contact);
     return clone(contact);
+  }
+
+  async getTherapistDeletionImpact(therapistId: string) {
+    const bookings = this.state.bookings
+      .filter((booking) => booking.assignedStaffId === therapistId)
+      .sort((first, second) =>
+        first.startsAt.localeCompare(second.startsAt) ||
+        first.id.localeCompare(second.id),
+      );
+    return clone(therapistDeletionImpact(bookings));
+  }
+
+  async deleteTherapistCascade(therapistId: string) {
+    if (!this.transactionState) {
+      throw new Error("Therapist deletion requires a transaction.");
+    }
+
+    const bookings = this.state.bookings
+      .filter((booking) => booking.assignedStaffId === therapistId)
+      .sort((first, second) =>
+        first.startsAt.localeCompare(second.startsAt) ||
+        first.id.localeCompare(second.id),
+      );
+    const bookingCountBefore = this.state.bookings.length;
+    const bookingIds = new Set(bookings.map((booking) => booking.id));
+    this.state.notifications = this.state.notifications.filter(
+      (notification) => !bookingIds.has(notification.bookingId),
+    );
+    this.state.bookings = this.state.bookings.filter(
+      (booking) => booking.assignedStaffId !== therapistId,
+    );
+    if (bookingCountBefore - this.state.bookings.length !== bookings.length) {
+      throw new CmsConflictError(
+        "The therapist's bookings changed while deletion was in progress.",
+      );
+    }
+    return clone(therapistDeletionImpact(bookings));
   }
 
   async getMediaAsset(publicId: string) {
@@ -428,6 +477,7 @@ export class MockCmsRepository implements CmsRepository {
 
   async listBookings(query: CmsBookingQuery = {}) {
     const nowIso = new Date().toISOString();
+    const sortDirection = query.order === "startsAt-desc" ? -1 : 1;
     const filtered = this.state.bookings.filter((booking) => {
       if (query.from && booking.localDate < query.from) return false;
       if (query.to && booking.localDate > query.to) return false;
@@ -462,9 +512,11 @@ export class MockCmsRepository implements CmsRepository {
 
     return clone(
       filtered
-        .sort((first, second) =>
-          first.startsAt.localeCompare(second.startsAt),
-        )
+        .sort((first, second) => {
+          const startsAtOrder = first.startsAt.localeCompare(second.startsAt);
+          if (startsAtOrder !== 0) return startsAtOrder * sortDirection;
+          return first.id.localeCompare(second.id) * sortDirection;
+        })
         .map(normaliseBooking),
     );
   }

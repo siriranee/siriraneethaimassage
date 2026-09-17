@@ -183,13 +183,14 @@ test("notification records keep Resend delivery metadata free of contact details
 });
 
 test("CMS navigation includes therapist management and omits retired publishing surfaces", async () => {
-  const [shell, settings, integrations, types, contentService, teamPage, teamPageStyles, teamEditor, collectionRoute, itemRoute] = await Promise.all([
+  const [shell, settings, integrations, types, contentService, teamPage, teamEditPage, teamPageStyles, teamEditor, collectionRoute, itemRoute] = await Promise.all([
     source("src/components/cms/CmsShell.tsx"),
     source("src/app/cms/(protected)/settings/page.tsx"),
     source("src/app/cms/(protected)/settings/integrations/page.tsx"),
     source("src/domain/cms/types.ts"),
     source("src/server/cms/content-service.ts"),
     source("src/app/cms/(protected)/team/page.tsx"),
+    source("src/app/cms/(protected)/team/[memberId]/edit/page.tsx"),
     source("src/app/cms/(protected)/team/page.module.css"),
     source("src/components/cms/TeamEditorForm.tsx"),
     source("src/app/api/cms/team/route.ts"),
@@ -216,18 +217,31 @@ test("CMS navigation includes therapist management and omits retired publishing 
   assert.match(teamEditor, /name="publicProfile"/);
   assert.match(teamEditor, /name="serviceIds"/);
   assert.match(teamEditor, /scope:\s*"therapist-profile"/);
-  assert.match(teamEditor, /Remove therapist/);
+  assert.match(teamEditor, /Delete therapist/);
   assert.match(teamEditor, /method:\s*"DELETE"/);
-  assert.match(teamEditor, /historical booking record will be kept/);
+  assert.match(teamEditor, /Permanently delete/);
+  assert.match(teamEditor, /No cancellation emails will be sent/);
+  assert.match(teamEditor, /!isNew \? \(/);
+  assert.doesNotMatch(teamEditor, /!isNew && !member\.archived/);
+  assert.match(teamEditor, /router\.replace\("\/cms\/team"\)/);
+  assert.doesNotMatch(
+    teamEditor,
+    /router\.replace\("\/cms\/team"\);\s*router\.refresh\(\)/,
+  );
+  assert.match(teamEditor, /deletionImpact\.bookingCount/);
+  assert.match(teamEditor, /therapist-deletion-impact/);
+  assert.match(teamEditPage, /getCmsTeamDeletionImpact/);
+  assert.match(teamEditPage, /deletionImpact=\{deletionImpact\}/);
   assert.match(collectionRoute, /requireCmsApiUser\("content:write"\)/);
   assert.match(itemRoute, /requireCmsApiUser\("content:write"\)/);
   assert.match(collectionRoute, /isSameOriginMutation/);
   assert.match(itemRoute, /isSameOriginMutation/);
   assert.match(itemRoute, /export async function DELETE/);
-  assert.match(itemRoute, /archiveCmsTeamMember/);
-  assert.match(contentService, /export async function archiveCmsTeamMember/);
-  assert.match(contentService, /listFutureActiveTherapistBookings/);
-  assert.match(contentService, /action:\s*"team\.archived"/);
+  assert.match(itemRoute, /deleteCmsTeamMember/);
+  assert.match(contentService, /export async function deleteCmsTeamMember/);
+  assert.match(contentService, /export async function getCmsTeamDeletionImpact/);
+  assert.match(contentService, /deletedTeam:\s*true/);
+  assert.match(contentService, /action:\s*"team\.deleted"/);
   assert.doesNotMatch(settings, /\/cms\/settings\/recovery|Recovery/);
   assert.doesNotMatch(integrations, /\/cms\/notifications/);
   assert.doesNotMatch(types, /CmsPageRecord|CmsGalleryRecord|readonly pages\??:|readonly gallery:/);

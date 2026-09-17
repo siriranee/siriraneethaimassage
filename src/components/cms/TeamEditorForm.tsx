@@ -2,10 +2,14 @@
 
 import { LoaderCircle, Trash2 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 
-import type { CmsTeamEditorRecord } from "@/domain/cms/types";
+import type {
+  CmsTeamEditorRecord,
+  CmsTherapistDeletionImpact,
+} from "@/domain/cms/types";
 import type { PreparedClientImage } from "@/lib/media/client-image";
 import {
   isApprovedImageUrlForOwnership,
@@ -43,6 +47,11 @@ type TeamSaveResponse = Readonly<{
   mediaRollback?: unknown;
 }>;
 
+type TeamDeleteResponse = Readonly<{
+  error?: unknown;
+  deleted?: unknown;
+}>;
+
 function lines(value: FormDataEntryValue | null) {
   return String(value ?? "")
     .split(/\r?\n/)
@@ -78,13 +87,28 @@ function isTeamEditorRecord(value: unknown): value is CmsTeamEditorRecord {
   );
 }
 
+function isTeamDeletionResult(
+  value: unknown,
+): value is Readonly<{ memberId: string; bookingCount: number }> {
+  if (!value || typeof value !== "object") return false;
+  const deleted = value as { memberId?: unknown; bookingCount?: unknown };
+  return (
+    typeof deleted.memberId === "string" &&
+    typeof deleted.bookingCount === "number" &&
+    Number.isInteger(deleted.bookingCount) &&
+    deleted.bookingCount >= 0
+  );
+}
+
 export function TeamEditorForm({
   cloudinaryOwnership,
+  deletionImpact = { bookingCount: 0, bookingReferences: [] },
   isNew = false,
   member,
   services,
 }: Readonly<{
   cloudinaryOwnership?: CloudinaryDeliveryOwnership | null;
+  deletionImpact?: CmsTherapistDeletionImpact;
   isNew?: boolean;
   member: CmsTeamEditorRecord;
   services: readonly ServiceOption[];
@@ -101,14 +125,14 @@ export function TeamEditorForm({
   const [operationalActive, setOperationalActive] = useState(member.operationalActive);
   const [archived, setArchived] = useState(Boolean(member.archived));
   const [saving, setSaving] = useState(false);
-  const [removing, setRemoving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error" | "progress";
     text: string;
   } | null>(null);
   const { dirty, markDirty, markSaved } = useUnsavedChanges();
-  const locked = saving || preparationBusy || removing;
+  const locked = saving || preparationBusy || deleting;
   const savedImageCanPreview = isApprovedImageUrlForOwnership(imageUrl, cloudinaryOwnership);
 
   function fieldError(name: string) {
@@ -258,24 +282,35 @@ export function TeamEditorForm({
     }
   }
 
-  async function removeTherapist() {
-    if (isNew || archived || saveLockRef.current || preparationBusy || removing) {
+  async function deleteTherapist() {
+    if (
+      isNew ||
+      saveLockRef.current ||
+      preparationBusy ||
+      deleting
+    ) {
       return;
     }
     const unsavedWarning = dirty
       ? " Your unsaved changes will be discarded."
       : "";
+    const bookingCountNote = deletionImpact.bookingCount === 1
+      ? " One booking is currently assigned."
+      : ` ${deletionImpact.bookingCount} bookings are currently assigned.`;
     if (
       !window.confirm(
-        `Remove ${member.name} from booking? Their historical booking record will be kept.${unsavedWarning}`,
+        `Permanently delete ${member.name}? Their therapist profile and every booking assigned at deletion time will be deleted with those bookings' notification records.${bookingCountNote} No cancellation emails will be sent. This cannot be undone.${unsavedWarning}`,
       )
     ) {
       return;
     }
 
     saveLockRef.current = true;
-    setRemoving(true);
-    setFeedback({ tone: "progress", text: "Removing therapist…" });
+    setDeleting(true);
+    setFeedback({
+      tone: "progress",
+      text: "Deleting therapist and related bookings…",
+    });
 
     try {
       const response = await fetch(`/api/cms/team/${member.id}`, {
@@ -284,23 +319,27 @@ export function TeamEditorForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ expectedVersion: version }),
       });
-      const result = (await response.json().catch(() => ({}))) as TeamSaveResponse;
+      const result = (await response.json().catch(() => ({}))) as TeamDeleteResponse;
       if (!response.ok) {
         throw new TeamSaveError(result.error);
+      }
+      if (!isTeamDeletionResult(result.deleted)) {
+        throw new TeamSaveError(
+          "The deletion result could not be confirmed. Refresh the therapist list before trying again.",
+        );
       }
 
       markSaved();
       router.replace("/cms/team");
-      router.refresh();
     } catch (error) {
       setFeedback({
         tone: "error",
         text: error instanceof TeamSaveError
           ? error.message
-          : "The removal result could not be confirmed. Refresh the therapist list before trying again.",
+          : "The deletion result could not be confirmed. Refresh the therapist list before trying again.",
       });
       saveLockRef.current = false;
-      setRemoving(false);
+      setDeleting(false);
     }
   }
 
@@ -464,6 +503,35 @@ export function TeamEditorForm({
         </section>
       </fieldset>
 
+      {!isNew && deletionImpact.bookingCount > 0 ? (
+        <section className={teamStyles.deletionImpact} id="therapist-deletion-impact" role="status">
+          <div>
+            <strong>
+              {deletionImpact.bookingCount === 1
+                ? "1 related booking will also be permanently deleted."
+                : `${deletionImpact.bookingCount} related bookings will also be permanently deleted.`}
+            </strong>
+            <span>
+              Their notification records will be removed. No cancellation emails will be sent.
+            </span>
+          </div>
+          <ul aria-label="Bookings that will be deleted">
+            {deletionImpact.bookingReferences.map((reference) => (
+              <li key={reference}>
+                <Link href={`/cms/bookings?search=${encodeURIComponent(reference)}`}>
+                  {reference}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {deletionImpact.bookingCount > deletionImpact.bookingReferences.length ? (
+            <small>
+              And {deletionImpact.bookingCount - deletionImpact.bookingReferences.length} more.
+            </small>
+          ) : null}
+        </section>
+      ) : null}
+
       <div className={styles.saveBar}>
         <span aria-live="polite">
           {feedback ? (
@@ -471,19 +539,20 @@ export function TeamEditorForm({
           ) : `Profile version ${version} · contact version ${contactVersion}${dirty ? " · unsaved changes" : ""}`}
         </span>
         <div className={teamStyles.saveActions}>
-          {!isNew && !archived ? (
+          {!isNew ? (
             <button
+              aria-describedby={deletionImpact.bookingCount ? "therapist-deletion-impact" : undefined}
               className={teamStyles.removeButton}
               disabled={locked}
-              onClick={() => void removeTherapist()}
+              onClick={() => void deleteTherapist()}
               type="button"
             >
-              {removing ? (
+              {deleting ? (
                 <LoaderCircle aria-hidden="true" className={teamStyles.spinner} />
               ) : (
                 <Trash2 aria-hidden="true" />
               )}
-              {removing ? "Removing…" : "Remove therapist"}
+              {deleting ? "Deleting…" : "Delete therapist"}
             </button>
           ) : null}
           <button disabled={locked} type="submit">{saving ? "Saving therapist…" : isNew ? "Create therapist" : "Save therapist"}</button>

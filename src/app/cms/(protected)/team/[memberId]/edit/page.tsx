@@ -5,6 +5,7 @@ import { CmsPageHeader, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import {
   getCmsContent,
+  getCmsTeamDeletionImpact,
   getCmsTeamEditorRecord,
 } from "@/server/cms/content-service";
 import { getCloudinaryMediaOwnershipConfig } from "@/server/media/config";
@@ -16,10 +17,11 @@ type PageProps = {
 export default async function CmsTeamMemberEditPage({ params }: PageProps) {
   await requireCmsPageUser("content:write");
   const { memberId } = await params;
-  const [member, content, cloudinaryOwnership] = await Promise.all([
+  const [member, content, cloudinaryOwnership, deletionImpact] = await Promise.all([
     getCmsTeamEditorRecord(memberId),
     getCmsContent(),
     Promise.resolve(getCloudinaryMediaOwnershipConfig()),
+    getCmsTeamDeletionImpact(memberId),
   ]);
   if (!member) notFound();
 
@@ -40,6 +42,7 @@ export default async function CmsTeamMemberEditPage({ params }: PageProps) {
       />
       <TeamEditorForm
         cloudinaryOwnership={cloudinaryOwnership}
+        deletionImpact={deletionImpact}
         member={member}
         services={services}
       />

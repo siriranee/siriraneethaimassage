@@ -16,6 +16,7 @@ import type {
   CmsPublication,
   CmsSession,
   CmsTherapistContact,
+  CmsTherapistDeletionImpact,
   CmsUser,
 } from "@/domain/cms/types";
 import type {
@@ -52,6 +53,12 @@ export interface CmsRepository {
     contact: CmsTherapistContact,
     expectedVersion?: number,
   ): Promise<CmsTherapistContact>;
+  getTherapistDeletionImpact(
+    therapistId: string,
+  ): Promise<CmsTherapistDeletionImpact>;
+  deleteTherapistCascade(
+    therapistId: string,
+  ): Promise<CmsTherapistDeletionImpact>;
 
   getMediaAsset(publicId: string): Promise<CmsMediaAsset | null>;
   saveMediaAsset(

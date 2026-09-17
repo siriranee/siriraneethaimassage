@@ -124,6 +124,62 @@
   font-size: var(--fs-sm);
 }
 
+.deletionImpact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.9rem 1rem;
+  margin-top: 1rem;
+  border: 1px solid rgb(var(--color-danger-rgb) / 0.28);
+  border-radius: 0.8rem;
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
+.deletionImpact > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.deletionImpact span,
+.deletionImpact small {
+  color: inherit;
+  font-size: var(--fs-sm);
+}
+
+.deletionImpact ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.deletionImpact a {
+  display: inline-flex;
+  min-height: 2.15rem;
+  align-items: center;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.deletionImpact a:hover,
+.deletionImpact a:focus-visible {
+  background: rgb(var(--color-danger-rgb) / 0.1);
+}
+
+.deletionImpact small {
+  grid-column: 1 / -1;
+}
+
 .saveActions {
   display: flex;
   align-items: center;
@@ -144,6 +200,10 @@
 .saveActions .removeButton:hover:not(:disabled) {
   background: var(--color-danger);
   color: var(--color-on-brand);
+}
+
+.saveActions .removeButton:disabled {
+  cursor: not-allowed;
 }
 
 .saveActions .removeButton:focus-visible {
@@ -179,6 +239,14 @@
 
   .savedPreview {
     width: 100%;
+  }
+
+  .deletionImpact {
+    grid-template-columns: 1fr;
+  }
+
+  .deletionImpact ul {
+    justify-content: flex-start;
   }
 }
 

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
+import { RouteTransitionIndicator } from "@/components/RouteTransitionIndicator";
 import { defaultMetadata } from "@/lib/metadata";
 
 import "./globals.css";
@@ -17,7 +18,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en-IE" data-scroll-behavior="smooth">
-      <body>{children}</body>
+      <body>
+        {children}
+        <Suspense fallback={null}>
+          <RouteTransitionIndicator />
+        </Suspense>
+      </body>
     </html>
   );
 }

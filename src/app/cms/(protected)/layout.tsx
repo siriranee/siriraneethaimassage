@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { redirect } from "next/navigation";
 
+import { RouteLoading } from "@/components/RouteLoading";
 import { CmsShell } from "@/components/cms/CmsShell";
 import { canCmsRole } from "@/domain/cms/permissions";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
@@ -10,7 +11,7 @@ import { listCmsNotificationBellItems } from "@/server/cms/read-service";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function ProtectedCmsLayout({
+async function ProtectedCmsShell({
   children,
 }: Readonly<{ children: ReactNode }>) {
   const mode = getCmsMode();
@@ -33,5 +34,15 @@ export default async function ProtectedCmsLayout({
     >
       {children}
     </CmsShell>
+  );
+}
+
+export default function ProtectedCmsLayout({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  return (
+    <Suspense fallback={<RouteLoading variant="cms" />}>
+      <ProtectedCmsShell>{children}</ProtectedCmsShell>
+    </Suspense>
   );
 }
