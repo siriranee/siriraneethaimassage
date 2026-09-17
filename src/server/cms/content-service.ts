@@ -867,6 +867,80 @@ export async function updateCmsTeamMember(
   });
 }
 
+export async function archiveCmsTeamMember(
+  memberId: string,
+  expectedVersion: number,
+  context: MutationContext,
+): Promise<CmsTeamEditorRecord> {
+  const repository = getCmsRepository();
+
+  return repository.transaction(async (transaction) => {
+    await transaction.lockTherapist(memberId);
+    const storedCurrent = await transaction.getContent();
+    const current = normaliseCmsContent(storedCurrent);
+    const existing = current.team.find((member) => member.id === memberId);
+    if (!existing) throw new Error("Team member not found.");
+    if (existing.version !== expectedVersion) throw new CmsConflictError();
+    if (existing.archived) {
+      throw new CmsConflictError("This therapist has already been removed.");
+    }
+
+    const now = new Date().toISOString();
+    const futureAssignedBookings =
+      await transaction.listFutureActiveTherapistBookings(memberId, now);
+    if (futureAssignedBookings[0]) {
+      throw new CmsConflictError(
+        `Reassign future booking ${futureAssignedBookings[0].reference} before removing this therapist.`,
+      );
+    }
+
+    const archived: CmsTeamRecord = {
+      ...existing,
+      publicProfile: false,
+      operationalActive: false,
+      archived: true,
+      version: existing.version + 1,
+      updatedAt: now,
+    };
+    const next: CmsContentState = {
+      ...current,
+      revision: current.revision + 1,
+      team: current.team.map((member) =>
+        member.id === memberId ? archived : member,
+      ),
+      updatedAt: now,
+      updatedBy: context.actor.id,
+    };
+    const contact = await transaction.getTherapistContact(memberId);
+
+    await commitCmsMediaForContentMutation(transaction, {
+      current,
+      next,
+      submission: null,
+      actor: context.actor,
+      requestId: context.requestId,
+    });
+    await transaction.saveContent(next, storedCurrent.revision);
+    await publishContentImmediately(
+      transaction,
+      next,
+      { section: "team", entityId: memberId },
+      context,
+    );
+    await appendCmsAudit(transaction, {
+      actor: context.actor,
+      action: "team.archived",
+      entityType: "team-member",
+      entityId: memberId,
+      summary:
+        "Removed a therapist from public and operational booking choices while preserving their historical record.",
+      requestId: context.requestId,
+    });
+
+    return teamEditorRecord(archived, contact);
+  });
+}
+
 export async function createCmsTeamMember(
   input: unknown,
   context: MutationContext,

@@ -315,7 +315,7 @@ test("content mutations publish only their saved section immediately", async () 
   assert.match(createAndUpdate, /Created and published a new treatment/);
   assert.match(createAndUpdate, /Updated and published treatment content and pricing/);
   assert.equal((createAndUpdate.match(/\{ section: "services", entityId: serviceId \}/g) ?? []).length, 2);
-  assert.equal((contentService.match(/\{ section: "team", entityId: memberId \}/g) ?? []).length, 2);
+  assert.equal((contentService.match(/\{ section: "team", entityId: memberId \}/g) ?? []).length, 3);
   assert.equal((contentService.match(/\{ section: "promotions", entityId: promotionId \}/g) ?? []).length, 2);
   assert.equal((contentService.match(/\{ section: "vouchers", entityId: voucherId \}/g) ?? []).length, 2);
   assert.doesNotMatch(contentService, /section: "gallery"|entityId: itemId/);

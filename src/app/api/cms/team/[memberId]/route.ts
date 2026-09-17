@@ -1,10 +1,12 @@
 import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
 import {
+  archiveCmsTeamMember,
   getCmsTeamEditorRecord,
   updateCmsTeamMember,
 } from "@/server/cms/content-service";
 import {
+  cmsErrorResponse,
   cmsNoStoreJson,
   readCmsJsonObject,
 } from "@/server/cms/http";
@@ -113,5 +115,27 @@ export async function PATCH(request: Request, context: RouteContext) {
         : {}),
       ...(mediaRollback ? { mediaRollback } : {}),
     });
+  }
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  if (!isSameOriginMutation(request)) {
+    return cmsNoStoreJson({ error: "Invalid request origin." }, { status: 403 });
+  }
+
+  const { response, user } = await requireCmsApiUser("content:write");
+  if (response || !user) return response;
+
+  try {
+    const body = await readCmsJsonObject(request);
+    const { memberId } = await context.params;
+    const member = await archiveCmsTeamMember(
+      memberId,
+      Number(body.expectedVersion),
+      { actor: user, requestId: getRequestId(request) },
+    );
+    return cmsNoStoreJson({ member });
+  } catch (error) {
+    return cmsErrorResponse(error);
   }
 }

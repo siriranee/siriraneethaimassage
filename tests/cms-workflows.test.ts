@@ -183,13 +183,14 @@ test("notification records keep Resend delivery metadata free of contact details
 });
 
 test("CMS navigation includes therapist management and omits retired publishing surfaces", async () => {
-  const [shell, settings, integrations, types, contentService, teamPage, teamEditor, collectionRoute, itemRoute] = await Promise.all([
+  const [shell, settings, integrations, types, contentService, teamPage, teamPageStyles, teamEditor, collectionRoute, itemRoute] = await Promise.all([
     source("src/components/cms/CmsShell.tsx"),
     source("src/app/cms/(protected)/settings/page.tsx"),
     source("src/app/cms/(protected)/settings/integrations/page.tsx"),
     source("src/domain/cms/types.ts"),
     source("src/server/cms/content-service.ts"),
     source("src/app/cms/(protected)/team/page.tsx"),
+    source("src/app/cms/(protected)/team/page.module.css"),
     source("src/components/cms/TeamEditorForm.tsx"),
     source("src/app/api/cms/team/route.ts"),
     source("src/app/api/cms/team/[memberId]/route.ts"),
@@ -206,16 +207,27 @@ test("CMS navigation includes therapist management and omits retired publishing 
   assert.match(teamPage, /listCmsTeamEditorRecords/);
   assert.match(teamPage, /requireCmsPageUser\("content:write"\)/);
   assert.match(teamPage, /href="\/cms\/team\/new"/);
+  assert.match(teamPageStyles, /\.teamGrid\s*\{[\s\S]*?align-items:\s*start/);
+  assert.match(teamPageStyles, /\.memberCard\s*\{[\s\S]*?align-self:\s*start/);
+  assert.doesNotMatch(teamPageStyles, /\.cardBody\s*\{[\s\S]*?height:\s*100%/);
   assert.match(teamEditor, /name="notificationEmail"/);
   assert.match(teamEditor, /name="contactPhone"/);
   assert.match(teamEditor, /name="operationalActive"/);
   assert.match(teamEditor, /name="publicProfile"/);
   assert.match(teamEditor, /name="serviceIds"/);
   assert.match(teamEditor, /scope:\s*"therapist-profile"/);
+  assert.match(teamEditor, /Remove therapist/);
+  assert.match(teamEditor, /method:\s*"DELETE"/);
+  assert.match(teamEditor, /historical booking record will be kept/);
   assert.match(collectionRoute, /requireCmsApiUser\("content:write"\)/);
   assert.match(itemRoute, /requireCmsApiUser\("content:write"\)/);
   assert.match(collectionRoute, /isSameOriginMutation/);
   assert.match(itemRoute, /isSameOriginMutation/);
+  assert.match(itemRoute, /export async function DELETE/);
+  assert.match(itemRoute, /archiveCmsTeamMember/);
+  assert.match(contentService, /export async function archiveCmsTeamMember/);
+  assert.match(contentService, /listFutureActiveTherapistBookings/);
+  assert.match(contentService, /action:\s*"team\.archived"/);
   assert.doesNotMatch(settings, /\/cms\/settings\/recovery|Recovery/);
   assert.doesNotMatch(integrations, /\/cms\/notifications/);
   assert.doesNotMatch(types, /CmsPageRecord|CmsGalleryRecord|readonly pages\??:|readonly gallery:/);

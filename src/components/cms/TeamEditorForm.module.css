@@ -124,6 +124,48 @@
   font-size: var(--fs-sm);
 }
 
+.saveActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.saveActions .removeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-color: var(--color-danger);
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
+.saveActions .removeButton:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: var(--color-on-brand);
+}
+
+.saveActions .removeButton:focus-visible {
+  outline: 3px solid rgb(var(--color-danger-rgb) / 0.28);
+  outline-offset: 2px;
+}
+
+.saveActions button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.spinner {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 1050px) {
   .serviceGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -137,5 +179,19 @@
 
   .savedPreview {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .saveActions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
   }
 }

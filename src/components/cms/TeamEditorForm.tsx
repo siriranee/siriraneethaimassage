@@ -1,5 +1,6 @@
 "use client";
 
+import { LoaderCircle, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
@@ -100,13 +101,14 @@ export function TeamEditorForm({
   const [operationalActive, setOperationalActive] = useState(member.operationalActive);
   const [archived, setArchived] = useState(Boolean(member.archived));
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error" | "progress";
     text: string;
   } | null>(null);
   const { dirty, markDirty, markSaved } = useUnsavedChanges();
-  const locked = saving || preparationBusy;
+  const locked = saving || preparationBusy || removing;
   const savedImageCanPreview = isApprovedImageUrlForOwnership(imageUrl, cloudinaryOwnership);
 
   function fieldError(name: string) {
@@ -253,6 +255,52 @@ export function TeamEditorForm({
     } finally {
       saveLockRef.current = false;
       setSaving(false);
+    }
+  }
+
+  async function removeTherapist() {
+    if (isNew || archived || saveLockRef.current || preparationBusy || removing) {
+      return;
+    }
+    const unsavedWarning = dirty
+      ? " Your unsaved changes will be discarded."
+      : "";
+    if (
+      !window.confirm(
+        `Remove ${member.name} from booking? Their historical booking record will be kept.${unsavedWarning}`,
+      )
+    ) {
+      return;
+    }
+
+    saveLockRef.current = true;
+    setRemoving(true);
+    setFeedback({ tone: "progress", text: "Removing therapist…" });
+
+    try {
+      const response = await fetch(`/api/cms/team/${member.id}`, {
+        method: "DELETE",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedVersion: version }),
+      });
+      const result = (await response.json().catch(() => ({}))) as TeamSaveResponse;
+      if (!response.ok) {
+        throw new TeamSaveError(result.error);
+      }
+
+      markSaved();
+      router.replace("/cms/team");
+      router.refresh();
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof TeamSaveError
+          ? error.message
+          : "The removal result could not be confirmed. Refresh the therapist list before trying again.",
+      });
+      saveLockRef.current = false;
+      setRemoving(false);
     }
   }
 
@@ -422,7 +470,24 @@ export function TeamEditorForm({
             <span className={feedback.tone === "error" ? styles.error : feedback.tone === "success" ? styles.success : styles.progressStatus} role={feedback.tone === "error" ? "alert" : "status"}>{feedback.text}</span>
           ) : `Profile version ${version} · contact version ${contactVersion}${dirty ? " · unsaved changes" : ""}`}
         </span>
-        <button disabled={locked} type="submit">{saving ? "Saving therapist…" : isNew ? "Create therapist" : "Save therapist"}</button>
+        <div className={teamStyles.saveActions}>
+          {!isNew && !archived ? (
+            <button
+              className={teamStyles.removeButton}
+              disabled={locked}
+              onClick={() => void removeTherapist()}
+              type="button"
+            >
+              {removing ? (
+                <LoaderCircle aria-hidden="true" className={teamStyles.spinner} />
+              ) : (
+                <Trash2 aria-hidden="true" />
+              )}
+              {removing ? "Removing…" : "Remove therapist"}
+            </button>
+          ) : null}
+          <button disabled={locked} type="submit">{saving ? "Saving therapist…" : isNew ? "Create therapist" : "Save therapist"}</button>
+        </div>
       </div>
     </form>
   );

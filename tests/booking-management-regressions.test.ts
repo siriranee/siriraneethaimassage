@@ -113,3 +113,42 @@ test("therapist deactivation and booking creation are rejected in both serialize
   await assert.rejects(createAdminBooking(fixture.input, fixture.context), /Choose an active massage therapist/);
   assert.equal((await fixture.repository.listBookings()).length, 0);
 });
+
+test("therapist removal archives safely, preserves private contact data and blocks future assignments", async () => {
+  const { createAdminBooking } = await import("@/server/cms/booking-service");
+  const { archiveCmsTeamMember } = await import("@/server/cms/content-service");
+
+  let fixture = await setup();
+  await createAdminBooking(fixture.input, fixture.context);
+  await assert.rejects(
+    archiveCmsTeamMember(
+      fixture.therapist.id,
+      fixture.therapist.version,
+      fixture.context,
+    ),
+    /Reassign future booking/,
+  );
+
+  fixture = await setup();
+  const removed = await archiveCmsTeamMember(
+    fixture.therapist.id,
+    fixture.therapist.version,
+    fixture.context,
+  );
+  assert.equal(removed.archived, true);
+  assert.equal(removed.operationalActive, false);
+  assert.equal(removed.publicProfile, false);
+  assert.equal(removed.notificationEmail, "demo.therapist@example.invalid");
+  assert.equal(
+    (await fixture.repository.getTherapistContact(fixture.therapist.id))
+      ?.notificationEmail,
+    "demo.therapist@example.invalid",
+  );
+  const published = await fixture.repository.getPublishedContent();
+  const publishedTherapist = published?.snapshot.team.find(
+    (member) => member.id === fixture.therapist.id,
+  );
+  assert.equal(publishedTherapist?.archived, true);
+  assert.equal(publishedTherapist?.operationalActive, false);
+  assert.equal(publishedTherapist?.publicProfile, false);
+});
