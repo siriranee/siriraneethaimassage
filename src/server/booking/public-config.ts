@@ -1,11 +1,12 @@
 import "server-only";
 
+import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
 import { getPublishedCmsContent } from "@/server/cms/content-service";
 
-export async function getPublicBookingPlannerServices() {
+export async function getPublicBookingPlannerData() {
   const content = await getPublishedCmsContent();
 
-  return content.services
+  const services = content.services
     .filter(
       (service) =>
         service.prices.some((price) => price.active),
@@ -26,4 +27,36 @@ export async function getPublicBookingPlannerServices() {
           priceEur: price.priceCents / 100,
         })),
     }));
+
+  const activeServiceIds = new Set(services.map((service) => service.id));
+  const therapists = [...content.team]
+    .filter(
+      (member) =>
+        member.publicProfile &&
+        member.operationalActive &&
+        !member.archived &&
+        member.serviceIds.some((serviceId) => activeServiceIds.has(serviceId)),
+    )
+    .sort((first, second) => first.sortOrder - second.sortOrder)
+    .map((member) => ({
+      id: member.id,
+      slug: member.slug,
+      name: member.name,
+      role: member.publicRole,
+      shortBio: member.shortBio,
+      imageUrl:
+        member.imageUrl && isApprovedPublicImageUrl(member.imageUrl)
+          ? member.imageUrl
+          : "",
+      imageAlt: member.imageAlt,
+      serviceIds: member.serviceIds.filter((serviceId) =>
+        activeServiceIds.has(serviceId),
+      ),
+    }));
+
+  return { services, therapists } as const;
+}
+
+export async function getPublicBookingPlannerServices() {
+  return (await getPublicBookingPlannerData()).services;
 }

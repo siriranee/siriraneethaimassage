@@ -3,8 +3,10 @@ import "server-only";
 import type {
   CmsAuditEvent,
   CmsBooking,
+  CmsFutureTherapistBooking,
   CmsBookingHold,
   CmsBookingNotification,
+  CmsEmailDeliveryEvent,
   CmsBookingQuery,
   CmsClosure,
   CmsContentState,
@@ -12,9 +14,12 @@ import type {
   CmsMediaAsset,
   CmsPublication,
   CmsSession,
+  CmsTherapistContact,
   CmsUser,
 } from "@/domain/cms/types";
 import type { PublicBookingIdentifier } from "@/domain/booking/public-status";
+import { applyEmailDeliveryEvent } from "@/domain/booking/email-delivery";
+import { bookingEmailNeedsAttention, type CmsBookingEmailAttention } from "@/domain/cms/notification-presentation";
 import {
   createDefaultContentState,
   createMockAdministrator,
@@ -32,6 +37,7 @@ type MockState = {
   publication: CmsPublication;
   publications: CmsPublication[];
   mediaAssets: CmsMediaAsset[];
+  therapistContacts: CmsTherapistContact[];
   users: CmsUser[];
   sessions: CmsSession[];
   loginAttempts: CmsLoginAttempt[];
@@ -40,6 +46,7 @@ type MockState = {
   closures: CmsClosure[];
   holds: CmsBookingHold[];
   notifications: CmsBookingNotification[];
+  emailDeliveryEvents: CmsEmailDeliveryEvent[];
 };
 
 type MockGlobal = typeof globalThis & {
@@ -49,6 +56,26 @@ type MockGlobal = typeof globalThis & {
 
 function clone<T>(value: T): T {
   return structuredClone(value);
+}
+
+function normaliseBooking(booking: CmsBooking): CmsBooking {
+  return {
+    ...booking,
+    assignedStaffId:
+      typeof booking.assignedStaffId === "string" ? booking.assignedStaffId : "",
+    assignedStaffName:
+      typeof booking.assignedStaffName === "string"
+        ? booking.assignedStaffName
+        : "",
+  };
+}
+
+function normaliseHold(hold: CmsBookingHold): CmsBookingHold {
+  return {
+    ...hold,
+    assignedStaffId:
+      typeof hold.assignedStaffId === "string" ? hold.assignedStaffId : "",
+  };
 }
 
 function createState(): MockState {
@@ -66,6 +93,7 @@ function createState(): MockState {
     publication,
     publications: [publication],
     mediaAssets: [],
+    therapistContacts: [],
     users: [createMockAdministrator()],
     sessions: [],
     loginAttempts: [],
@@ -74,6 +102,7 @@ function createState(): MockState {
     closures: [],
     holds: [],
     notifications: [],
+    emailDeliveryEvents: [],
   };
 }
 
@@ -81,6 +110,8 @@ function getGlobalState() {
   const cmsGlobal = globalThis as MockGlobal;
   cmsGlobal.__siriraneeCmsMockState ??= createState();
   cmsGlobal.__siriraneeCmsMockState.mediaAssets ??= [];
+  cmsGlobal.__siriraneeCmsMockState.therapistContacts ??= [];
+  cmsGlobal.__siriraneeCmsMockState.emailDeliveryEvents ??= [];
   cmsGlobal.__siriraneeCmsMockQueue ??= Promise.resolve();
 
   return cmsGlobal;
@@ -93,6 +124,7 @@ function includesSearch(booking: CmsBooking, search: string) {
     booking.customer.phone,
     booking.customer.email,
     booking.serviceName,
+    booking.assignedStaffName,
   ]
     .join(" ")
     .toLowerCase();
@@ -168,6 +200,37 @@ export class MockCmsRepository implements CmsRepository {
     this.state.publications = this.state.publications
       .sort((first, second) => second.publishedAt.localeCompare(first.publishedAt))
       .slice(0, CMS_PUBLICATION_RETENTION_COUNT);
+  }
+
+  async getTherapistContact(id: string) {
+    return clone(
+      this.state.therapistContacts.find((contact) => contact.id === id) ?? null,
+    );
+  }
+
+  async saveTherapistContact(
+    contact: CmsTherapistContact,
+    expectedVersion?: number,
+  ) {
+    const index = this.state.therapistContacts.findIndex(
+      (item) => item.id === contact.id,
+    );
+
+    if (expectedVersion === undefined) {
+      if (index >= 0) throw new CmsConflictError();
+      this.state.therapistContacts.push(clone(contact));
+      return clone(contact);
+    }
+
+    if (
+      index < 0 ||
+      this.state.therapistContacts[index].version !== expectedVersion
+    ) {
+      throw new CmsConflictError();
+    }
+
+    this.state.therapistContacts[index] = clone(contact);
+    return clone(contact);
   }
 
   async getMediaAsset(publicId: string) {
@@ -364,6 +427,7 @@ export class MockCmsRepository implements CmsRepository {
   }
 
   async listBookings(query: CmsBookingQuery = {}) {
+    const nowIso = new Date().toISOString();
     const filtered = this.state.bookings.filter((booking) => {
       if (query.from && booking.localDate < query.from) return false;
       if (query.to && booking.localDate > query.to) return false;
@@ -371,11 +435,25 @@ export class MockCmsRepository implements CmsRepository {
       if (query.source && booking.source !== query.source) return false;
       if (query.serviceId && booking.serviceId !== query.serviceId) return false;
       if (
+        query.therapistId &&
+        booking.assignedStaffId !== query.therapistId
+      ) return false;
+      if (
         query.attention === "expired" &&
         !(
           booking.status === "pending" &&
           booking.capacityExpiresAt &&
-          booking.capacityExpiresAt <= new Date().toISOString()
+          booking.capacityExpiresAt <= nowIso
+        )
+      ) return false;
+      if (
+        query.attention === "unassigned" &&
+        !(
+          !booking.assignedStaffId?.trim() &&
+          booking.endsAt > nowIso &&
+          (booking.status === "confirmed" ||
+            (booking.status === "pending" &&
+              (!booking.capacityExpiresAt || booking.capacityExpiresAt > nowIso)))
         )
       ) return false;
       if (query.search && !includesSearch(booking, query.search)) return false;
@@ -383,9 +461,11 @@ export class MockCmsRepository implements CmsRepository {
     });
 
     return clone(
-      filtered.sort((first, second) =>
-        first.startsAt.localeCompare(second.startsAt),
-      ),
+      filtered
+        .sort((first, second) =>
+          first.startsAt.localeCompare(second.startsAt),
+        )
+        .map(normaliseBooking),
     );
   }
 
@@ -403,12 +483,37 @@ export class MockCmsRepository implements CmsRepository {
           endsAt: booking.endsAt,
           status: booking.status,
           expiresAt: booking.capacityExpiresAt || "",
+          assignedStaffId:
+            typeof booking.assignedStaffId === "string"
+              ? booking.assignedStaffId
+              : "",
         })),
     );
   }
 
+  async listFutureActiveTherapistBookings(
+    therapistId: string,
+    afterIso: string,
+  ): Promise<readonly CmsFutureTherapistBooking[]> {
+    return clone(
+      this.state.bookings
+        .filter(
+          (booking) =>
+            booking.assignedStaffId === therapistId &&
+            booking.endsAt > afterIso &&
+            (booking.status === "confirmed" ||
+              (booking.status === "pending" &&
+                (!booking.capacityExpiresAt ||
+                  booking.capacityExpiresAt > afterIso))),
+        )
+        .sort((first, second) => first.startsAt.localeCompare(second.startsAt))
+        .map(({ reference, serviceId }) => ({ reference, serviceId })),
+    );
+  }
+
   async getBooking(id: string) {
-    return clone(this.state.bookings.find((booking) => booking.id === id) ?? null);
+    const booking = this.state.bookings.find((item) => item.id === id);
+    return clone(booking ? normaliseBooking(booking) : null);
   }
 
   async findBookingPublicStatus(identifier: PublicBookingIdentifier) {
@@ -427,11 +532,10 @@ export class MockCmsRepository implements CmsRepository {
   }
 
   async findBookingByIdempotencyHash(hash: string) {
-    return clone(
-      this.state.bookings.find(
-        (booking) => booking.idempotencyKeyHash === hash,
-      ) ?? null,
+    const booking = this.state.bookings.find(
+      (item) => item.idempotencyKeyHash === hash,
     );
+    return clone(booking ? normaliseBooking(booking) : null);
   }
 
   async saveBooking(booking: CmsBooking, expectedVersion?: number) {
@@ -512,8 +616,43 @@ export class MockCmsRepository implements CmsRepository {
     );
   }
 
+  async listBookingEmailAttention(bookingIds?: readonly string[], limit = 8) {
+    const ids = bookingIds ? new Set(bookingIds.slice(0, 500)) : null;
+    const groups = new Map<string, CmsBookingEmailAttention>();
+    for (const notification of this.state.notifications) {
+      if (ids && !ids.has(notification.bookingId)) continue;
+      const booking = this.state.bookings.find((item) => item.id === notification.bookingId) ?? null;
+      if (!bookingEmailNeedsAttention(notification, booking)) continue;
+      const current = groups.get(notification.bookingId);
+      groups.set(notification.bookingId, {
+        bookingId: notification.bookingId,
+        bookingReference: notification.bookingReference,
+        count: (current?.count ?? 0) + 1,
+        audiences: [...new Set([...current?.audiences ?? [], notification.audience ?? "customer"])],
+        updatedAt: current && current.updatedAt > notification.updatedAt ? current.updatedAt : notification.updatedAt,
+      });
+    }
+    return clone([...groups.values()]
+      .sort((first, second) => second.updatedAt.localeCompare(first.updatedAt) || first.bookingId.localeCompare(second.bookingId))
+      .slice(0, Math.max(1, Math.min(limit, 500))));
+  }
+
   async getNotification(id: string) {
     return clone(this.state.notifications.find((item) => item.id === id) ?? null);
+  }
+
+  async recordEmailDeliveryEvent(event: CmsEmailDeliveryEvent) {
+    if (!this.state.emailDeliveryEvents.some((item) => item.id === event.id)) {
+      this.state.emailDeliveryEvents.push(clone(event));
+    }
+    await this.reconcileEmailDeliveryEvents(event.providerMessageId);
+  }
+
+  async reconcileEmailDeliveryEvents(providerMessageId: string) {
+    const events = this.state.emailDeliveryEvents.filter((event) =>
+      event.providerMessageId === providerMessageId);
+    this.state.notifications = this.state.notifications.map((notification) =>
+      events.reduce(applyEmailDeliveryEvent, notification));
   }
 
   async saveNotification(notification: CmsBookingNotification) {
@@ -577,21 +716,25 @@ export class MockCmsRepository implements CmsRepository {
     );
     if (index < 0) return false;
     this.state.notifications[index] = clone(notification);
+    if (notification.providerMessageId) {
+      await this.reconcileEmailDeliveryEvents(notification.providerMessageId);
+    }
     return true;
   }
 
   async listActiveHolds(nowIso: string) {
     return clone(
-      this.state.holds.filter(
-        (hold) => hold.status === "active" && hold.expiresAt > nowIso,
-      ),
+      this.state.holds
+        .filter(
+          (hold) => hold.status === "active" && hold.expiresAt > nowIso,
+        )
+        .map(normaliseHold),
     );
   }
 
   async findHoldByTokenHash(tokenHash: string) {
-    return clone(
-      this.state.holds.find((hold) => hold.tokenHash === tokenHash) ?? null,
-    );
+    const hold = this.state.holds.find((item) => item.tokenHash === tokenHash);
+    return clone(hold ? normaliseHold(hold) : null);
   }
 
   async saveHold(hold: CmsBookingHold) {
@@ -603,5 +746,10 @@ export class MockCmsRepository implements CmsRepository {
 
   async lockBookingDate(localDate: string) {
     void localDate;
+  }
+
+  async lockTherapist(therapistId: string) {
+    // Mock transactions already serialize all mutations through one queue.
+    void therapistId;
   }
 }

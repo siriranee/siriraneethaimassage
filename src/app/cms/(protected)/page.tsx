@@ -2,10 +2,12 @@ import {
   CalendarClock,
   CalendarDays,
   ClipboardList,
+  UserRoundX,
 } from "lucide-react";
 import Link from "next/link";
 
 import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
+import { CmsBookingEmailAttentionNotice } from "@/components/cms/CmsBookingEmailAttentionNotice";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import {
   CmsEmptyState,
@@ -32,7 +34,8 @@ function formatDate(value: string) {
 export default async function CmsDashboardPage() {
   const user = await requireCmsPageUser("dashboard:view");
   const canManageBookings = canCmsRole(user.role, "bookings:write");
-  const { summary, upcoming } = await getCmsDashboardData();
+  const { summary, upcoming, emailAttention, upcomingEmailAttention } = await getCmsDashboardData();
+  const attentionByBooking = new Map(upcomingEmailAttention.map((item) => [item.bookingId, item]));
 
   return (
     <>
@@ -47,7 +50,10 @@ export default async function CmsDashboardPage() {
         <CmsStatCard detail="Appointments on the Dublin calendar" icon={CalendarDays} label="Today" tone="purple" value={summary.todayCount} />
         <CmsStatCard detail="Awaiting internal confirmation" icon={ClipboardList} label="Pending" tone="gold" value={summary.pendingCount} />
         <CmsStatCard detail="Future active appointments" icon={CalendarClock} label="Upcoming" tone="green" value={summary.upcomingCount} />
+        <CmsStatCard detail="Active appointments needing a therapist" icon={UserRoundX} label="Unassigned" tone="purple" value={summary.unassignedCount} />
       </div>
+
+      <CmsBookingEmailAttentionNotice items={emailAttention} />
 
       <CmsPanel title="Upcoming appointments" description="Times are shown in Europe/Dublin.">
         {upcoming.length ? (
@@ -73,6 +79,7 @@ export default async function CmsDashboardPage() {
                 <dl className={styles.bookingCardDetails}>
                   <div><dt>Treatment</dt><dd>{booking.serviceName}</dd></div>
                   <div><dt>Duration</dt><dd>{booking.durationMinutes} min</dd></div>
+                  <div><dt>Therapist</dt><dd>{booking.assignedStaffName || "Unassigned"}</dd></div>
                   <div><dt>Phone</dt><dd>{booking.customer.phone}</dd></div>
                   <div className={styles.bookingCardNotes}>
                     <dt>Notes</dt>
@@ -85,6 +92,7 @@ export default async function CmsDashboardPage() {
                   {canManageBookings ? (
                     <CmsBookingQuickActions
                       booking={booking}
+                      emailAttention={attentionByBooking.get(booking.id)}
                       hasCustomerEmail={Boolean(booking.customer.email)}
                       isMock={booking.demo}
                       key={`${booking.id}:${booking.version}`}

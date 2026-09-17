@@ -14,8 +14,11 @@ import type { CmsBooking, CmsSiteSettings } from "@/domain/cms/types";
 import {
   renderCustomerBookingCancelledEmail,
   renderCustomerBookingConfirmedEmail,
+  renderCustomerBookingRescheduledEmail,
   renderOwnerBookingRequestedEmail,
+  renderTherapistBookingEmail,
   type CustomerBookingEmailBusiness,
+  type TherapistBookingEmailEvent,
 } from "@/server/booking/booking-email";
 
 const requiredEnvironmentNames = [
@@ -62,6 +65,12 @@ export type OwnerBookingEmailFingerprinter = (
   booking: CmsBooking,
 ) => string | null;
 
+export type OwnerBookingEmailFingerprintCompatibility = (
+  booking: CmsBooking,
+  previousFingerprint: string,
+  originalBookingVersion?: number,
+) => boolean;
+
 export type CustomerBookingEmailSender = (
   booking: CmsBooking,
   business: CustomerBookingEmailBusiness,
@@ -69,6 +78,40 @@ export type CustomerBookingEmailSender = (
 
 export type CustomerBookingEmailFingerprinter = (
   booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+) => string | null;
+
+export type CustomerBookingRescheduleEmailSender = (
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  bookingVersion: number,
+) => Promise<BookingEmailSendResult>;
+
+export type CustomerBookingRescheduleEmailFingerprinter = (
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  bookingVersion: number,
+) => string | null;
+
+export type TherapistBookingEmailRecipient = {
+  readonly id: string;
+  readonly name: string;
+  readonly notificationEmail: string;
+};
+
+export type TherapistBookingEmailSender = (
+  booking: CmsBooking,
+  recipient: TherapistBookingEmailRecipient,
+  event: TherapistBookingEmailEvent,
+  bookingVersion: number,
+  business: CustomerBookingEmailBusiness,
+) => Promise<BookingEmailSendResult>;
+
+export type TherapistBookingEmailFingerprinter = (
+  booking: CmsBooking,
+  recipient: TherapistBookingEmailRecipient,
+  event: TherapistBookingEmailEvent,
+  bookingVersion: number,
   business: CustomerBookingEmailBusiness,
 ) => string | null;
 
@@ -241,6 +284,11 @@ function bookingUrl(origin: string | undefined, bookingId: string) {
   ).toString();
 }
 
+function cmsUrl(origin: string | undefined) {
+  if (!origin) return undefined;
+  return new URL("/cms", origin).toString();
+}
+
 function resolveConfiguration(
   dependencies: Pick<SendDependencies, "configuration" | "environment">,
 ) {
@@ -343,6 +391,114 @@ function createCustomerBookingCancellationEmailRequest(
   return { options, payload };
 }
 
+function createCustomerBookingRescheduleEmailRequest(
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  bookingVersion: number,
+  configuration: ResendBookingEmailConfiguration,
+) {
+  const customerEmail = clean(booking.customer.email).toLowerCase();
+  if (
+    booking.status !== "confirmed" ||
+    !isEmailAddress(customerEmail) ||
+    !Number.isInteger(bookingVersion) || bookingVersion < 1
+  ) return null;
+
+  const publicReplyTo = clean(business.email);
+  const message = renderCustomerBookingRescheduledEmail(booking, {
+    ...business,
+    siteOrigin: configuration.siteOrigin,
+  });
+  const payload: CreateEmailOptions = {
+    from: configuration.from,
+    to: [customerEmail],
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    ...(isEmailAddress(publicReplyTo) ? { replyTo: publicReplyTo } : {}),
+    tags: [
+      { name: "event", value: "booking-rescheduled" },
+      { name: "audience", value: "customer" },
+    ],
+  };
+  const options: CreateEmailRequestOptions = {
+    idempotencyKey: `customer-booking-rescheduled/${booking.id}/${bookingVersion}`,
+  };
+  return { options, payload };
+}
+
+function isTherapistBookingEmailStateValid(
+  booking: CmsBooking,
+  recipient: TherapistBookingEmailRecipient,
+  event: TherapistBookingEmailEvent,
+) {
+  if (event === "removed") {
+    // A historical removal remains true if a later booking update or
+    // cancellation affects the other therapist. The outbox checks its snapshot.
+    return booking.assignedStaffId !== recipient.id;
+  }
+
+  if (event === "cancelled") {
+    return (
+      booking.status === "cancelled" &&
+      booking.assignedStaffId === recipient.id
+    );
+  }
+
+  return (
+    booking.status === "confirmed" &&
+    booking.assignedStaffId === recipient.id
+  );
+}
+
+function createTherapistBookingEmailRequest(
+  booking: CmsBooking,
+  recipient: TherapistBookingEmailRecipient,
+  event: TherapistBookingEmailEvent,
+  bookingVersion: number,
+  business: CustomerBookingEmailBusiness,
+  configuration: ResendBookingEmailConfiguration,
+) {
+  const therapistId = clean(recipient.id);
+  const therapistEmail = clean(recipient.notificationEmail).toLowerCase();
+  const therapistName = clean(recipient.name);
+  if (
+    !therapistId ||
+    !therapistName ||
+    !isEmailAddress(therapistEmail) ||
+    !Number.isInteger(bookingVersion) ||
+    bookingVersion < 1 ||
+    !isTherapistBookingEmailStateValid(booking, recipient, event)
+  ) {
+    return null;
+  }
+
+  const publicReplyTo = clean(business.email);
+  const message = renderTherapistBookingEmail(booking, {
+    event,
+    therapistName,
+    businessName: business.name,
+    cmsUrl: cmsUrl(configuration.siteOrigin),
+  });
+  const payload: CreateEmailOptions = {
+    from: configuration.from,
+    to: [therapistEmail],
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    ...(isEmailAddress(publicReplyTo) ? { replyTo: publicReplyTo } : {}),
+    tags: [
+      { name: "event", value: `booking-${event}` },
+      { name: "audience", value: "therapist" },
+    ],
+  };
+  const options: CreateEmailRequestOptions = {
+    idempotencyKey:
+      `therapist-booking-${event}/${booking.id}/${therapistId}/${bookingVersion}`,
+  };
+  return { options, payload };
+}
+
 export function getOwnerBookingEmailDeliveryFingerprint(
   booking: CmsBooking,
   dependencies: Pick<
@@ -358,17 +514,50 @@ export function getOwnerBookingEmailDeliveryFingerprint(
   if (!configuration || !fingerprintSecret) return null;
   const request = createOwnerBookingEmailRequest(booking, configuration);
   const domainKey = createHmac("sha256", fingerprintSecret)
+    .update("siriranee/resend-booking-email/fingerprint/v2")
+    .digest();
+  const hash = createHmac("sha256", domainKey)
+    .update(JSON.stringify({ request, bookingStatus: booking.status }))
+    .digest("base64url");
+  // A CMS notes-only save changes version, but not the outgoing message. Keep
+  // the rendered request (including its recipient and provider key) as identity.
+  return `owner-v2:${hash}`;
+}
+
+export function isOwnerBookingEmailDeliveryFingerprintCompatible(
+  booking: CmsBooking,
+  previousFingerprint: string,
+  originalBookingVersion?: number,
+  dependencies: Pick<
+    SendDependencies,
+    "configuration" | "environment" | "fingerprintSecret"
+  > = {},
+) {
+  // Only the historical unprefixed format may migrate. A changed v2 payload
+  // must never be rebound to the same provider idempotency key.
+  if (!/^[A-Za-z0-9_-]{43}$/.test(previousFingerprint)) return false;
+  const configuration = resolveConfiguration(dependencies).configuration;
+  const fingerprintSecret = clean(
+    dependencies.fingerprintSecret ??
+      (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
+  );
+  if (!configuration || !fingerprintSecret) return false;
+  const request = createOwnerBookingEmailRequest(booking, configuration);
+  const domainKey = createHmac("sha256", fingerprintSecret)
     .update("siriranee/resend-booking-email/fingerprint/v1")
     .digest();
-  return createHmac("sha256", domainKey)
-    .update(
-      JSON.stringify({
-        request,
-        bookingStatus: booking.status,
-        bookingVersion: booking.version,
-      }),
-    )
-    .digest("base64url");
+  // Original website outboxes were bound at version 1. Some older rows were
+  // first bound during delivery instead; accept their recorded or exact current
+  // version only, and fail closed if the historical version is unknown.
+  const versions = new Set([originalBookingVersion, 1, booking.version]);
+  return [...versions].some((version) => {
+    if (typeof version !== "number" || !Number.isSafeInteger(version) ||
+      version < 1 || version > booking.version) return false;
+    const legacyHash = createHmac("sha256", domainKey)
+      .update(JSON.stringify({ request, bookingStatus: booking.status, bookingVersion: version }))
+      .digest("base64url");
+    return legacyHash === previousFingerprint;
+  });
 }
 
 export function getCustomerBookingEmailDeliveryFingerprint(
@@ -427,7 +616,84 @@ export function getCustomerBookingCancellationEmailDeliveryFingerprint(
     .digest("base64url");
 }
 
-function providerErrorCode(name: string, statusCode: number | null) {
+export function getTherapistBookingEmailDeliveryFingerprint(
+  booking: CmsBooking,
+  recipient: TherapistBookingEmailRecipient,
+  event: TherapistBookingEmailEvent,
+  bookingVersion: number,
+  business: CustomerBookingEmailBusiness,
+  dependencies: Pick<
+    SendDependencies,
+    "configuration" | "environment" | "fingerprintSecret"
+  > = {},
+) {
+  const configuration = resolveConfiguration(dependencies).configuration;
+  const fingerprintSecret = clean(
+    dependencies.fingerprintSecret ??
+      (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
+  );
+  if (!configuration || !fingerprintSecret) return null;
+  const request = createTherapistBookingEmailRequest(
+    booking,
+    recipient,
+    event,
+    bookingVersion,
+    business,
+    configuration,
+  );
+  if (!request) return null;
+  const domainKey = createHmac("sha256", fingerprintSecret)
+    .update("siriranee/resend-therapist-booking-email/fingerprint/v1")
+    .digest();
+  return createHmac("sha256", domainKey)
+    .update(
+      JSON.stringify({
+        request,
+        event,
+        bookingVersion,
+        ...(event === "removed" ? {} : { bookingStatus: booking.status }),
+      }),
+    )
+    .digest("base64url");
+}
+
+export function getCustomerBookingRescheduleEmailDeliveryFingerprint(
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  bookingVersion: number,
+  dependencies: Pick<
+    SendDependencies,
+    "configuration" | "environment" | "fingerprintSecret"
+  > = {},
+) {
+  const configuration = resolveConfiguration(dependencies).configuration;
+  const fingerprintSecret = clean(
+    dependencies.fingerprintSecret ??
+      (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
+  );
+  if (!configuration || !fingerprintSecret) return null;
+  const request = createCustomerBookingRescheduleEmailRequest(
+    booking, business, bookingVersion, configuration,
+  );
+  if (!request) return null;
+  const domainKey = createHmac("sha256", fingerprintSecret)
+    .update("siriranee/resend-customer-booking-reschedule-email/fingerprint/v1")
+    .digest();
+  return createHmac("sha256", domainKey)
+    .update(JSON.stringify({ request, bookingStatus: booking.status, bookingVersion }))
+    .digest("base64url");
+}
+
+function providerErrorCode(name: string, statusCode: number | null | undefined) {
+  // The SDK catches fetch / response JSON failures and returns application_error
+  // with no HTTP status instead of throwing. Resend may have accepted the email
+  // before that response was lost, so this is not proof of an unsent message.
+  if (statusCode == null || !Number.isFinite(statusCode)) {
+    return "resend-unexpected-error";
+  }
+  if (statusCode >= 500) {
+    return "resend-provider-unavailable";
+  }
   if (name === "concurrent_idempotent_requests") {
     return "resend-concurrent-idempotency";
   }
@@ -450,9 +716,6 @@ function providerErrorCode(name: string, statusCode: number | null) {
     name === "missing_required_field"
   ) {
     return "resend-message-rejected";
-  }
-  if (statusCode !== null && statusCode >= 500) {
-    return "resend-provider-unavailable";
   }
   return "resend-provider-error";
 }
@@ -522,6 +785,14 @@ async function sendResolvedBookingEmail(
           response.error.name,
           response.error.statusCode,
         ),
+      };
+    }
+
+    if (typeof response.data?.id !== "string" || !response.data.id.trim()) {
+      return {
+        status: "failed",
+        attempted: true,
+        errorCode: "resend-unexpected-error",
       };
     }
 
@@ -617,5 +888,79 @@ export async function sendCustomerBookingCancelledEmail(
     };
   }
 
+  return sendResolvedBookingEmail(request, configuration, dependencies);
+}
+
+export async function sendTherapistBookingEmail(
+  booking: CmsBooking,
+  recipient: TherapistBookingEmailRecipient,
+  event: TherapistBookingEmailEvent,
+  bookingVersion: number,
+  business: CustomerBookingEmailBusiness,
+  dependencies: SendDependencies = {},
+): Promise<BookingEmailSendResult> {
+  const inspected = resolveConfiguration(dependencies);
+  const configuration = inspected.configuration;
+
+  if (!configuration) {
+    return {
+      status: "failed",
+      attempted: false,
+      errorCode: inspected.invalid.length
+        ? "resend-configuration-invalid"
+        : "resend-configuration-missing",
+    };
+  }
+
+  const request = createTherapistBookingEmailRequest(
+    booking,
+    recipient,
+    event,
+    bookingVersion,
+    business,
+    configuration,
+  );
+  if (!request) {
+    const notificationEmail = clean(recipient.notificationEmail).toLowerCase();
+    return {
+      status: "failed",
+      attempted: false,
+      errorCode: !notificationEmail
+        ? "therapist-email-missing"
+        : !isEmailAddress(notificationEmail)
+          ? "therapist-email-invalid"
+          : "therapist-booking-state-invalid",
+    };
+  }
+
+  return sendResolvedBookingEmail(request, configuration, dependencies);
+}
+
+export async function sendCustomerBookingRescheduledEmail(
+  booking: CmsBooking,
+  business: CustomerBookingEmailBusiness,
+  bookingVersion: number,
+  dependencies: SendDependencies = {},
+): Promise<BookingEmailSendResult> {
+  const inspected = resolveConfiguration(dependencies);
+  const configuration = inspected.configuration;
+  if (!configuration) {
+    return {
+      status: "failed", attempted: false,
+      errorCode: inspected.invalid.length
+        ? "resend-configuration-invalid" : "resend-configuration-missing",
+    };
+  }
+  const request = createCustomerBookingRescheduleEmailRequest(
+    booking, business, bookingVersion, configuration,
+  );
+  if (!request) {
+    return {
+      status: "failed", attempted: false,
+      errorCode: booking.status !== "confirmed"
+        ? "booking-not-confirmed"
+        : !booking.customer.email ? "customer-email-missing" : "customer-email-invalid",
+    };
+  }
   return sendResolvedBookingEmail(request, configuration, dependencies);
 }

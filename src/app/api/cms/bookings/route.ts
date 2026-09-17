@@ -2,11 +2,12 @@ import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
 import { createAdminBooking } from "@/server/cms/booking-service";
 import { cmsErrorResponse, cmsNoStoreJson, readCmsJsonObject } from "@/server/cms/http";
-import { attemptCustomerBookingConfirmationEmail } from "@/server/cms/notification-service";
+import { dispatchBookingMutationEmails } from "@/server/cms/notification-service";
 import { listCmsBookings } from "@/server/cms/read-service";
 import { getCmsRepository } from "@/server/cms/repositories";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET() {
   const { response } = await requireCmsApiUser("bookings:view");
@@ -27,15 +28,9 @@ export async function POST(request: Request) {
       requestId: getRequestId(request),
       idempotencyKey: request.headers.get("idempotency-key") ?? undefined,
     });
-    const confirmationEmail =
-      booking.status === "confirmed"
-        ? await attemptCustomerBookingConfirmationEmail(
-            getCmsRepository(),
-            booking,
-          )
-        : undefined;
+    const emails = await dispatchBookingMutationEmails(getCmsRepository(), null, booking);
     return cmsNoStoreJson(
-      { booking, ...(confirmationEmail ? { confirmationEmail } : {}) },
+      { booking, ...emails },
       { status: 201 },
     );
   } catch (error) {

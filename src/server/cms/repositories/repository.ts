@@ -3,8 +3,10 @@ import "server-only";
 import type {
   CmsAuditEvent,
   CmsBooking,
+  CmsFutureTherapistBooking,
   CmsBookingHold,
   CmsBookingNotification,
+  CmsEmailDeliveryEvent,
   CmsBookingOccupancy,
   CmsBookingQuery,
   CmsClosure,
@@ -13,6 +15,7 @@ import type {
   CmsMediaAsset,
   CmsPublication,
   CmsSession,
+  CmsTherapistContact,
   CmsUser,
 } from "@/domain/cms/types";
 import type {
@@ -20,6 +23,7 @@ import type {
   PublicBookingStatusSource,
 } from "@/domain/booking/public-status";
 import type { CmsMode } from "@/server/cms/config";
+import type { CmsBookingEmailAttention } from "@/domain/cms/notification-presentation";
 
 export class CmsConflictError extends Error {
   constructor(message = "This record was changed by another request.") {
@@ -42,6 +46,12 @@ export interface CmsRepository {
   getPublication(id: string): Promise<CmsPublication | null>;
   listPublications(limit?: number): Promise<readonly CmsPublication[]>;
   savePublication(publication: CmsPublication): Promise<void>;
+
+  getTherapistContact(id: string): Promise<CmsTherapistContact | null>;
+  saveTherapistContact(
+    contact: CmsTherapistContact,
+    expectedVersion?: number,
+  ): Promise<CmsTherapistContact>;
 
   getMediaAsset(publicId: string): Promise<CmsMediaAsset | null>;
   saveMediaAsset(
@@ -91,6 +101,10 @@ export interface CmsRepository {
     from: string,
     to: string,
   ): Promise<readonly CmsBookingOccupancy[]>;
+  listFutureActiveTherapistBookings(
+    therapistId: string,
+    afterIso: string,
+  ): Promise<readonly CmsFutureTherapistBooking[]>;
   getBooking(id: string): Promise<CmsBooking | null>;
   findBookingPublicStatus(
     identifier: PublicBookingIdentifier,
@@ -115,7 +129,13 @@ export interface CmsRepository {
   listDashboardNotifications(
     limit?: number,
   ): Promise<readonly CmsBookingNotification[]>;
+  listBookingEmailAttention(
+    bookingIds?: readonly string[],
+    limit?: number,
+  ): Promise<readonly CmsBookingEmailAttention[]>;
   getNotification(id: string): Promise<CmsBookingNotification | null>;
+  recordEmailDeliveryEvent(event: CmsEmailDeliveryEvent): Promise<void>;
+  reconcileEmailDeliveryEvents(providerMessageId: string): Promise<void>;
   saveNotification(notification: CmsBookingNotification): Promise<void>;
   saveNotificationIfAbsent(
     notification: CmsBookingNotification,
@@ -139,4 +159,6 @@ export interface CmsRepository {
   saveHold(hold: CmsBookingHold): Promise<CmsBookingHold>;
 
   lockBookingDate(localDate: string): Promise<void>;
+  /** Serialize therapist changes and assignments inside a transaction, before date locks. */
+  lockTherapist(therapistId: string): Promise<void>;
 }

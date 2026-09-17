@@ -52,10 +52,10 @@ const sitemapSource = await read("src/app/sitemap.ts");
 const robotsSource = await read("src/app/robots.ts");
 const publicAdapterSource = await read("src/server/cms/public-adapter.ts");
 const publicBookingSource = await read("src/server/booking/public-booking.ts");
+const publicBookingConfigSource = await read("src/server/booking/public-config.ts");
 const defaultContentSource = await read("src/server/cms/default-content.ts");
 const contentServiceSource = await read("src/server/cms/content-service.ts");
 const servicesPageSource = await read("src/app/(site)/services/page.tsx");
-const therapistsPageSource = await read("src/app/(site)/therapists/page.tsx");
 const contactPageSource = await read("src/app/(site)/contact/page.tsx");
 const galleryPageSource = await read("src/app/(site)/gallery/page.tsx");
 const promotionsPageSource = await read("src/app/(site)/promotions/page.tsx");
@@ -134,7 +134,6 @@ const conciseHeroSource = [
   pageCopySource,
   defaultContentSource,
   servicesPageSource,
-  therapistsPageSource,
 ].join("\n");
 
 for (const copy of [
@@ -145,7 +144,6 @@ for (const copy of [
   "Massage Gifts & Offers",
   "A Look Inside Siriranee",
   "Massage in Howth, Dublin",
-  "The Siriranee Team",
 ]) {
   check(conciseHeroSource.includes(copy), `Concise PageHero copy is missing: ${copy}`);
 }
@@ -221,24 +219,35 @@ for (const retiredColor of [
   );
 }
 
-for (const [relativePath, source] of customerBookingSources) {
-  check(
-    !/[?&]therapist=/.test(source),
-    `Customer booking URL still selects a therapist in ${relativePath}`,
-  );
-  check(
-    !/\btherapistSlug\b/.test(source),
-    `Customer booking state still contains a therapist slug in ${relativePath}`,
-  );
-  check(
-    !/name=["']therapist["']/.test(source),
-    `Customer booking UI still contains a therapist control in ${relativePath}`,
-  );
-  check(
-    !/therapist[ -]preference/i.test(source),
-    `Customer booking copy still asks for a therapist preference in ${relativePath}`,
-  );
-}
+const bookingPlannerSource = customerBookingSources.get(
+  "src/components/booking/BookingPlanner.tsx",
+) ?? "";
+const bookingPageSource = customerBookingSources.get(
+  "src/app/(site)/book/page.tsx",
+) ?? "";
+const contactLinksSource = customerBookingSources.get(
+  "src/lib/contact-links.ts",
+) ?? "";
+const bookingCopySource = customerBookingSources.get("src/content/booking.ts") ?? "";
+check(
+  bookingPlannerSource.includes('name="therapistId"') &&
+    bookingPlannerSource.includes("therapistId: selectedTherapist.id"),
+  "Customer booking must require and submit a therapist selection",
+);
+check(
+  bookingPageSource.includes("initialTherapistSlug") &&
+    bookingPageSource.includes("therapists={plannerData.therapists}"),
+  "The booking page must load therapists and preserve a safe profile deep link",
+);
+check(
+  contactLinksSource.includes('query.set("therapist", therapistSlug)') &&
+    contactLinksSource.includes("therapistName"),
+  "Booking and contact handoffs must preserve a validated therapist preference",
+);
+check(
+  !/do not include a therapist-selection step/i.test(bookingCopySource),
+  "Retired no-therapist booking policy remains in public copy",
+);
 
 for (const relativePath of bookNowSources) {
   const source = await read(relativePath);
@@ -328,10 +337,11 @@ check(
   "Google Maps must remain click-to-load until the visitor opts in",
 );
 check(
-  !sitemapSource.includes('{ path: "/therapists"') &&
+  !sitemapSource.includes("/therapists") &&
+    !sitemapSource.includes("getPublicTeam") &&
     sitemapSource.includes("getPublicPromotions") &&
     sitemapSource.includes("promotions.length > 0"),
-  "Sitemap must exclude the team page and include promotions only when published",
+  "Sitemap must exclude removed therapist pages and include promotions only when published",
 );
 check(
   robotsSource.includes('process.env.VERCEL_ENV === "preview"') &&
@@ -341,7 +351,6 @@ check(
 const publicMarketingCopy = [
   homePageSource,
   aboutPageSource,
-  therapistsPageSource,
   openGraphImageSource,
   defaultContentSource,
 ].join("\n");
@@ -368,7 +377,6 @@ check(
 );
 for (const forbiddenField of [
   "therapist",
-  "therapistId",
   "staffId",
   "calendarId",
   "price",
@@ -380,8 +388,17 @@ for (const forbiddenField of [
   );
 }
 check(
-  /assignedStaffId:\s*""/.test(publicBookingSource),
-  "Public booking must leave internal staff assignment empty",
+  /text\(source\.therapistId, "therapistId"/.test(publicBookingSource) &&
+    /member\.publicProfile/.test(publicBookingSource) &&
+    /member\.operationalActive/.test(publicBookingSource) &&
+    /member\.serviceIds\.includes\(service\.id\)/.test(publicBookingSource) &&
+    /assignedStaffId:\s*therapist\.id/.test(publicBookingSource),
+  "Public booking must validate and persist the selected eligible therapist",
+);
+check(
+  !publicAdapterSource.includes("notificationEmail") &&
+    !publicBookingConfigSource.includes("notificationEmail"),
+  "Private therapist notification email must never enter public adapters or booking data",
 );
 
 async function collectSourceFiles(directory) {

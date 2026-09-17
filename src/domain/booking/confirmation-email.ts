@@ -24,6 +24,29 @@ export type CustomerBookingCancellationEmailOutcome = {
     | "mock-mode";
 };
 
+export type CustomerBookingRescheduleEmailOutcome = {
+  readonly status: "sent" | "pending" | "failed" | "indeterminate" | "skipped";
+  readonly reason?: "missing-customer-email" | "booking-not-confirmed" | "mock-mode";
+};
+
+export function customerBookingRescheduleEmailFeedback(
+  outcome: CustomerBookingRescheduleEmailOutcome,
+) {
+  if (outcome.status === "sent") {
+    return { tone: "success" as const, text: "Booking updated. Updated appointment email accepted by Resend." };
+  }
+  const detail = outcome.status === "pending"
+    ? "The updated appointment email has not been sent yet."
+    : outcome.status === "indeterminate"
+      ? "Email delivery is uncertain—check Resend before retrying."
+      : outcome.status === "skipped" && outcome.reason === "missing-customer-email"
+        ? "No customer email address was provided."
+        : outcome.status === "skipped" && outcome.reason === "mock-mode"
+          ? "Demo mode did not contact Resend."
+          : "The updated appointment email could not be sent.";
+  return { tone: "warning" as const, text: `Booking updated. ${detail}` };
+}
+
 export function customerBookingConfirmationEmailFeedback(
   outcome: CustomerBookingConfirmationEmailOutcome,
 ) {

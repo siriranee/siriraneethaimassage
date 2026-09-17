@@ -2,14 +2,12 @@ import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
 import { deleteAdminBooking, updateAdminBooking } from "@/server/cms/booking-service";
 import { cmsErrorResponse, cmsNoStoreJson, readCmsJsonObject } from "@/server/cms/http";
-import {
-  attemptCustomerBookingCancellationEmail,
-  attemptCustomerBookingConfirmationEmail,
-} from "@/server/cms/notification-service";
+import { dispatchBookingMutationEmails } from "@/server/cms/notification-service";
 import { getCmsBooking } from "@/server/cms/read-service";
 import { getCmsRepository } from "@/server/cms/repositories";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type RouteContext = {
   readonly params: Promise<{ readonly bookingId: string }>;
@@ -42,24 +40,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       Number(body.expectedVersion),
       { actor: user, requestId: getRequestId(request) },
     );
-    const confirmationEmail =
-      current?.status !== "confirmed" && booking.status === "confirmed"
-        ? await attemptCustomerBookingConfirmationEmail(
-            getCmsRepository(),
-            booking,
-          )
-        : undefined;
-    const cancellationEmail =
-      current?.status !== "cancelled" && booking.status === "cancelled"
-        ? await attemptCustomerBookingCancellationEmail(
-            getCmsRepository(),
-            booking,
-          )
-        : undefined;
+    const emails = await dispatchBookingMutationEmails(getCmsRepository(), current, booking);
     return cmsNoStoreJson({
       booking,
-      ...(confirmationEmail ? { confirmationEmail } : {}),
-      ...(cancellationEmail ? { cancellationEmail } : {}),
+      ...emails,
     });
   } catch (error) {
     return cmsErrorResponse(error);

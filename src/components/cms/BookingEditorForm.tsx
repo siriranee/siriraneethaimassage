@@ -6,22 +6,27 @@ import { useState, type FormEvent } from "react";
 import {
   customerBookingCancellationEmailFeedback,
   customerBookingConfirmationEmailFeedback,
+  customerBookingRescheduleEmailFeedback,
   type CustomerBookingCancellationEmailOutcome,
   type CustomerBookingConfirmationEmailOutcome,
+  type CustomerBookingRescheduleEmailOutcome,
 } from "@/domain/booking/confirmation-email";
 import {
   getAllowedBookingStatusTransitions,
   isTerminalBookingStatus,
 } from "@/domain/booking/status";
 import { bookingChangeReasons, type CmsBooking } from "@/domain/cms/types";
+import { withTherapistEmailFeedback, type TherapistEmailAttempt } from "@/domain/cms/notification-presentation";
 import { useUnsavedChanges } from "./useUnsavedChanges";
 
 import styles from "./CmsEditorForm.module.css";
 
 export function BookingEditorForm({
   booking,
+  therapists,
 }: Readonly<{
   booking: CmsBooking;
+  therapists: readonly { readonly id: string; readonly name: string }[];
 }>) {
   const router = useRouter();
   const [version, setVersion] = useState(booking.version);
@@ -36,6 +41,7 @@ export function BookingEditorForm({
     ...getAllowedBookingStatusTransitions(booking.status),
   ];
   const appointmentLocked = isTerminalBookingStatus(booking.status);
+  const [therapistId, setTherapistId] = useState(booking.assignedStaffId);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,6 +85,7 @@ export function BookingEditorForm({
           expectedVersion: version,
           localDate: data.get("localDate"),
           localTime: data.get("localTime"),
+          therapistId,
           status: data.get("status"),
           changeReason: data.get("changeReason"),
           internalNotes: data.get("internalNotes"),
@@ -89,6 +96,8 @@ export function BookingEditorForm({
         booking?: CmsBooking;
         confirmationEmail?: CustomerBookingConfirmationEmailOutcome;
         cancellationEmail?: CustomerBookingCancellationEmailOutcome;
+        rescheduleEmail?: CustomerBookingRescheduleEmailOutcome;
+        therapistEmails?: readonly TherapistEmailAttempt[];
       };
 
       if (!response.ok || !result.booking) {
@@ -98,13 +107,16 @@ export function BookingEditorForm({
 
       setVersion(result.booking.version);
       markSaved();
-      setFeedback(
+      setFeedback(withTherapistEmailFeedback(
         result.confirmationEmail
           ? customerBookingConfirmationEmailFeedback(result.confirmationEmail)
           : result.cancellationEmail
             ? customerBookingCancellationEmailFeedback(result.cancellationEmail)
+          : result.rescheduleEmail
+            ? customerBookingRescheduleEmailFeedback(result.rescheduleEmail)
           : { tone: "success", text: "Booking changes saved." },
-      );
+        result.therapistEmails,
+      ));
       router.refresh();
     } catch {
       setFeedback({
@@ -126,16 +138,30 @@ export function BookingEditorForm({
             <select defaultValue={booking.status} name="status">
               {statusOptions.map((status) => <option key={status} value={status}>{status === "no-show" ? "No-show" : status.charAt(0).toUpperCase() + status.slice(1)}</option>)}
             </select>
-            <small>{booking.demo ? "Demo mode does not contact Resend. " : "Confirming or cancelling a booking emails the customer when an email address is recorded. "}Final statuses cannot be reopened.</small>
+            <small>{booking.demo ? "Demo mode does not contact Resend. " : "Confirming or cancelling a booking emails the customer when an email address is recorded. Rescheduling or changing the therapist for a confirmed appointment also emails the updated details. "}Final statuses cannot be reopened.</small>
           </label>
           <label className={styles.field}>Date<input defaultValue={booking.localDate} disabled={appointmentLocked} name="localDate" required type="date" /></label>
           <label className={styles.field}>Dublin time<input defaultValue={booking.localTime} disabled={appointmentLocked} name="localTime" required step={300} type="time" /></label>
+          <label className={styles.field}>Massage therapist
+            <select
+              disabled={appointmentLocked}
+              name="therapistId"
+              onChange={(event) => setTherapistId(event.target.value)}
+              value={therapistId}
+            >
+              <option value="">Unassigned</option>
+              {therapists.map((therapist) => (
+                <option key={therapist.id} value={therapist.id}>{therapist.name}</option>
+              ))}
+            </select>
+            <small>Assign a therapist before confirming or rescheduling. Existing unassigned appointments can still have their notes updated. Changing the therapist rechecks availability and requires a change reason. {booking.demo ? "Demo mode does not send emails." : "Assigned therapists receive appointment updates in separate emails."}</small>
+          </label>
           <label className={styles.field}>Change reason
             <select defaultValue="" name="changeReason">
               <option value="">Not changing status or time</option>
               {bookingChangeReasons.map((reason) => <option key={reason} value={reason}>{reason.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}</option>)}
             </select>
-            <small>Required when changing status, date or time. Uses a controlled reason so sensitive details do not enter the audit log.</small>
+            <small>Required when changing status, date, time or therapist. Uses a controlled reason so sensitive details do not enter the audit log.</small>
           </label>
           <label className={styles.fullField}>Internal notes<textarea defaultValue={booking.internalNotes} maxLength={1000} name="internalNotes" /></label>
         </div>

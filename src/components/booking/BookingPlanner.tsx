@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Clock3, RotateCw } from "lucide-react";
 import {
@@ -33,9 +34,22 @@ export type BookingPlannerService = {
   readonly pricing: readonly PricePoint[];
 };
 
+export type BookingPlannerTherapist = {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly role: string;
+  readonly shortBio: string;
+  readonly imageUrl: string;
+  readonly imageAlt: string;
+  readonly serviceIds: readonly string[];
+};
+
 type BookingPlannerProps = {
   readonly services: readonly BookingPlannerService[];
+  readonly therapists: readonly BookingPlannerTherapist[];
   readonly initialServiceSlug?: string;
+  readonly initialTherapistSlug?: string;
   readonly initialDuration?: number;
   readonly initialDate?: string;
   readonly initialTime?: string;
@@ -69,6 +83,7 @@ type PublicBookingSnapshot = {
   readonly localTime: string;
   readonly timezone: "Europe/Dublin";
   readonly status: string;
+  readonly therapistName: string;
 };
 
 type PublicBookingResponse = {
@@ -143,6 +158,15 @@ function formatLocalDate(value: string) {
   );
 }
 
+function therapistInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
 function currentDublinDate() {
   const parts = new Intl.DateTimeFormat("en-IE", {
     year: "numeric",
@@ -179,7 +203,9 @@ function getDurationOptions(service: BookingPlannerService) {
 
 export function BookingPlanner({
   services,
+  therapists,
   initialServiceSlug,
+  initialTherapistSlug,
   initialDuration,
   initialDate,
   initialTime,
@@ -187,7 +213,17 @@ export function BookingPlanner({
   const requestedService = services.find(
     (service) => service.slug === initialServiceSlug,
   );
-  const firstService = requestedService ?? services[0];
+  const requestedTherapistBySlug = therapists.find(
+    (therapist) => therapist.slug === initialTherapistSlug,
+  );
+  const firstService =
+    requestedService ??
+    (requestedTherapistBySlug
+      ? services.find((service) =>
+          requestedTherapistBySlug.serviceIds.includes(service.id),
+        )
+      : undefined) ??
+    services[0];
   const initialDurationOptions = firstService
     ? getDurationOptions(firstService)
     : [];
@@ -198,11 +234,23 @@ export function BookingPlanner({
     )
       ? initialDuration
       : (initialDurationOptions[0]?.durationMinutes ?? 0);
+  const firstEligibleTherapists = firstService
+    ? therapists.filter((therapist) =>
+        therapist.serviceIds.includes(firstService.id),
+      )
+    : [];
+  const requestedTherapist = firstEligibleTherapists.find(
+    (therapist) => therapist.slug === initialTherapistSlug,
+  );
+  const firstTherapist = requestedTherapist ?? firstEligibleTherapists[0];
 
   const [selectedServiceId, setSelectedServiceId] = useState(
     firstService?.id ?? "",
   );
   const [selectedDuration, setSelectedDuration] = useState(firstDuration);
+  const [selectedTherapistId, setSelectedTherapistId] = useState(
+    firstTherapist?.id ?? "",
+  );
   const [calendarRequested, setCalendarRequested] = useState(false);
   const [preferredDate, setPreferredDate] = useState(
     initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : "",
@@ -243,6 +291,15 @@ export function BookingPlanner({
   const durationOptions = selectedService
     ? getDurationOptions(selectedService)
     : [];
+  const eligibleTherapists = selectedService
+    ? therapists.filter((therapist) =>
+        therapist.serviceIds.includes(selectedService.id),
+      )
+    : [];
+  const selectedTherapist =
+    eligibleTherapists.find(
+      (therapist) => therapist.id === selectedTherapistId,
+    ) ?? eligibleTherapists[0];
   const acuityOptions = selectedService
     ? getAcuityBookingOptions(selectedService.slug)
     : [];
@@ -273,6 +330,7 @@ export function BookingPlanner({
         durationMinutes: selectedDuration,
         preferredDate: preferredDate || undefined,
         preferredTime: selectedTime || undefined,
+        therapistSlug: selectedTherapist?.slug,
       })
     : "/contact";
   const selectionLabel = selectedService
@@ -280,17 +338,23 @@ export function BookingPlanner({
         selectedDurationOption
           ? formatDuration(selectedDurationOption.durationMinutes)
           : "duration in calendar"
-      }`
+      }${selectedTherapist ? ` · ${selectedTherapist.name}` : ""}`
     : "Massage appointment";
 
   useEffect(() => {
-    if (!preferredDate || !selectedDuration || !selectedService) return;
+    if (
+      !preferredDate ||
+      !selectedDuration ||
+      !selectedService ||
+      !selectedTherapist
+    ) return;
 
     const controller = new AbortController();
     const params = new URLSearchParams({
       serviceId: selectedService.id,
       durationMinutes: String(selectedDuration),
       localDate: preferredDate,
+      therapistId: selectedTherapist.id,
     });
 
     void fetch(`/api/public/availability?${params.toString()}`, {
@@ -333,6 +397,7 @@ export function BookingPlanner({
     preferredDate,
     selectedDuration,
     selectedService,
+    selectedTherapist,
   ]);
 
   useEffect(() => {
@@ -370,6 +435,15 @@ export function BookingPlanner({
 
   function selectService(serviceId: string) {
     const nextService = services.find((service) => service.id === serviceId);
+    const nextEligibleTherapists = nextService
+      ? therapists.filter((therapist) =>
+          therapist.serviceIds.includes(nextService.id),
+        )
+      : [];
+    const nextTherapist =
+      nextEligibleTherapists.find(
+        (therapist) => therapist.id === selectedTherapistId,
+      ) ?? nextEligibleTherapists[0];
 
     setSelectedServiceId(serviceId);
     setSelectedDuration(
@@ -377,10 +451,12 @@ export function BookingPlanner({
         ? (getDurationOptions(nextService)[0]?.durationMinutes ?? 0)
         : 0,
     );
+    setSelectedTherapistId(nextTherapist?.id ?? "");
+    setPreferredDate("");
     setSelectedTime("");
     setAvailableSlots([]);
     setAvailabilityMode(null);
-    setAvailabilityState(preferredDate ? "loading" : "idle");
+    setAvailabilityState("idle");
     resetSubmission();
   }
 
@@ -390,6 +466,17 @@ export function BookingPlanner({
     setAvailableSlots([]);
     setAvailabilityMode(null);
     setAvailabilityState(preferredDate ? "loading" : "idle");
+    resetSubmission();
+  }
+
+  function selectTherapist(therapistId: string) {
+    setSelectedTherapistId(therapistId);
+    setPreferredDate("");
+    setSelectedTime("");
+    setAvailableSlots([]);
+    setAvailabilityMode(null);
+    setAvailabilityMessage("");
+    setAvailabilityState("idle");
     resetSubmission();
   }
 
@@ -433,6 +520,7 @@ export function BookingPlanner({
       !directBookingAvailable ||
       !selectedTime ||
       !selectedDuration ||
+      !selectedTherapist ||
       submissionState === "submitting"
     ) {
       return;
@@ -458,6 +546,7 @@ export function BookingPlanner({
           email: data.get("email"),
           notes: data.get("notes"),
           serviceId: selectedService.id,
+          therapistId: selectedTherapist.id,
           durationMinutes: selectedDuration,
           localDate: preferredDate,
           localTime: selectedTime,
@@ -547,6 +636,10 @@ export function BookingPlanner({
                   <dd>{confirmation.serviceName}</dd>
                 </div>
                 <div>
+                  <dt>Massage therapist</dt>
+                  <dd>{confirmation.therapistName}</dd>
+                </div>
+                <div>
                   <dt>Appointment</dt>
                   <dd>
                     {formatLocalDate(confirmation.localDate)} ·{" "}
@@ -624,6 +717,80 @@ export function BookingPlanner({
               >
                 <legend>
                   <span>
+                    <strong>Massage therapist</strong>
+                    <small>Choose who you would like to see for this treatment.</small>
+                  </span>
+                </legend>
+
+                {eligibleTherapists.length ? (
+                  <div className={styles.therapistGrid}>
+                    {eligibleTherapists.map((therapist) => {
+                      const inputId = `booking-therapist-${therapist.id}`;
+
+                      return (
+                        <label
+                          className={styles.optionLabel}
+                          htmlFor={inputId}
+                          key={therapist.id}
+                        >
+                          <input
+                            checked={selectedTherapist?.id === therapist.id}
+                            className={styles.radioInput}
+                            id={inputId}
+                            name="therapistId"
+                            onChange={() => selectTherapist(therapist.id)}
+                            required
+                            type="radio"
+                            value={therapist.id}
+                          />
+                          <span className={styles.therapistOption}>
+                            <span className={styles.therapistPortrait}>
+                              {therapist.imageUrl ? (
+                                <Image
+                                  alt={therapist.imageAlt || therapist.name}
+                                  height={80}
+                                  sizes="80px"
+                                  src={therapist.imageUrl}
+                                  width={80}
+                                />
+                              ) : (
+                                <span aria-hidden="true">
+                                  {therapistInitials(therapist.name)}
+                                </span>
+                              )}
+                            </span>
+                            <span className={styles.therapistCopy}>
+                              <strong>{therapist.name}</strong>
+                              <span>{therapist.role}</span>
+                              {therapist.shortBio ? (
+                                <small>{therapist.shortBio}</small>
+                              ) : null}
+                            </span>
+                            <span className={styles.choiceMark} aria-hidden="true" />
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className={styles.therapistEmpty} role="status">
+                    <strong>No therapist is available for this treatment yet.</strong>
+                    <span>Please choose another treatment or contact Siriranee.</span>
+                  </div>
+                )}
+                {fieldErrors.therapistId ? (
+                  <span className={styles.fieldError} role="alert">
+                    {fieldErrors.therapistId}
+                  </span>
+                ) : null}
+              </fieldset>
+
+              <fieldset
+                className={styles.fieldset}
+                disabled={submissionState === "submitting"}
+              >
+                <legend>
+                  <span>
                     <strong>Duration</strong>
                   </span>
                 </legend>
@@ -686,6 +853,7 @@ export function BookingPlanner({
                     refreshKey={availabilityRefresh}
                     selectedDate={preferredDate}
                     serviceId={selectedService.id}
+                    therapistId={selectedTherapist?.id ?? ""}
                   />
 
                   <section
@@ -706,7 +874,12 @@ export function BookingPlanner({
                       </div>
                     </header>
 
-                    {!preferredDate ? (
+                    {!selectedTherapist ? (
+                      <div className={styles.timePlaceholder}>
+                        <Clock3 aria-hidden="true" />
+                        <p>Choose a therapist before selecting a day and time.</p>
+                      </div>
+                    ) : !preferredDate ? (
                       <div className={styles.timePlaceholder}>
                         <Clock3 aria-hidden="true" />
                         <p>Select a day to see times.</p>
@@ -953,6 +1126,10 @@ export function BookingPlanner({
                 </dd>
               </div>
               <div>
+                <dt>Massage therapist</dt>
+                <dd>{selectedTherapist?.name ?? "Not selected yet"}</dd>
+              </div>
+              <div>
                 <dt>Date &amp; time</dt>
                 <dd>{appointmentLabel}</dd>
               </div>
@@ -971,7 +1148,11 @@ export function BookingPlanner({
           {!confirmation && directBookingAvailable ? (
             <button
               className={styles.primaryAction}
-              disabled={!selectedTime || submissionState === "submitting"}
+              disabled={
+                !selectedTime ||
+                !selectedTherapist ||
+                submissionState === "submitting"
+              }
               type="submit"
             >
               {submissionState === "submitting"

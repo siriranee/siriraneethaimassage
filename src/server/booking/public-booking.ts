@@ -100,7 +100,6 @@ export async function createPublicBooking(
   const forbidden = [
     "assignedStaffId",
     "therapist",
-    "therapistId",
     "staffId",
     "calendarId",
     "price",
@@ -134,6 +133,7 @@ export async function createPublicBooking(
 
   const notes = optionalText(source.notes, 600);
   const serviceId = text(source.serviceId, "serviceId", 2, 120);
+  const therapistId = text(source.therapistId, "therapistId", 2, 120);
   const durationMinutes = Number(source.durationMinutes);
   const localDate = String(source.localDate ?? "").trim();
   const localTime = String(source.localTime ?? "").trim();
@@ -160,6 +160,7 @@ export async function createPublicBooking(
       email,
       notes,
       serviceId,
+      therapistId,
       durationMinutes,
       localDate,
       localTime,
@@ -182,11 +183,12 @@ export async function createPublicBooking(
         return { booking: existing, created: false as const };
       }
 
+      await transaction.lockTherapist(therapistId);
+      await transaction.lockBookingDate(localDate);
       const publication = await transaction.getPublishedContent();
       if (!publication) throw new Error("Public booking is disabled.");
       const content = publication.snapshot;
       assertLivePublicBookingReady(content);
-      await transaction.lockBookingDate(localDate);
 
       const service = content.services.find(
         (item) => item.id === serviceId,
@@ -196,6 +198,20 @@ export async function createPublicBooking(
       );
       if (!service || !price) {
         throw new CmsValidationError("Choose an available treatment and duration.");
+      }
+      const therapist = content.team.find(
+        (member) =>
+          member.id === therapistId &&
+          member.publicProfile &&
+          member.operationalActive &&
+          !member.archived &&
+          member.serviceIds.includes(service.id),
+      );
+      if (!therapist) {
+        throw new CmsValidationError(
+          "Choose an available massage therapist for this treatment.",
+          { therapistId: "Choose an available massage therapist." },
+        );
       }
 
       const { bookings, holds, closures } =
@@ -207,6 +223,7 @@ export async function createPublicBooking(
       const slot = getAvailabilitySlots({
         localDate,
         durationMinutes,
+        therapistId: therapist.id,
         settings: content.bookingSettings,
         weeklyHours: content.site.weeklyHours,
         closures,
@@ -249,7 +266,8 @@ export async function createPublicBooking(
         status: "pending",
         source: "website",
         capacityExpiresAt,
-        assignedStaffId: "",
+        assignedStaffId: therapist.id,
+        assignedStaffName: therapist.name,
         internalNotes:
           "Website request awaiting internal confirmation. Temporary capacity expires automatically if it is not confirmed.",
         privacyAcceptedAt: now,

@@ -173,6 +173,15 @@ export function collectCmsScopedMediaReferences(
     }
   }
 
+  for (const member of content.team ?? []) {
+    if (typeof member.imageUrl === "string" && member.imageUrl) {
+      references.push({
+        scope: "therapist-profile",
+        secureUrl: member.imageUrl,
+      });
+    }
+  }
+
   for (const voucher of content.vouchers ?? []) {
     if (typeof voucher.imageUrl === "string" && voucher.imageUrl) {
       references.push({

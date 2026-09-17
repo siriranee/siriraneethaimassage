@@ -148,9 +148,21 @@ export const getPublicTeam = cache(
       .filter((member) => member.publicProfile && !member.archived)
       .sort((first, second) => first.sortOrder - second.sortOrder)
       .map((member) => ({
-        slug: member.id,
+        id: member.id,
+        slug: member.slug,
         name: member.name,
         role: member.publicRole,
+        shortBio: member.shortBio,
+        biography: member.biography,
+        imageUrl:
+          member.imageUrl && isPublicProjectImage(member.imageUrl)
+            ? member.imageUrl
+            : "",
+        imageAlt: member.imageAlt,
+        specialties: member.specialties,
+        languages: member.languages,
+        serviceIds: member.serviceIds,
+        bookable: member.operationalActive && !member.archived,
       }));
   },
 );

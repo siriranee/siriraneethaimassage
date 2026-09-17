@@ -42,7 +42,6 @@ test("home slides, page copy and the gallery are static project content", async 
     slider,
     servicesPage,
     bookPage,
-    therapistsPage,
     galleryPage,
     sitemap,
   ] = await Promise.all([
@@ -58,7 +57,6 @@ test("home slides, page copy and the gallery are static project content", async 
     source("src/components/marketing/HomeHeroSlider.tsx"),
     source("src/app/(site)/services/page.tsx"),
     source("src/app/(site)/book/page.tsx"),
-    source("src/app/(site)/therapists/page.tsx"),
     source("src/app/(site)/gallery/page.tsx"),
     source("src/app/sitemap.ts"),
   ]);
@@ -81,7 +79,6 @@ test("home slides, page copy and the gallery are static project content", async 
   for (const [pageId, pageSource] of [
     ["services", servicesPage],
     ["book", bookPage],
-    ["therapists", therapistsPage],
   ] as const) {
     assert.match(pageSource, new RegExp(`getPageCopy\\("${pageId}"\\)`));
     assert.match(pageSource, /pageCopy\.eyebrow/);
@@ -98,5 +95,6 @@ test("home slides, page copy and the gallery are static project content", async 
   ]) {
     await assert.rejects(source(retiredPath), { code: "ENOENT" });
   }
-  assert.doesNotMatch(sitemap, /path:\s*"\/therapists"/);
+  assert.doesNotMatch(sitemap, /\/therapists/);
+  assert.doesNotMatch(sitemap, /getPublicTeam/);
 });

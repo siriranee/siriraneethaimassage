@@ -4,10 +4,62 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 import { isMongoCommitResultIndeterminate } from "../src/server/cms/mongo-error-label";
+import {
+  bookingActivityStatusLabel,
+  bookingEmailDeliveryFeedback,
+  withTherapistEmailFeedback,
+} from "../src/domain/cms/notification-presentation";
 
 async function source(path: string) {
   return readFile(resolve(process.cwd(), path), "utf8");
 }
+
+test("historical request activity only prompts review while the booking is still pending", () => {
+  assert.match(bookingActivityStatusLabel("pending"), /review needed/);
+  for (const status of ["confirmed", "cancelled", "completed", "no-show"] as const) {
+    const label = bookingActivityStatusLabel(status);
+    assert.match(label, /Current status:/);
+    assert.doesNotMatch(label, /review needed|new request/i);
+  }
+  assert.match(bookingActivityStatusLabel(undefined), /Historical activity/);
+});
+
+test("provider acceptance is never presented as verified email delivery", () => {
+  const accepted = bookingEmailDeliveryFeedback({ status: "sent", provider: "resend", lastError: "" });
+  assert.equal(accepted.label, "Accepted by Resend");
+  assert.match(accepted.text, /delivery has not been verified/);
+  const delivered = bookingEmailDeliveryFeedback({ status: "sent", provider: "resend", deliveryStatus: "delivered", lastError: "" });
+  assert.equal(delivered.label, "Delivered");
+  assert.equal(delivered.tone, "success");
+  assert.match(delivered.text, /does not confirm.*opened/);
+});
+
+test("adverse delivery events take precedence over earlier successful provider acceptance", () => {
+  for (const deliveryStatus of ["bounced", "failed", "delayed", "complained", "suppressed"] as const) {
+    const feedback = bookingEmailDeliveryFeedback({ status: "sent", provider: "resend", deliveryStatus, lastError: "" });
+    assert.equal(feedback.tone, "warning", deliveryStatus);
+    assert.notEqual(feedback.label, "Accepted by Resend");
+    assert.notEqual(feedback.label, "Delivered");
+  }
+  const uncertain = bookingEmailDeliveryFeedback({ status: "indeterminate", provider: "resend", lastError: "" });
+  assert.match(uncertain.text, /before retrying to avoid a duplicate/);
+});
+
+test("a saved booking still warns when its separate therapist email did not succeed", () => {
+  const saved = { tone: "success" as const, text: "Booking confirmed." };
+  for (const outcome of [
+    { status: "failed" },
+    { status: "pending" },
+    { status: "indeterminate" },
+    { status: "skipped", reason: "therapist-contact-unavailable" },
+  ] as const) {
+    const feedback = withTherapistEmailFeedback(saved, [outcome]);
+    assert.equal(feedback.tone, "warning");
+    assert.match(feedback.text, /^Booking confirmed\./);
+    assert.match(feedback.text, /Therapist email needs attention/);
+  }
+  assert.deepEqual(withTherapistEmailFeedback(saved, [{ status: "skipped", reason: "mock-mode" }]), saved);
+});
 
 test("MongoDB indeterminate commit labels are detected without a driver dependency", () => {
   assert.equal(
@@ -69,6 +121,37 @@ test("public service details resolve current CMS slugs only at request time", as
   assert.match(page, /notFound\(\)/);
 });
 
+test("therapist notification addresses stay private and never enter public payloads", async () => {
+  const [types, adapter, plannerConfig, bookingRoute] = await Promise.all([
+    source("src/domain/cms/types.ts"),
+    source("src/server/cms/public-adapter.ts"),
+    source("src/server/booking/public-config.ts"),
+    source("src/app/api/public/bookings/route.ts"),
+  ]);
+  const publicTeamMapper = adapter.slice(
+    adapter.indexOf("export const getPublicTeam"),
+    adapter.indexOf("export const getPublicPromotions"),
+  );
+  const teamRecord = types.slice(
+    types.indexOf("export type CmsTeamRecord"),
+    types.indexOf("export type CmsTherapistContact"),
+  );
+  const privateContact = types.slice(
+    types.indexOf("export type CmsTherapistContact"),
+    types.indexOf("export type CmsTeamEditorRecord"),
+  );
+
+  assert.doesNotMatch(teamRecord, /notificationEmail/);
+  assert.match(privateContact, /readonly notificationEmail:\s*string/);
+  assert.match(privateContact, /readonly contactPhone:\s*string/);
+  assert.doesNotMatch(publicTeamMapper, /notificationEmail/);
+  assert.doesNotMatch(publicTeamMapper, /contactPhone/);
+  assert.doesNotMatch(plannerConfig, /notificationEmail/);
+  assert.doesNotMatch(plannerConfig, /contactPhone/);
+  assert.match(bookingRoute, /therapistName:\s*booking\.assignedStaffName/);
+  assert.doesNotMatch(bookingRoute, /therapistEmail|notificationEmail/);
+});
+
 test("notification records keep Resend delivery metadata free of contact details and message bodies", async () => {
   const [types, notifications, publicBooking] = await Promise.all([
     source("src/domain/cms/types.ts"),
@@ -76,7 +159,7 @@ test("notification records keep Resend delivery metadata free of contact details
     source("src/server/booking/public-booking.ts"),
   ]);
   const record = types.slice(types.indexOf("export type CmsBookingNotification"), types.indexOf("export type CmsBookingQuery"));
-  assert.doesNotMatch(record, /recipient|phone|email|messageBody|body:/i);
+  assert.doesNotMatch(record, /readonly\s+(?:recipient\w*|phone\w*|email\w*|messageBody|body)\??\s*:/i);
   assert.match(notifications, /status: "preview"/);
   assert.match(
     notifications,
@@ -85,9 +168,12 @@ test("notification records keep Resend delivery metadata free of contact details
   assert.match(notifications, /audience: "owner"/);
   assert.match(
     notifications,
-    /id: customerBookingConfirmationEmailNotificationId\(booking\.id\)/,
+    /customerBookingConfirmationEmailNotificationId\(booking\.id\)/,
   );
   assert.match(notifications, /audience: "customer"/);
+  assert.match(notifications, /audience: "therapist"/);
+  assert.match(notifications, /targetTeamMemberId:/);
+  assert.match(notifications, /therapistBookingEmailNotificationId/);
   assert.match(notifications, /status: "queued"/);
   assert.match(notifications, /provider: "resend"/);
   assert.match(
@@ -96,18 +182,40 @@ test("notification records keep Resend delivery metadata free of contact details
   );
 });
 
-test("CMS navigation omits retired pages, media, recovery and manual publishing", async () => {
-  const [shell, settings, integrations, types, contentService] = await Promise.all([
+test("CMS navigation includes therapist management and omits retired publishing surfaces", async () => {
+  const [shell, settings, integrations, types, contentService, teamPage, teamEditor, collectionRoute, itemRoute] = await Promise.all([
     source("src/components/cms/CmsShell.tsx"),
     source("src/app/cms/(protected)/settings/page.tsx"),
     source("src/app/cms/(protected)/settings/integrations/page.tsx"),
     source("src/domain/cms/types.ts"),
     source("src/server/cms/content-service.ts"),
+    source("src/app/cms/(protected)/team/page.tsx"),
+    source("src/components/cms/TeamEditorForm.tsx"),
+    source("src/app/api/cms/team/route.ts"),
+    source("src/app/api/cms/team/[memberId]/route.ts"),
   ]);
+  assert.match(shell, /href: "\/cms\/team", label: "Therapists"/);
+  assert.match(
+    shell,
+    /href: "\/cms\/team", label: "Therapists", icon: UsersRound, permission: "content:write"/,
+  );
   assert.doesNotMatch(
     shell,
-    /\/cms\/(?:team|content|notifications|search|pages|media)/,
+    /\/cms\/(?:content|notifications|search|pages|media)/,
   );
+  assert.match(teamPage, /listCmsTeamEditorRecords/);
+  assert.match(teamPage, /requireCmsPageUser\("content:write"\)/);
+  assert.match(teamPage, /href="\/cms\/team\/new"/);
+  assert.match(teamEditor, /name="notificationEmail"/);
+  assert.match(teamEditor, /name="contactPhone"/);
+  assert.match(teamEditor, /name="operationalActive"/);
+  assert.match(teamEditor, /name="publicProfile"/);
+  assert.match(teamEditor, /name="serviceIds"/);
+  assert.match(teamEditor, /scope:\s*"therapist-profile"/);
+  assert.match(collectionRoute, /requireCmsApiUser\("content:write"\)/);
+  assert.match(itemRoute, /requireCmsApiUser\("content:write"\)/);
+  assert.match(collectionRoute, /isSameOriginMutation/);
+  assert.match(itemRoute, /isSameOriginMutation/);
   assert.doesNotMatch(settings, /\/cms\/settings\/recovery|Recovery/);
   assert.doesNotMatch(integrations, /\/cms\/notifications/);
   assert.doesNotMatch(types, /CmsPageRecord|CmsGalleryRecord|readonly pages\??:|readonly gallery:/);
@@ -171,7 +279,8 @@ test("notification bell loads one safe dashboard feed per CMS page load", async 
   assert.match(layout, /await listCmsNotificationBellItems\(\)/);
   assert.match(layout, /notifications=\{notifications\}/);
   assert.doesNotMatch(bell, /fetch\(|setInterval\(|setTimeout\(|visibilitychange/);
-  assert.doesNotMatch(bellMapper, /lastError|attemptCount|status|channel/);
+  assert.doesNotMatch(bellMapper, /lastError|attemptCount|channel|\.customer/);
+  assert.match(bellMapper, /currentStatus: currentStatuses\.get/);
   assert.match(mockRepository, /filter\(\(item\) => item\.channel === "dashboard"\)/);
   assert.match(mongoRepository, /find\(\{ channel: "dashboard" \}/);
   assert.match(indexes, /\{ channel: 1, createdAt: -1 \}/);

@@ -10,6 +10,7 @@ import type {
 export type AvailabilityOccupancy = {
   readonly startsAt: string;
   readonly endsAt: string;
+  readonly assignedStaffId?: string;
   readonly status?:
     | BookingStatus
     | "active"
@@ -33,6 +34,8 @@ export type AvailabilitySlot = {
 export type AvailabilityInput = {
   readonly localDate: string;
   readonly durationMinutes: number;
+  /** When supplied, availability also enforces one appointment at a time for this therapist. */
+  readonly therapistId?: string;
   readonly settings: CmsBookingSettings;
   readonly weeklyHours: readonly CmsWeeklyHours[];
   readonly closures: readonly CmsClosure[];
@@ -130,6 +133,40 @@ function maximumConcurrent(
   }
 
   return maximum;
+}
+
+function hasTherapistConflict(
+  start: number,
+  end: number,
+  occupancy: readonly AvailabilityOccupancy[],
+  settings: CmsBookingSettings,
+  now: Temporal.Instant,
+  therapistId: string,
+) {
+  return occupancy.some((item) => {
+    if (item.assignedStaffId !== therapistId) return false;
+    if (
+      item.status &&
+      !["pending", "confirmed", "active"].includes(item.status)
+    ) {
+      return false;
+    }
+    if (
+      item.expiresAt &&
+      Temporal.Instant.compare(Temporal.Instant.from(item.expiresAt), now) <= 0
+    ) {
+      return false;
+    }
+
+    const itemStart =
+      Temporal.Instant.from(item.startsAt).epochMilliseconds -
+      settings.bufferBeforeMinutes * 60_000;
+    const itemEnd =
+      Temporal.Instant.from(item.endsAt).epochMilliseconds +
+      settings.bufferAfterMinutes * 60_000;
+
+    return overlaps(start, end, itemStart, itemEnd);
+  });
 }
 
 function intersectsClosure(
@@ -246,6 +283,19 @@ export function getAvailabilitySlots(input: AvailabilityInput): readonly Availab
     );
     const remainingCapacity = input.settings.maxConcurrentBookings - used;
     if (remainingCapacity < 1) continue;
+    if (
+      input.therapistId &&
+      hasTherapistConflict(
+        occupiedStart,
+        occupiedEnd,
+        occupancy,
+        input.settings,
+        now,
+        input.therapistId,
+      )
+    ) {
+      continue;
+    }
 
     slots.push({
       slotId: `${input.localDate}T${localTime}`,

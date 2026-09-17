@@ -5,19 +5,15 @@ import { BookingEditorForm } from "@/components/cms/BookingEditorForm";
 import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
 import { CmsDeleteBookingButton } from "@/components/cms/CmsDeleteBookingButton";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
-import { CmsRetryConfirmationEmail } from "@/components/cms/CmsRetryConfirmationEmail";
+import { CmsRetryBookingEmail } from "@/components/cms/CmsRetryBookingEmail";
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
-import {
-  customerBookingCancellationEmailFeedback,
-  customerBookingConfirmationEmailFeedback,
-} from "@/domain/booking/confirmation-email";
+import { bookingEmailDeliveryFeedback } from "@/domain/cms/notification-presentation";
 import { isPendingCapacityExpired } from "@/domain/booking/status";
+import { isBookingEmailDeliveryUncertain } from "@/domain/booking/email-retry-policy";
 import { canCmsRole } from "@/domain/cms/permissions";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
-import {
-  canRetryCustomerBookingCancellationEmail,
-  canRetryCustomerBookingConfirmationEmail,
-} from "@/server/cms/notification-service";
+import { canRetryBookingEmailNotification } from "@/server/cms/notification-service";
+import { getCmsContent } from "@/server/cms/content-service";
 import { getCmsBooking, listCmsBookingTimeline, listCmsNotifications } from "@/server/cms/read-service";
 
 import styles from "@/components/cms/CmsViews.module.css";
@@ -29,70 +25,47 @@ type PageProps = {
 export default async function CmsBookingDetailPage({ params }: PageProps) {
   const user = await requireCmsPageUser("bookings:write");
   const { bookingId } = await params;
-  const [booking, timeline, notifications] = await Promise.all([
+  const [booking, timeline, notifications, content] = await Promise.all([
     getCmsBooking(bookingId),
     listCmsBookingTimeline(bookingId),
     listCmsNotifications(bookingId, 100),
+    getCmsContent(),
   ]);
   if (!booking) notFound();
   const expiredPending = isPendingCapacityExpired(booking);
-  const confirmationNotification = notifications.find(
-    (notification) =>
+  const latestCustomerEmail = [...notifications]
+    .sort((first, second) => second.createdAt.localeCompare(first.createdAt))
+    .find((notification) =>
       notification.audience === "customer" &&
       notification.channel === "email" &&
-      notification.kind === "booking-confirmed" &&
-      notification.provider === "resend",
-  );
-  const cancellationNotification = notifications.find(
-    (notification) =>
-      notification.audience === "customer" &&
-      notification.channel === "email" &&
-      notification.kind === "booking-cancelled" &&
-      notification.provider === "resend",
-  );
-  const confirmationFeedback =
-    booking.status !== "confirmed"
-      ? null
-      : confirmationNotification
-        ? customerBookingConfirmationEmailFeedback(
-            booking.demo
-              ? { status: "skipped", reason: "mock-mode" }
-              : confirmationNotification.status === "sent"
-                ? { status: "sent" }
-                : confirmationNotification.status === "queued"
-                  ? { status: "pending" }
-                  : confirmationNotification.status === "failed"
-                    ? { status: "failed" }
-                    : { status: "indeterminate" },
-          )
-        : !booking.customer.email
-          ? customerBookingConfirmationEmailFeedback({
-              status: "skipped",
-              reason: "missing-customer-email",
-            })
-          : null;
-  const cancellationFeedback =
-    booking.status !== "cancelled"
-      ? null
-      : cancellationNotification
-        ? customerBookingCancellationEmailFeedback(
-            booking.demo
-              ? { status: "skipped", reason: "mock-mode" }
-              : cancellationNotification.status === "sent"
-                ? { status: "sent" }
-                : cancellationNotification.status === "queued"
-                  ? { status: "pending" }
-                  : cancellationNotification.status === "failed"
-                    ? { status: "failed" }
-                    : { status: "indeterminate" },
-          )
-        : !booking.customer.email
-          ? customerBookingCancellationEmailFeedback({
-              status: "skipped",
-              reason: "missing-customer-email",
-            })
-          : null;
-  const customerEmailFeedback = cancellationFeedback ?? confirmationFeedback;
+      (booking.status === "cancelled"
+        ? notification.kind === "booking-cancelled"
+        : booking.status === "confirmed" &&
+          (notification.kind === "booking-confirmed" || notification.kind === "booking-rescheduled")),
+    );
+  const customerEmailFeedback = latestCustomerEmail && !booking.demo
+    ? bookingEmailDeliveryFeedback(latestCustomerEmail, canRetryBookingEmailNotification(latestCustomerEmail))
+    : null;
+  const eligibleTherapists = content.team
+    .filter(
+      (member) =>
+        member.operationalActive &&
+        !member.archived &&
+        member.serviceIds.includes(booking.serviceId),
+    )
+    .sort((first, second) => first.sortOrder - second.sortOrder)
+    .map((member) => ({ id: member.id, name: member.name }));
+  const therapistOptions =
+    booking.assignedStaffId &&
+    !eligibleTherapists.some((member) => member.id === booking.assignedStaffId)
+      ? [
+          {
+            id: booking.assignedStaffId,
+            name: `${booking.assignedStaffName || "Previously assigned therapist"} (inactive)`,
+          },
+          ...eligibleTherapists,
+        ]
+      : eligibleTherapists;
 
   return (
     <>
@@ -123,15 +96,15 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
       {customerEmailFeedback ? (
         <CmsNotice
           tone={customerEmailFeedback.tone}
-          title={
-            customerEmailFeedback.tone === "success"
-              ? booking.status === "cancelled"
-                ? "Cancellation email accepted"
-                : "Confirmation email accepted"
-              : "Booking saved; email needs attention"
-          }
+          title={`Customer email · ${customerEmailFeedback.label}`}
         >
           {customerEmailFeedback.text}
+        </CmsNotice>
+      ) : null}
+
+      {!booking.demo && !booking.customer.email && (booking.status === "confirmed" || booking.status === "cancelled") ? (
+        <CmsNotice tone="warning" title="Booking saved without a customer email">
+          No customer email address was provided. Contact the customer directly about this appointment.
         </CmsNotice>
       ) : null}
 
@@ -158,6 +131,7 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
             </div>
             <div><dt>Reference</dt><dd>{booking.reference}</dd></div>
             <div><dt>Treatment</dt><dd>{booking.serviceName}</dd></div>
+            <div><dt>Massage therapist</dt><dd>{booking.assignedStaffName || "Unassigned"}</dd></div>
             <div><dt>Duration & price</dt><dd>{booking.durationMinutes} min · €{(booking.priceCents / 100).toFixed(0)}</dd></div>
             <div><dt>Date</dt><dd>{booking.localDate}</dd></div>
             <div><dt>Dublin time</dt><dd>{booking.localTime}</dd></div>
@@ -190,10 +164,14 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
         )}
       </CmsPanel>
 
-      <CmsPanel title={`Notification activity · ${notifications.length}`} description="Records contain delivery metadata only. Recipient addresses and message bodies are not stored here.">
+      <CmsPanel title={`Notification activity · ${notifications.length}`} description="Past events stay in this history after a booking is confirmed. Accepted means the email provider received the message; Delivered means the recipient's email service accepted it.">
         {notifications.length ? (
           <ul className={styles.activityList}>
-            {notifications.map((notification) => (
+            {notifications.map((notification) => {
+              const isEmail = notification.channel === "email";
+              const retryAllowed = !booking.demo && canRetryBookingEmailNotification(notification);
+              const delivery = isEmail ? bookingEmailDeliveryFeedback(notification, retryAllowed) : null;
+              return (
               <li key={notification.id}>
                 <Mail aria-hidden="true" />
                 <div>
@@ -208,54 +186,40 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
                           notification.channel === "email" &&
                           notification.kind === "booking-cancelled"
                         ? "Customer cancellation email"
+                      : notification.audience === "customer" && isEmail && notification.kind === "booking-rescheduled"
+                        ? "Customer reschedule email"
+                      : notification.audience === "therapist" && isEmail
+                        ? `Therapist email · ${notification.kind.replaceAll("booking-", "").replaceAll("-", " ")}`
                       : `${notification.kind.replaceAll("-", " ")} · ${notification.channel}`}
                   </strong>
                   <span>
-                    {notification.status === "sent" && notification.provider === "resend"
-                      ? "accepted by Resend"
-                      : notification.status === "sending"
-                        ? "sending through Resend"
-                        : notification.status === "indeterminate"
-                          ? "delivery uncertain — review in Resend"
-                          : notification.status.replaceAll("-", " ")}
+                    {delivery?.label ?? "Historical activity"}
                     {(notification.status === "failed" ||
                       notification.status === "indeterminate") && notification.lastError
                       ? ` · ${notification.lastError.replaceAll("-", " ")}`
                       : ""}
                     {" · "}
-                    {new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Dublin" }).format(new Date(notification.updatedAt || notification.createdAt))}
+                    {new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Dublin" }).format(new Date(notification.providerEventAt || notification.updatedAt || notification.createdAt))}
                   </span>
-                  {!booking.demo &&
-                  booking.status === "confirmed" &&
-                  canRetryCustomerBookingConfirmationEmail(notification) ? (
-                    <CmsRetryConfirmationEmail
+                  {delivery ? <span>{delivery.text}</span> : null}
+                  {retryAllowed ? (
+                    <CmsRetryBookingEmail
                       bookingId={booking.id}
-                      deliveryUncertain={
-                        notification.status === "indeterminate" ||
-                        notification.status === "sending"
-                      }
-                    />
-                  ) : !booking.demo &&
-                    booking.status === "cancelled" &&
-                    canRetryCustomerBookingCancellationEmail(notification) ? (
-                    <CmsRetryConfirmationEmail
-                      bookingId={booking.id}
-                      deliveryUncertain={
-                        notification.status === "indeterminate" ||
-                        notification.status === "sending"
-                      }
-                      kind="cancellation"
+                      notificationId={notification.id}
+                      deliveryUncertain={isBookingEmailDeliveryUncertain(notification)}
                     />
                   ) : null}
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         ) : <p>No notification activity has been recorded for this booking.</p>}
       </CmsPanel>
 
       <BookingEditorForm
         booking={booking}
+        therapists={therapistOptions}
         key={`editor:${booking.id}:${booking.version}`}
       />
     </>

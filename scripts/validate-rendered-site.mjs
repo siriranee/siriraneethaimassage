@@ -2,6 +2,7 @@ const baseUrl = new URL(
   process.env.RENDERED_SITE_BASE_URL || "http://localhost:3000",
 );
 const failures = [];
+const publicTherapistNames = new Map();
 
 const publicRoutes = [
   "/",
@@ -18,7 +19,6 @@ const publicRoutes = [
   "/services/neck-shoulder-upper-back-massage",
   "/services/deep-tissue-massage",
   "/services/hot-stone-massage",
-  "/therapists",
   "/visit",
 ];
 
@@ -67,20 +67,49 @@ function visibleMarkup(html) {
   return html.replace(/<script\b[\s\S]*?<\/script>/gi, "");
 }
 
-function checkNoTherapistSelection(html, context) {
+function checkAppointmentHandoff(html, targetPath, context) {
+  const link = [...visibleMarkup(html).matchAll(/href="([^"]+)"/gi)]
+    .map((match) => new URL(decodeAttribute(match[1]), baseUrl))
+    .find((url) => url.pathname === targetPath && url.searchParams.get("service") === "hot-oil-massage");
+  check(Boolean(link), `${context} is missing its appointment handoff`);
+  if (!link) return;
+  check(link.searchParams.get("duration") === "90", `${context} lost the chosen duration`);
+  if (targetPath === "/contact") {
+    check(link.hash === "#appointment-request", `${context} lost the appointment section`);
+    const selectedLabel = [...visibleMarkup(html).matchAll(/<label\b[^>]*>[\s\S]*?<\/label>/gi)]
+      .map((match) => match[0])
+      .find((label) => /<input\b(?=[^>]*name="therapistId")(?=[^>]*\schecked(?:=|\s|>))[^>]*>/i.test(label));
+    const selectedName = selectedLabel ? decodeAttribute(capture(selectedLabel, /<strong[^>]*>([^<]+)<\/strong>/i)) : "";
+    const therapistSlug = link.searchParams.get("therapist");
+    check(
+      selectedName
+        ? publicTherapistNames.get(therapistSlug) === selectedName
+        : !therapistSlug,
+      `${context} did not preserve the selected available therapist`,
+    );
+  } else {
+    const therapistSlug = link.searchParams.get("therapist");
+    check(!therapistSlug || publicTherapistNames.has(therapistSlug), `${context} preserved an unavailable therapist`);
+  }
+}
+
+function checkTherapistSelectionSafety(html, context) {
   const visible = visibleMarkup(html);
   check(
-    !/name=["']therapist["']/i.test(visible),
-    `${context} contains a therapist selection control`,
+    !/name=["'](?:assignedStaffId|staffId|therapistEmail|notificationEmail)["']/i.test(
+      visible,
+    ),
+    `${context} exposes a private or privileged therapist field`,
   );
   check(
-    !/therapist[ -]preference/i.test(visible),
-    `${context} asks for a therapist preference`,
+    !/assignedStaffId|notificationEmail/i.test(visible),
+    `${context} renders private therapist data`,
   );
-  check(
-    !/(?:\?|&amp;|&)therapist=/i.test(visible),
-    `${context} contains a therapist booking query`,
-  );
+  for (const control of visible.matchAll(
+    /<input\b[^>]*name=["']therapistId["'][^>]*>/gi,
+  )) {
+    check(/\srequired(?:=|\s|>)/i.test(control[0]), `${context} has an optional therapist choice`);
+  }
 }
 
 async function request(path, init = {}) {
@@ -284,16 +313,26 @@ check(
   !/>\s*Buy(?: now| voucher)?\s*</i.test(homeMarkup),
   "Homepage voucher section contains an online buying action",
 );
-checkNoTherapistSelection(pages.get("/book") ?? "", "Booking page");
-checkNoTherapistSelection(pages.get("/contact") ?? "", "Contact page");
-const teamMarkup = pages.get("/therapists") ?? "";
-if (!teamMarkup.includes('id="team-heading"')) {
-  check(
-    /<meta[^>]+name="robots"[^>]+content="noindex, nofollow"/i.test(
-      teamMarkup,
-    ),
-    "Empty team page must be noindex, nofollow",
-  );
+const bookingMarkup = pages.get("/book") ?? "";
+checkTherapistSelectionSafety(bookingMarkup, "Booking page");
+checkTherapistSelectionSafety(pages.get("/contact") ?? "", "Contact page");
+check(
+  /name=["']therapistId["']/i.test(bookingMarkup) ||
+    bookingMarkup.includes("No therapist is available for this treatment yet."),
+  "Booking page neither offers a required therapist choice nor explains therapist unavailability",
+);
+const selectedTherapistLabel = [...visibleMarkup(bookingMarkup).matchAll(/<label\b[^>]*>[\s\S]*?<\/label>/gi)]
+  .map((match) => match[0])
+  .find((label) => /<input\b(?=[^>]*name="therapistId")(?=[^>]*\schecked(?:=|\s|>))[^>]*>/i.test(label));
+const selectedTherapistName = selectedTherapistLabel
+  ? decodeAttribute(capture(selectedTherapistLabel, /<strong[^>]*>([^<]+)<\/strong>/i)).trim()
+  : "";
+const defaultTherapistLink = [...visibleMarkup(bookingMarkup).matchAll(/href="([^"]+)"/gi)]
+  .map((match) => new URL(decodeAttribute(match[1]), baseUrl))
+  .find((url) => url.pathname === "/contact" && url.searchParams.has("therapist"));
+const defaultTherapistSlug = defaultTherapistLink?.searchParams.get("therapist") ?? "";
+if (defaultTherapistSlug && selectedTherapistName) {
+  publicTherapistNames.set(defaultTherapistSlug, selectedTherapistName);
 }
 const bookingStatusMarkup = pages.get("/book/status") ?? "";
 check(
@@ -303,8 +342,10 @@ check(
   "Booking status page must be noindex, nofollow",
 );
 check(
-  !/(?:href|action)="[^"]*(?:\?|&amp;|&)therapist=/i.test(renderedSource),
-  "Rendered site contains a link that preselects a therapist",
+  !/(?:href|action)="[^"]*(?:\?|&amp;|&)(?:assignedStaffId|staffId|notificationEmail)=/i.test(
+    renderedSource,
+  ),
+  "Rendered site contains a link with private therapist data",
 );
 for (const obsolete of [
   ["Siam", "Harmony"].join(" "),
@@ -407,7 +448,7 @@ if (validContact) {
       `Valid contact handoff is missing: ${expected}`,
     );
   }
-  checkNoTherapistSelection(validContact.body, "Valid contact handoff");
+  checkTherapistSelectionSafety(validContact.body, "Valid contact handoff");
   const canonical = decodeAttribute(
     capture(
       validContact.body,
@@ -417,8 +458,9 @@ if (validContact) {
   check(new URL(canonical).pathname === "/contact", "Contact query canonical is incorrect");
 }
 
+const handoffTherapistSlug = defaultTherapistSlug || "unavailable-therapist";
 const legacyContact = await request(
-  "/contact?service=hot-oil-massage&duration=90&therapist=waen",
+  `/contact?service=hot-oil-massage&duration=90&therapist=${encodeURIComponent(handoffTherapistSlug)}`,
 );
 if (legacyContact) {
   for (const expected of [
@@ -426,18 +468,14 @@ if (legacyContact) {
     "Hot Oil Massage",
     "1 hr 30 min",
     "€95",
-    "/book?service=hot-oil-massage&amp;duration=90",
   ]) {
     check(
       legacyContact.body.includes(expected),
       `Legacy contact URL did not preserve service and duration: ${expected}`,
     );
   }
-  check(
-    !visibleMarkup(legacyContact.body).includes("Waen"),
-    "Legacy contact therapist query was displayed",
-  );
-  checkNoTherapistSelection(legacyContact.body, "Legacy contact URL");
+  checkAppointmentHandoff(legacyContact.body, "/book", "Therapist contact URL");
+  checkTherapistSelectionSafety(legacyContact.body, "Therapist contact URL");
 }
 
 const invalidMarker = "NOT_ALLOWED_ABC";
@@ -467,13 +505,8 @@ if (validBook) {
     /name="duration" checked="" value="90"/.test(validBook.body),
     "Booking duration query was not preselected",
   );
-  check(
-    /\/contact\?service=hot-oil-massage&amp;duration=90#appointment-request/.test(
-      validBook.body,
-    ),
-    "Booking contact handoff does not preserve service and duration",
-  );
-  checkNoTherapistSelection(validBook.body, "Valid booking URL");
+  checkAppointmentHandoff(validBook.body, "/contact", "Booking contact handoff");
+  checkTherapistSelectionSafety(validBook.body, "Valid booking URL");
   for (const privateField of [
     "customerName",
     "phone",
@@ -489,7 +522,7 @@ if (validBook) {
 }
 
 const legacyBook = await request(
-  "/book?service=hot-oil-massage&duration=90&therapist=waen",
+  `/book?service=hot-oil-massage&duration=90&therapist=${encodeURIComponent(handoffTherapistSlug)}`,
 );
 if (legacyBook) {
   check(
@@ -500,17 +533,8 @@ if (legacyBook) {
     /name="duration" checked="" value="90"/.test(legacyBook.body),
     "Legacy booking URL did not preserve the duration",
   );
-  check(
-    /\/contact\?service=hot-oil-massage&amp;duration=90#appointment-request/.test(
-      legacyBook.body,
-    ),
-    "Legacy booking URL did not produce a service-and-duration-only handoff",
-  );
-  check(
-    !visibleMarkup(legacyBook.body).includes("Waen"),
-    "Legacy booking therapist query was displayed",
-  );
-  checkNoTherapistSelection(legacyBook.body, "Legacy booking URL");
+  checkAppointmentHandoff(legacyBook.body, "/contact", "Therapist booking URL");
+  checkTherapistSelectionSafety(legacyBook.body, "Therapist booking URL");
 }
 
 const invalidBook = await request(
@@ -525,7 +549,7 @@ if (invalidBook) {
     !/name="duration" checked="" value="90"/.test(invalidBook.body),
     "Malformed booking duration was accepted",
   );
-  checkNoTherapistSelection(invalidBook.body, "Invalid booking URL");
+  checkTherapistSelectionSafety(invalidBook.body, "Invalid booking URL");
 }
 
 const internalTargets = new Set();
@@ -594,7 +618,10 @@ if (sitemap) {
   check(!sitemap.body.includes("/cms"), "Sitemap contains a CMS route");
   check(!sitemap.body.includes("/api/"), "Sitemap contains an API route");
   check(!sitemap.body.includes("/book/status"), "Sitemap contains booking status");
-  check(!sitemap.body.includes("/therapists"), "Sitemap contains the team page");
+  check(
+    !sitemap.body.includes("/therapists"),
+    "Sitemap contains the removed therapist pages",
+  );
   const promotionsArePublished =
     (pages.get("/promotions") ?? "").includes('id="current-offers-heading"');
   check(
@@ -605,7 +632,6 @@ if (sitemap) {
   for (const route of publicRoutes.filter(
     (route) =>
       route !== "/book/status" &&
-      route !== "/therapists" &&
       route !== "/promotions",
   )) {
     check(
@@ -755,7 +781,7 @@ check(!homeResponse.headers.has("x-powered-by"), "X-Powered-By header is exposed
 
 for (const [source, destination] of [
   ["/services/back-neck-shoulder-massage", "/services/neck-shoulder-upper-back-massage"],
-  ["/masseuses", "/therapists"],
+  ["/masseuses", "/book"],
 ]) {
   const result = await request(source, { redirect: "manual" });
   if (result) {
@@ -768,6 +794,13 @@ for (const [source, destination] of [
       new URL(location, baseUrl).pathname === destination,
       `${source} redirects to ${location}`,
     );
+  }
+}
+
+for (const removedPath of ["/therapists", "/therapists/siriranee"]) {
+  const result = await request(removedPath, { redirect: "manual" });
+  if (result) {
+    check(result.response.status === 404, `${removedPath} should return 404 after removal`);
   }
 }
 

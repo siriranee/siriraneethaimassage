@@ -6,6 +6,11 @@ import { getCmsContent } from "@/server/cms/content-service";
 export default async function CmsBookingSettingsPage() {
   await requireCmsPageUser("settings:write");
   const content = await getCmsContent();
+  const activeServiceIds = new Set(
+    content.services
+      .filter((service) => service.prices.some((price) => price.active))
+      .map((service) => service.id),
+  );
 
   return (
     <>
@@ -22,7 +27,17 @@ export default async function CmsBookingSettingsPage() {
         booking-email settings. Privacy, monitoring and recovery remain launch
         responsibilities.
       </CmsNotice>
-      <BookingSettingsForm openingHoursConfirmed={content.site.openingHoursConfirmed} settings={content.bookingSettings} />
+      <BookingSettingsForm
+        hasBookableTherapist={content.team.some(
+          (member) =>
+            member.publicProfile &&
+            member.operationalActive &&
+            !member.archived &&
+            member.serviceIds.some((serviceId) => activeServiceIds.has(serviceId)),
+        )}
+        openingHoursConfirmed={content.site.openingHoursConfirmed}
+        settings={content.bookingSettings}
+      />
     </>
   );
 }

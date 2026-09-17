@@ -23,6 +23,7 @@ import {
   shiftCalendarMonth,
 } from "@/domain/booking/calendar-month";
 import type { BookingStatus } from "@/domain/cms/types";
+import type { CmsBookingEmailAttention } from "@/domain/cms/notification-presentation";
 
 import styles from "./CmsCalendar.module.css";
 
@@ -34,12 +35,15 @@ export type CmsCalendarBooking = {
   readonly hasCustomerEmail: boolean;
   readonly customerNotes: string;
   readonly serviceName: string;
+  readonly assignedStaffId: string;
+  readonly therapistName: string;
   readonly durationMinutes: number;
   readonly localDate: string;
   readonly localTime: string;
   readonly status: BookingStatus;
   readonly version: number;
   readonly demo: boolean;
+  readonly emailAttention?: CmsBookingEmailAttention;
 };
 
 export type CmsCalendarClosure = {
@@ -427,6 +431,10 @@ export function CmsCalendar({
                           </small>
                           <dl className={styles.agendaBookingDetails}>
                             <div>
+                              <dt>Therapist</dt>
+                              <dd>{booking.therapistName || "Unassigned"}</dd>
+                            </div>
+                            <div>
                               <dt>Phone</dt>
                               <dd>{booking.customerPhone}</dd>
                             </div>
@@ -443,6 +451,7 @@ export function CmsCalendar({
                         {canManageBookings ? (
                           <CmsBookingQuickActions
                             booking={booking}
+                            emailAttention={booking.emailAttention}
                             hasCustomerEmail={booking.hasCustomerEmail}
                             isMock={booking.demo}
                             key={`${booking.id}:${booking.version}`}

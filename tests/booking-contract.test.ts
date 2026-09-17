@@ -7,26 +7,46 @@ async function source(path: string) {
   return readFile(resolve(process.cwd(), path), "utf8");
 }
 
-test("customer booking controls never expose therapist selection", async () => {
-  const [planner, bookPage, contactPage] = await Promise.all([
-    source("src/components/booking/BookingPlanner.tsx"),
-    source("src/app/(site)/book/page.tsx"),
-    source("src/app/(site)/contact/page.tsx"),
-  ]);
-  const customerSource = [planner, bookPage, contactPage].join("\n");
+function assertEmailDispatchFollowsSave(route: string, saveFunction: string) {
+  const savePosition = route.indexOf(`await ${saveFunction}(`);
+  const dispatchPosition = route.indexOf("await dispatchBookingMutationEmails(");
+  assert.ok(savePosition >= 0, `Missing awaited ${saveFunction} call`);
+  assert.ok(dispatchPosition > savePosition, "Email dispatch must follow the awaited booking save");
+  assert.match(route.slice(dispatchPosition), /\.\.\.emails/);
+}
 
-  assert.doesNotMatch(customerSource, /name=["']therapist["']/i);
-  assert.doesNotMatch(customerSource, /[?&]therapist=/i);
-  assert.doesNotMatch(customerSource, /therapist[ -]preference/i);
+test("customer booking requires an eligible therapist and supports profile deep links", async () => {
+  const [planner, calendar, bookPage, publicConfig] = await Promise.all([
+    source("src/components/booking/BookingPlanner.tsx"),
+    source("src/components/booking/BookingCalendar.tsx"),
+    source("src/app/(site)/book/page.tsx"),
+    source("src/server/booking/public-config.ts"),
+  ]);
+
+  assert.match(planner, /name="therapistId"/);
+  assert.match(planner, /required/);
+  assert.match(planner, /eligibleTherapists/);
+  assert.match(planner, /therapist\.serviceIds\.includes\(selectedService\.id\)/);
+  assert.match(planner, /therapistId:\s*selectedTherapist\.id/);
+  assert.match(planner, /requestedTherapistBySlug\.serviceIds\.includes\(service\.id\)/);
+  assert.match(planner, /Choose a therapist before selecting a day and time\./);
+  assert.match(calendar, /Choose a therapist to see available days\./);
+  assert.match(calendar, /!hasRequiredSelection/);
+  assert.match(bookPage, /readonly therapist\?: string \| string\[\]/);
+  assert.match(bookPage, /initialTherapistSlug/);
+  assert.match(bookPage, /therapists=\{plannerData\.therapists\}/);
+  assert.match(publicConfig, /member\.publicProfile/);
+  assert.match(publicConfig, /member\.operationalActive/);
+  assert.match(publicConfig, /!member\.archived/);
+  assert.doesNotMatch(publicConfig, /notificationEmail/);
 });
 
-test("public booking rejects privileged fields and stores no staff assignment", async () => {
+test("public booking accepts only a validated public therapist assignment", async () => {
   const booking = await source("src/server/booking/public-booking.ts");
 
   for (const field of [
     "assignedStaffId",
     "therapist",
-    "therapistId",
     "staffId",
     "calendarId",
     "price",
@@ -34,12 +54,20 @@ test("public booking rejects privileged fields and stores no staff assignment", 
   ]) {
     assert.match(booking, new RegExp(`"${field}"`));
   }
-  assert.match(booking, /assignedStaffId:\s*""/);
+  assert.match(booking, /text\(source\.therapistId, "therapistId"/);
+  assert.match(booking, /member\.id === therapistId/);
+  assert.match(booking, /member\.publicProfile/);
+  assert.match(booking, /member\.operationalActive/);
+  assert.match(booking, /!member\.archived/);
+  assert.match(booking, /member\.serviceIds\.includes\(service\.id\)/);
+  assert.match(booking, /assignedStaffId:\s*therapist\.id/);
+  assert.match(booking, /assignedStaffName:\s*therapist\.name/);
+  assert.match(booking, /therapistId:\s*therapist\.id/);
   assert.match(booking, /requestFingerprintHash/);
   assert.match(booking, /privacyNoticeVersion:\s*bookingPrivacyNotice\.version/);
 });
 
-test("booking management surfaces do not offer staff assignment", async () => {
+test("booking management surfaces support therapist assignment and visibility", async () => {
   const files = await Promise.all([
     source("src/components/cms/AdminBookingForm.tsx"),
     source("src/components/cms/BookingEditorForm.tsx"),
@@ -51,9 +79,11 @@ test("booking management surfaces do not offer staff assignment", async () => {
   ]);
   const managementSource = files.join("\n");
 
-  assert.doesNotMatch(managementSource, /assignedStaffId/);
-  assert.doesNotMatch(managementSource, /assigned staff/i);
-  assert.doesNotMatch(managementSource, /unassigned/i);
+  assert.match(managementSource, /name="therapistId"/);
+  assert.match(managementSource, /assignedStaffId/);
+  assert.match(managementSource, /assignedStaffName/);
+  assert.match(managementSource, /Massage therapist/);
+  assert.match(managementSource, /Unassigned/);
 });
 
 test("CMS booking views use cards with accessible icon-only status actions", async () => {
@@ -129,12 +159,19 @@ test("booking filters fold safely and administrators can permanently delete a bo
   assert.match(repository, /deleteBooking\(id: string, expectedVersion: number\)/);
 });
 
-test("public team profiles remain informational and have no assignment control", async () => {
-  const teamPage = await source("src/app/(site)/therapists/page.tsx");
+test("public booking therapist data excludes private contact details", async () => {
+  const [adapter, publicTypes] = await Promise.all([
+    source("src/server/cms/public-adapter.ts"),
+    source("src/domain/public-site.ts"),
+  ]);
 
-  assert.match(teamPage, /getPublicTeam/);
-  assert.doesNotMatch(teamPage, /assignedStaffId|operationalActive/);
-  assert.doesNotMatch(teamPage, /name=["']therapist["']|therapist[ -]preference/i);
+  const publicTeamMapper = adapter.slice(
+    adapter.indexOf("export const getPublicTeam"),
+    adapter.indexOf("export const getPublicPromotions"),
+  );
+  assert.match(publicTeamMapper, /member\.publicProfile && !member\.archived/);
+  assert.doesNotMatch(publicTeamMapper, /notificationEmail/);
+  assert.doesNotMatch(publicTypes, /notificationEmail/);
 });
 
 test("booking settings use the API response contract and gate public enablement", async () => {
@@ -165,17 +202,48 @@ test("booking settings use the API response contract and gate public enablement"
   );
 });
 
-test("booking mutations reject assignment fields and unsafe initial statuses", async () => {
+test("booking mutations validate therapist assignment and unsafe initial statuses", async () => {
   const service = await source("src/server/cms/booking-service.ts");
 
   assert.match(service, /status !== "pending" && status !== "confirmed"/);
   assert.match(service, /canTransitionBookingStatus\(current\.status, status\)/);
-  for (const field of ["assignedStaffId", "staffId", "therapist", "therapistId"]) {
+  for (const field of ["assignedStaffId", "staffId", "therapist"]) {
     assert.match(service, new RegExp(`"${field}"`));
   }
   assert.match(service, /parseBookingInput[\s\S]*?assertNoStaffAssignment\(source\)/);
-  assert.match(service, /assignedStaffId:\s*""/);
-  assert.doesNotMatch(service, /assignedStaffId:\s*input\./);
+  assert.match(service, /therapistId:\s*optionalText\(source\.therapistId/);
+  assert.match(service, /member\.id === input\.therapistId/);
+  assert.match(service, /member\.operationalActive/);
+  assert.match(service, /member\.serviceIds\.includes\(input\.serviceId\)/);
+  assert.match(service, /assignedStaffId:\s*therapist\?\.id \?\? ""/);
+  assert.match(service, /status === "confirmed" && !therapist/);
+  assert.match(service, /assignmentChanged/);
+});
+
+test("therapist lifecycle checks use a bounded-data future assignment query", async () => {
+  const [contentService, repository, mongoRepository] = await Promise.all([
+    source("src/server/cms/content-service.ts"),
+    source("src/server/cms/repositories/repository.ts"),
+    source("src/server/cms/repositories/mongo-repository.ts"),
+  ]);
+
+  assert.match(repository, /listFutureActiveTherapistBookings/);
+  assert.match(contentService, /transaction\.listFutureActiveTherapistBookings/);
+  assert.doesNotMatch(
+    contentService,
+    /listBookings\(\{ therapistId: memberId \}\)/,
+  );
+
+  const futureQuery = mongoRepository.slice(
+    mongoRepository.indexOf("async listFutureActiveTherapistBookings"),
+    mongoRepository.indexOf("async getBooking", mongoRepository.indexOf("async listFutureActiveTherapistBookings")),
+  );
+  assert.match(futureQuery, /assignedStaffId: therapistId/);
+  assert.match(futureQuery, /endsAt: \{ \$gt: afterIso \}/);
+  assert.match(futureQuery, /status: "confirmed"/);
+  assert.match(futureQuery, /status: "pending"/);
+  assert.match(futureQuery, /projection: \{ _id: 0, reference: 1, serviceId: 1 \}/);
+  assert.doesNotMatch(futureQuery, /decodeBooking|customerEncrypted|\.limit\(/);
 });
 
 test("customer confirmation email is dispatched after commit with safe CMS feedback and retry controls", async () => {
@@ -215,16 +283,12 @@ test("customer confirmation email is dispatched after commit with safe CMS feedb
     bookingService,
     /attemptCustomerBookingConfirmationEmail/,
   );
-  assert.ok(
-    updateRoute.indexOf("await updateAdminBooking(") <
-      updateRoute.indexOf("await attemptCustomerBookingConfirmationEmail("),
+  assertEmailDispatchFollowsSave(updateRoute, "updateAdminBooking");
+  assertEmailDispatchFollowsSave(createRoute, "createAdminBooking");
+  assert.match(
+    notifications.slice(notifications.indexOf("export async function dispatchBookingMutationEmails")),
+    /confirmationEmail[\s\S]*await attemptCustomerBookingConfirmationEmail\(repository, booking/,
   );
-  assert.ok(
-    createRoute.indexOf("await createAdminBooking(") <
-      createRoute.indexOf("await attemptCustomerBookingConfirmationEmail("),
-  );
-  assert.match(updateRoute, /confirmationEmail/);
-  assert.match(createRoute, /confirmationEmail/);
   assert.match(adminForm, /"Idempotency-Key": idempotencyKeyRef\.current/);
   assert.match(createRoute, /request\.headers\.get\("idempotency-key"\)/);
   assert.match(
@@ -235,7 +299,7 @@ test("customer confirmation email is dispatched after commit with safe CMS feedb
     notifications,
     /customerBookingConfirmationEmailNotificationId\(booking\.id\)/,
   );
-  assert.match(notifications, /repository\.mode === "mock" && !options\.sender/);
+  assert.match(notifications, /\(repository\.mode === "mock" \|\| booking\.demo\) && !options\.sender/);
 
   assert.match(retryRoute, /isSameOriginMutation\(request\)/);
   assert.match(retryRoute, /requireCmsApiUser\("bookings:write"\)/);
@@ -298,11 +362,11 @@ test("customer cancellation email is dispatched after commit with distinct retry
     bookingService,
     /attemptCustomerBookingCancellationEmail/,
   );
-  assert.ok(
-    updateRoute.indexOf("await updateAdminBooking(") <
-      updateRoute.indexOf("await attemptCustomerBookingCancellationEmail("),
+  assertEmailDispatchFollowsSave(updateRoute, "updateAdminBooking");
+  assert.match(
+    notifications.slice(notifications.indexOf("export async function dispatchBookingMutationEmails")),
+    /cancellationEmail[\s\S]*await attemptCustomerBookingCancellationEmail\(repository, booking/,
   );
-  assert.match(updateRoute, /cancellationEmail/);
   assert.match(
     notifications,
     /customerBookingCancellationEmailNotificationId\(booking\.id\)/,
@@ -333,9 +397,9 @@ test("customer cancellation email is dispatched after commit with distinct retry
   assert.match(bookingDetailPage, /Customer cancellation email/);
   assert.match(
     bookingDetailPage,
-    /canRetryCustomerBookingCancellationEmail\(notification\)/,
+    /canRetryBookingEmailNotification\(notification\)/,
   );
-  assert.match(bookingDetailPage, /kind="cancellation"/);
+  assert.match(bookingDetailPage, /notificationId=\{notification\.id\}/);
 });
 
 test("contact handoff resolves service and price from the published snapshot", async () => {

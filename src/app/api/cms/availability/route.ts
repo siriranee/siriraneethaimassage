@@ -14,6 +14,7 @@ export async function GET(request: Request) {
       serviceId: url.searchParams.get("serviceId") ?? "",
       durationMinutes: Number(url.searchParams.get("durationMinutes")),
       localDate: url.searchParams.get("localDate") ?? "",
+      therapistId: url.searchParams.get("therapistId") ?? undefined,
     });
     return cmsNoStoreJson({ slots });
   } catch (error) {

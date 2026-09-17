@@ -10,7 +10,9 @@ import {
   type CmsPromotionRecord,
   type CmsServiceRecord,
   type CmsSiteSettings,
+  type CmsTeamEditorRecord,
   type CmsTeamRecord,
+  type CmsTherapistContact,
   type CmsUser,
   type CmsVoucherRecord,
 } from "@/domain/cms/types";
@@ -34,6 +36,8 @@ import {
   parseServiceUpdate,
   parseSiteSettingsUpdate,
   parseTeamCreate,
+  parseTherapistContactPhone,
+  parseTherapistNotificationEmail,
   parseTeamUpdate,
   parseVoucherCreate,
   parseVoucherUpdate,
@@ -271,6 +275,117 @@ export async function getCmsContent() {
   return normaliseCmsContent(await getCmsRepository().getContent());
 }
 
+function normaliseStoredStringList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const values: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const parsed = item.trim();
+    const key = parsed.toLocaleLowerCase("en-IE");
+    if (!parsed || seen.has(key)) continue;
+    seen.add(key);
+    values.push(parsed);
+  }
+  return values;
+}
+
+function normaliseTeamSlug(value: unknown, fallback: string) {
+  const candidate = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (
+    candidate.length >= 2 &&
+    candidate.length <= 100 &&
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(candidate)
+  ) {
+    return candidate;
+  }
+
+  const safeFallback = fallback
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90)
+    .replace(/-+$/g, "");
+  return safeFallback.length >= 2 ? safeFallback : "therapist";
+}
+
+function normaliseTeamRecords(
+  records: readonly CmsTeamRecord[] | undefined,
+  validServiceIds: readonly string[],
+) {
+  const allowedServices = new Set(validServiceIds);
+  const usedSlugs = new Set<string>();
+
+  return (records ?? []).map((member, index): CmsTeamRecord => {
+    const stored = member as CmsTeamRecord & {
+      readonly slug?: unknown;
+      readonly shortBio?: unknown;
+      readonly biography?: unknown;
+      readonly imageUrl?: unknown;
+      readonly imageAlt?: unknown;
+      readonly specialties?: unknown;
+      readonly languages?: unknown;
+      readonly serviceIds?: unknown;
+    };
+    const id = typeof stored.id === "string" ? stored.id : `therapist-${index + 1}`;
+    const name = typeof stored.name === "string" ? stored.name : "Therapist";
+    const baseSlug = normaliseTeamSlug(stored.slug, id || name);
+    let slug = baseSlug;
+    let suffix = 2;
+    while (usedSlugs.has(slug)) {
+      slug = `${baseSlug.slice(0, 95)}-${suffix}`;
+      suffix += 1;
+    }
+    usedSlugs.add(slug);
+
+    const serviceIds = normaliseStoredStringList(stored.serviceIds).filter(
+      (serviceId) => allowedServices.has(serviceId),
+    );
+    const archived = stored.archived === true;
+
+    return {
+      id,
+      slug,
+      name,
+      fullName:
+        typeof stored.fullName === "string" && stored.fullName.trim()
+          ? stored.fullName.trim()
+          : name,
+      publicRole:
+        typeof stored.publicRole === "string" && stored.publicRole.trim()
+          ? stored.publicRole.trim()
+          : "Massage therapist",
+      shortBio:
+        typeof stored.shortBio === "string" ? stored.shortBio.trim() : "",
+      biography:
+        typeof stored.biography === "string" ? stored.biography.trim() : "",
+      imageUrl:
+        typeof stored.imageUrl === "string" ? stored.imageUrl.trim() : "",
+      imageAlt:
+        typeof stored.imageAlt === "string" ? stored.imageAlt.trim() : "",
+      specialties: normaliseStoredStringList(stored.specialties),
+      languages: normaliseStoredStringList(stored.languages),
+      serviceIds,
+      publicProfile: !archived && stored.publicProfile === true,
+      operationalActive:
+        !archived && stored.operationalActive === true && serviceIds.length > 0,
+      archived,
+      sortOrder:
+        Number.isInteger(stored.sortOrder) && stored.sortOrder >= 0
+          ? stored.sortOrder
+          : index,
+      version:
+        Number.isInteger(stored.version) && stored.version >= 1
+          ? stored.version
+          : 1,
+      updatedAt:
+        typeof stored.updatedAt === "string" ? stored.updatedAt : "",
+    };
+  });
+}
+
 function normaliseCmsContent(content: CmsContentState): CmsContentState {
   const defaults = createDefaultContentState();
   const storedSchemaVersion = Number.isInteger(content.schemaVersion)
@@ -344,6 +459,10 @@ function normaliseCmsContent(content: CmsContentState): CmsContentState {
       updatedAt: stored.updatedAt,
     };
   });
+  const team = normaliseTeamRecords(
+    content.team,
+    services.map((service) => service.id),
+  );
 
   return {
     id: "siriranee-content",
@@ -366,7 +485,7 @@ function normaliseCmsContent(content: CmsContentState): CmsContentState {
         : content.site.whatsappNumber,
     },
     bookingSettings: content.bookingSettings,
-    team: content.team,
+    team,
     promotions: content.promotions,
     vouchers,
     updatedAt: content.updatedAt,
@@ -536,6 +655,25 @@ export async function updateCmsBookingSettings(
         current.bookingSettings,
         current.site.openingHoursConfirmed,
       );
+      const activeServiceIds = new Set(
+        current.services
+          .filter((service) => service.prices.some((price) => price.active))
+          .map((service) => service.id),
+      );
+      if (
+        updated.publicBookingEnabled &&
+        !current.team.some(
+          (member) =>
+            member.publicProfile &&
+            member.operationalActive &&
+            !member.archived &&
+            member.serviceIds.some((serviceId) => activeServiceIds.has(serviceId)),
+        )
+      ) {
+        throw new CmsValidationError(
+          "Add and enable at least one public therapist before enabling online booking.",
+        );
+      }
       return {
         ...current,
         revision: current.revision + 1,
@@ -550,72 +688,251 @@ export async function updateCmsBookingSettings(
   return updated!;
 }
 
+function teamEditorRecord(
+  member: CmsTeamRecord,
+  contact: CmsTherapistContact | null,
+): CmsTeamEditorRecord {
+  return {
+    ...member,
+    notificationEmail: contact?.notificationEmail ?? "",
+    contactPhone: contact?.contactPhone ?? "",
+    contactVersion: contact?.version ?? 0,
+  };
+}
+
+function teamInput(value: unknown) {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function assertUniqueTeamSlug(
+  team: readonly CmsTeamRecord[],
+  member: CmsTeamRecord,
+) {
+  if (
+    team.some(
+      (candidate) =>
+        candidate.id !== member.id &&
+        candidate.slug.toLocaleLowerCase("en-IE") ===
+          member.slug.toLocaleLowerCase("en-IE"),
+    )
+  ) {
+    throw new CmsValidationError(
+      "Another therapist already uses this profile URL.",
+      { slug: "Choose a unique therapist URL slug." },
+    );
+  }
+}
+
+export async function listCmsTeamEditorRecords(): Promise<
+  readonly CmsTeamEditorRecord[]
+> {
+  const repository = getCmsRepository();
+  const content = normaliseCmsContent(await repository.getContent());
+  const contacts = await Promise.all(
+    content.team.map((member) => repository.getTherapistContact(member.id)),
+  );
+  return content.team.map((member, index) =>
+    teamEditorRecord(member, contacts[index] ?? null),
+  );
+}
+
+export async function getCmsTeamEditorRecord(
+  memberId: string,
+): Promise<CmsTeamEditorRecord | null> {
+  const repository = getCmsRepository();
+  const content = normaliseCmsContent(await repository.getContent());
+  const member = content.team.find((candidate) => candidate.id === memberId);
+  if (!member) return null;
+  return teamEditorRecord(
+    member,
+    await repository.getTherapistContact(member.id),
+  );
+}
+
 export async function updateCmsTeamMember(
   memberId: string,
   input: unknown,
   expectedVersion: number,
   context: MutationContext,
-): Promise<CmsTeamRecord> {
-  let updated: CmsTeamRecord | null = null;
+): Promise<CmsTeamEditorRecord> {
+  const repository = getCmsRepository();
+  const source = teamInput(input);
 
-  await mutateContent(
-    context,
-    "team.updated",
-    "team-member",
-    memberId,
-    "Updated a public team profile.",
-    (current) => {
-      const existing = current.team.find((member) => member.id === memberId);
+  return repository.transaction(async (transaction) => {
+    await transaction.lockTherapist(memberId);
+    const storedCurrent = await transaction.getContent();
+    const current = normaliseCmsContent(storedCurrent);
+    const existing = current.team.find((member) => member.id === memberId);
+    if (!existing) throw new Error("Team member not found.");
+    if (existing.version !== expectedVersion) throw new CmsConflictError();
 
-      if (!existing) throw new Error("Team member not found.");
-      if (existing.version !== expectedVersion) {
-        throw new Error("This team profile was changed by another request.");
-      }
+    const currentContact = await transaction.getTherapistContact(memberId);
+    const suppliedContactVersion = Number(source.expectedContactVersion);
+    if (
+      source.expectedContactVersion !== undefined &&
+      (!Number.isInteger(suppliedContactVersion) ||
+        suppliedContactVersion !== (currentContact?.version ?? 0))
+    ) {
+      throw new CmsConflictError("This therapist contact was changed by another request.");
+    }
 
-      updated = parseTeamUpdate(input, existing);
-      return {
-        ...current,
-        revision: current.revision + 1,
-        team: current.team.map((member) =>
-          member.id === memberId ? updated! : member,
-        ),
-        updatedAt: new Date().toISOString(),
-        updatedBy: context.actor.id,
-      };
-    },
-    { section: "team", entityId: memberId },
-  );
+    const notificationEmail = parseTherapistNotificationEmail(
+      source.notificationEmail,
+      currentContact?.notificationEmail ?? "",
+    );
+    const contactPhone = parseTherapistContactPhone(
+      source.contactPhone,
+      currentContact?.contactPhone ?? "",
+    );
+    const updated = parseTeamUpdate(input, existing, {
+      notificationEmail,
+      validServiceIds: current.services.map((service) => service.id),
+    });
+    assertUniqueTeamSlug(current.team, updated);
+    const now = new Date().toISOString();
+    const futureAssignedBookings =
+      await transaction.listFutureActiveTherapistBookings(
+        memberId,
+        now,
+      );
+    const invalidatedBooking = futureAssignedBookings.find(
+      (booking) =>
+        updated.archived ||
+        !updated.operationalActive ||
+        !updated.serviceIds.includes(booking.serviceId),
+    );
+    if (invalidatedBooking) {
+      throw new CmsConflictError(
+        `Reassign future booking ${invalidatedBooking.reference} before deactivating, archiving or removing this therapist's treatment eligibility.`,
+      );
+    }
 
-  return updated!;
+    const next: CmsContentState = {
+      ...current,
+      revision: current.revision + 1,
+      team: current.team.map((member) =>
+        member.id === memberId ? updated : member,
+      ),
+      updatedAt: now,
+      updatedBy: context.actor.id,
+    };
+    const contactChanged =
+      (source.notificationEmail !== undefined &&
+        notificationEmail !== (currentContact?.notificationEmail ?? "")) ||
+      (source.contactPhone !== undefined &&
+        contactPhone !== (currentContact?.contactPhone ?? ""));
+    const nextContact: CmsTherapistContact | null = contactChanged
+      ? {
+          id: memberId,
+          notificationEmail,
+          contactPhone,
+          version: (currentContact?.version ?? 0) + 1,
+          updatedAt: now,
+          updatedBy: context.actor.id,
+        }
+      : currentContact;
+
+    await commitCmsMediaForContentMutation(transaction, {
+      current,
+      next,
+      submission: context.mediaSubmission,
+      actor: context.actor,
+      requestId: context.requestId,
+    });
+    await transaction.saveContent(next, storedCurrent.revision);
+    if (contactChanged && nextContact) {
+      await transaction.saveTherapistContact(
+        nextContact,
+        currentContact?.version,
+      );
+    }
+    await publishContentImmediately(
+      transaction,
+      next,
+      { section: "team", entityId: memberId },
+      context,
+    );
+    await appendCmsAudit(transaction, {
+      actor: context.actor,
+      action: "team.updated",
+      entityType: "team-member",
+      entityId: memberId,
+      summary: "Updated a therapist record and booking settings.",
+      requestId: context.requestId,
+    });
+
+    return teamEditorRecord(updated, nextContact);
+  });
 }
 
 export async function createCmsTeamMember(
   input: unknown,
   context: MutationContext,
-): Promise<CmsTeamRecord> {
-  let created: CmsTeamRecord | null = null;
+): Promise<CmsTeamEditorRecord> {
   const memberId = randomUUID();
+  const repository = getCmsRepository();
+  const source = teamInput(input);
 
-  await mutateContent(
-    context,
-    "team.created",
-    "team-member",
-    memberId,
-    "Created and published a new team profile.",
-    (current) => {
-      created = parseTeamCreate(input, memberId);
-      return {
-        ...current,
-        revision: current.revision + 1,
-        team: [...current.team, created],
-        updatedAt: new Date().toISOString(),
-        updatedBy: context.actor.id,
-      };
-    },
-    { section: "team", entityId: memberId },
-  );
+  return repository.transaction(async (transaction) => {
+    const storedCurrent = await transaction.getContent();
+    const current = normaliseCmsContent(storedCurrent);
+    const notificationEmail = parseTherapistNotificationEmail(
+      source.notificationEmail,
+    );
+    const contactPhone = parseTherapistContactPhone(source.contactPhone);
+    const created = parseTeamCreate(input, memberId, {
+      notificationEmail,
+      validServiceIds: current.services.map((service) => service.id),
+    });
+    assertUniqueTeamSlug(current.team, created);
 
-  return created!;
+    const now = new Date().toISOString();
+    const next: CmsContentState = {
+      ...current,
+      revision: current.revision + 1,
+      team: [...current.team, created],
+      updatedAt: now,
+      updatedBy: context.actor.id,
+    };
+    const contact: CmsTherapistContact | null = notificationEmail || contactPhone
+      ? {
+          id: memberId,
+          notificationEmail,
+          contactPhone,
+          version: 1,
+          updatedAt: now,
+          updatedBy: context.actor.id,
+        }
+      : null;
+
+    await commitCmsMediaForContentMutation(transaction, {
+      current,
+      next,
+      submission: context.mediaSubmission,
+      actor: context.actor,
+      requestId: context.requestId,
+    });
+    await transaction.saveContent(next, storedCurrent.revision);
+    if (contact) await transaction.saveTherapistContact(contact);
+    await publishContentImmediately(
+      transaction,
+      next,
+      { section: "team", entityId: memberId },
+      context,
+    );
+    await appendCmsAudit(transaction, {
+      actor: context.actor,
+      action: "team.created",
+      entityType: "team-member",
+      entityId: memberId,
+      summary: "Created and published a therapist record.",
+      requestId: context.requestId,
+    });
+
+    return teamEditorRecord(created, contact);
+  });
 }
 
 export async function createCmsPromotion(

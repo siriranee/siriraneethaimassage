@@ -32,6 +32,7 @@ export async function getPublicAvailability(input: {
   readonly serviceId: string;
   readonly durationMinutes: number;
   readonly localDate: string;
+  readonly therapistId: string;
 }) {
   const mode = getCmsMode();
 
@@ -53,11 +54,24 @@ export async function getPublicAvailability(input: {
       item.durationMinutes === input.durationMinutes &&
       item.active,
   );
+  const therapist = content.team.find(
+    (member) =>
+      member.id === input.therapistId &&
+      member.publicProfile &&
+      member.operationalActive &&
+      !member.archived &&
+      member.serviceIds.includes(input.serviceId),
+  );
 
-  if (!service || !price || !/^\d{4}-\d{2}-\d{2}$/.test(input.localDate)) {
+  if (
+    !service ||
+    !price ||
+    !therapist ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(input.localDate)
+  ) {
     return {
       status: mode === "mock" ? "planning" as const : "disabled" as const,
-      message: "Choose a published treatment, duration and valid date.",
+      message: "Choose an available treatment, therapist, duration and valid date.",
       slots: [],
     };
   }
@@ -80,6 +94,7 @@ export async function getPublicAvailability(input: {
   const slots = getAvailabilitySlots({
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
+    therapistId: therapist.id,
     settings: content.bookingSettings,
     weeklyHours: content.site.weeklyHours,
     closures,
@@ -107,6 +122,10 @@ export async function getPublicAvailability(input: {
       priceCents: price.priceCents,
       currency: "EUR" as const,
     },
+    therapist: {
+      id: therapist.id,
+      name: therapist.name,
+    },
     slots,
   };
 }
@@ -115,6 +134,7 @@ export async function getPublicAvailabilityCalendar(input: {
   readonly serviceId: string;
   readonly durationMinutes: number;
   readonly month: string;
+  readonly therapistId: string;
 }) {
   const mode = getCmsMode();
   const fallbackMinimumDate = currentDublinDate().toString();
@@ -140,6 +160,14 @@ export async function getPublicAvailabilityCalendar(input: {
       item.durationMinutes === input.durationMinutes &&
       item.active,
   );
+  const therapist = content.team.find(
+    (member) =>
+      member.id === input.therapistId &&
+      member.publicProfile &&
+      member.operationalActive &&
+      !member.archived &&
+      member.serviceIds.includes(input.serviceId),
+  );
   const firstDate = parseMonth(input.month);
   const now = Temporal.Now.instant();
   const minimumDate = now
@@ -151,10 +179,10 @@ export async function getPublicAvailabilityCalendar(input: {
   const liveReady = isLivePublicBookingReady(content);
   const status = liveReady ? "live" as const : "planning" as const;
 
-  if (!service || !price || !firstDate) {
+  if (!service || !price || !therapist || !firstDate) {
     return {
       status,
-      message: "Choose a published treatment, duration and valid calendar month.",
+      message: "Choose an available treatment, therapist, duration and valid calendar month.",
       month: input.month,
       minimumDate: minimumDate.toString(),
       maximumDate: maximumDate.toString(),
@@ -185,6 +213,7 @@ export async function getPublicAvailabilityCalendar(input: {
     const summary = classifyAvailabilityCalendarDay({
       localDate,
       durationMinutes: input.durationMinutes,
+      therapistId: therapist.id,
       settings: content.bookingSettings,
       weeklyHours: content.site.weeklyHours,
       closures,

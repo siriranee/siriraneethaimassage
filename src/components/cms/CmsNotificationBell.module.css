@@ -184,6 +184,35 @@
   margin-top: 0.2rem;
 }
 
+.itemCopy .currentStatus,
+.itemCopy .pendingStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 0.3rem;
+  margin: 0.2rem 0;
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.35rem;
+  background: var(--color-purple-50);
+  color: var(--color-purple-800);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.itemCopy .pendingStatus {
+  background: var(--color-gold-100);
+  color: var(--color-gold-text);
+}
+
+.pendingStatus svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.itemCopy .historyEvent {
+  margin-top: 0.15rem;
+}
+
 .emptyState {
   display: grid;
   justify-items: center;

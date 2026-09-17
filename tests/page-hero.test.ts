@@ -80,12 +80,6 @@ test("every shared inner-page hero points to a supplied wide image", async () =>
 });
 
 test("page hero content has no service-specific local fallback map", async () => {
-  const [heroes, therapistsPage] = await Promise.all([
-    source("src/content/page-heroes.ts"),
-    source("src/app/(site)/therapists/page.tsx"),
-  ]);
-
+  const heroes = await source("src/content/page-heroes.ts");
   assert.doesNotMatch(heroes, /serviceHeroImages|getServicePageHero/);
-  assert.match(therapistsPage, /\.\.\.pageHeroImages\.about/);
-  assert.doesNotMatch(therapistsPage, /traditional-thai-massage/);
 });

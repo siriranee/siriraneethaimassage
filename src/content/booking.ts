@@ -22,7 +22,8 @@ export const acuityConfig = {
 
 /**
  * Add only owner-confirmed Siriranee appointment identifiers.
- * Siriranee bookings do not include a therapist-selection step.
+ * The first-party booking flow handles therapist selection. These optional
+ * Acuity mappings only preselect an externally managed appointment type.
  * Empty mappings intentionally keep the public site in safe contact-only mode.
  */
 export const acuityAppointmentTypes: Readonly<

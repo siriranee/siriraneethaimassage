@@ -5,6 +5,7 @@ export type AppointmentSearchParams = {
   readonly duration?: QueryValue;
   readonly date?: QueryValue;
   readonly time?: QueryValue;
+  readonly therapist?: QueryValue;
 };
 
 export type AppointmentPreferenceInput = {
@@ -12,11 +13,13 @@ export type AppointmentPreferenceInput = {
   readonly durationMinutes: number;
   readonly preferredDate?: string;
   readonly preferredTime?: string;
+  readonly therapistSlug?: string;
 };
 
 export type AppointmentPreference = AppointmentPreferenceInput & {
   readonly serviceName: string;
   readonly priceEur: number;
+  readonly therapistName?: string;
 };
 
 const euroFormatter = new Intl.NumberFormat("en-IE", {
@@ -57,6 +60,7 @@ export function buildContactPreferenceHref({
   durationMinutes,
   preferredDate,
   preferredTime,
+  therapistSlug,
 }: AppointmentPreferenceInput) {
   const query = new URLSearchParams({
     service: serviceSlug,
@@ -68,6 +72,9 @@ export function buildContactPreferenceHref({
   if (preferredTime && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(preferredTime)) {
     query.set("time", preferredTime);
   }
+  if (therapistSlug && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(therapistSlug)) {
+    query.set("therapist", therapistSlug);
+  }
 
   return `/contact?${query.toString()}#appointment-request`;
 }
@@ -77,6 +84,7 @@ export function buildPlannerPreferenceHref({
   durationMinutes,
   preferredDate,
   preferredTime,
+  therapistSlug,
 }: AppointmentPreferenceInput) {
   const query = new URLSearchParams({
     service: serviceSlug,
@@ -84,6 +92,7 @@ export function buildPlannerPreferenceHref({
   });
   if (preferredDate) query.set("date", preferredDate);
   if (preferredTime) query.set("time", preferredTime);
+  if (therapistSlug) query.set("therapist", therapistSlug);
 
   return `/book?${query.toString()}`;
 }
@@ -95,6 +104,7 @@ export function parseAppointmentPreferenceInput(
   const durationValue = firstValue(searchParams.duration);
   const dateValue = firstValue(searchParams.date);
   const timeValue = firstValue(searchParams.time);
+  const therapistValue = firstValue(searchParams.therapist);
 
   if (
     typeof serviceSlug !== "string" ||
@@ -116,6 +126,11 @@ export function parseAppointmentPreferenceInput(
     preferredTime:
       typeof timeValue === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(timeValue)
         ? timeValue
+        : undefined,
+    therapistSlug:
+      typeof therapistValue === "string" &&
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(therapistValue)
+        ? therapistValue
         : undefined,
   };
 }
@@ -143,6 +158,9 @@ export function buildAppointmentWhatsAppUrl(
       : []),
     ...(preference.preferredTime
       ? [`Preferred time: ${preference.preferredTime} (Europe/Dublin)`]
+      : []),
+    ...(preference.therapistName
+      ? [`Preferred therapist: ${preference.therapistName}`]
       : []),
     "Please confirm whether this date and time is available.",
   ].join("\n");

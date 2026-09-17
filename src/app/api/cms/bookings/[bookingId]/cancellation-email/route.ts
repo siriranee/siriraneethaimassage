@@ -9,6 +9,7 @@ import { getCmsBooking } from "@/server/cms/read-service";
 import { getCmsRepository } from "@/server/cms/repositories";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type RouteContext = {
   readonly params: Promise<{ readonly bookingId: string }>;

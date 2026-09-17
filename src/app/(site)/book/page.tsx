@@ -7,7 +7,7 @@ import { PageHero } from "@/components/marketing/PageHero";
 import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
-import { getPublicBookingPlannerServices } from "@/server/booking/public-config";
+import { getPublicBookingPlannerData } from "@/server/booking/public-config";
 
 import styles from "./page.module.css";
 
@@ -26,6 +26,7 @@ type BookPageProps = {
     readonly duration?: string | string[];
     readonly date?: string | string[];
     readonly time?: string | string[];
+    readonly therapist?: string | string[];
   }>;
 };
 
@@ -35,14 +36,15 @@ function firstValue(value: string | string[] | undefined) {
 
 export default async function BookPage({ searchParams }: BookPageProps) {
   const pageCopy = getPageCopy("book");
-  const [query, plannerServices] = await Promise.all([
+  const [query, plannerData] = await Promise.all([
     searchParams,
-    getPublicBookingPlannerServices(),
+    getPublicBookingPlannerData(),
   ]);
   const initialServiceSlug = firstValue(query.service);
   const durationValue = firstValue(query.duration);
   const dateValue = firstValue(query.date);
   const timeValue = firstValue(query.time);
+  const initialTherapistSlug = firstValue(query.therapist);
   const initialDuration =
     typeof durationValue === "string" && /^\d{1,3}$/.test(durationValue)
       ? Number(durationValue)
@@ -68,10 +70,12 @@ export default async function BookPage({ searchParams }: BookPageProps) {
           </Link>
         </div>
         <BookingPlanner
-          services={plannerServices}
+          services={plannerData.services}
+          therapists={plannerData.therapists}
           initialDate={typeof dateValue === "string" ? dateValue : undefined}
           initialDuration={initialDuration}
           initialServiceSlug={initialServiceSlug}
+          initialTherapistSlug={initialTherapistSlug}
           initialTime={typeof timeValue === "string" ? timeValue : undefined}
         />
       </div>

@@ -134,6 +134,22 @@ function safeSlug(value: unknown, field = "slug") {
   return result;
 }
 
+function teamSlug(value: unknown, field = "slug") {
+  const result = typeof value === "string" ? value.trim().toLowerCase() : "";
+
+  if (
+    result.length < 2 ||
+    result.length > 100 ||
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(result)
+  ) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      [field]: "Use 2–100 lowercase letters, numbers and single hyphens.",
+    });
+  }
+
+  return result;
+}
+
 function optionalDate(value: unknown, field: string) {
   const result = typeof value === "string" ? value.trim() : "";
   if (result && !/^\d{4}-\d{2}-\d{2}$/.test(result)) {
@@ -177,6 +193,78 @@ function stringList(
   }
 
   return items;
+}
+
+function uniqueStringList(
+  value: unknown,
+  field: string,
+  maximumItems: number,
+  maximumLength: number,
+) {
+  const items = stringList(value, field, maximumItems, maximumLength);
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  for (const item of items) {
+    const key = item.toLocaleLowerCase("en-IE");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+  }
+
+  return unique;
+}
+
+function teamServiceIds(
+  value: unknown,
+  current: readonly string[],
+  validServiceIds: readonly string[],
+) {
+  if (value === undefined) return [...current];
+  if (!Array.isArray(value)) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      serviceIds: "Choose treatments from the current service list.",
+    });
+  }
+
+  const allowed = new Set(validServiceIds);
+  const selected: string[] = [];
+  for (const [index, item] of value.entries()) {
+    const serviceId = typeof item === "string" ? item.trim() : "";
+    if (!serviceId || serviceId.length > 120 || !allowed.has(serviceId)) {
+      throw new CmsValidationError("Please check the highlighted fields.", {
+        [`serviceIds.${index}`]: "Choose a current Siriranee treatment.",
+      });
+    }
+    if (!selected.includes(serviceId)) selected.push(serviceId);
+  }
+
+  return selected;
+}
+
+export function parseTherapistNotificationEmail(
+  value: unknown,
+  current = "",
+) {
+  if (value === undefined) return current.trim().toLowerCase();
+  const email = optionalText(value, 254).toLowerCase();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      notificationEmail: "Enter a valid therapist notification email.",
+    });
+  }
+  return email;
+}
+
+export function parseTherapistContactPhone(value: unknown, current = "") {
+  if (value === undefined) return current.trim();
+  const phone = optionalText(value, 30);
+  if (phone && !/^\+?[\d\s().-]{7,30}$/.test(phone)) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      contactPhone: "Enter a valid private therapist phone number.",
+    });
+  }
+  return phone;
 }
 
 function prices(value: unknown, serviceId: string): readonly CmsServicePrice[] {
@@ -521,20 +609,96 @@ export function parseBookingSettingsUpdate(
 export function parseTeamUpdate(
   value: unknown,
   current: CmsTeamRecord,
+  options: {
+    readonly notificationEmail: string;
+    readonly validServiceIds: readonly string[];
+  },
 ): CmsTeamRecord {
   const source =
     value && typeof value === "object"
       ? (value as Record<string, unknown>)
       : {};
 
-  const archived = source.archived === true;
+  const archived =
+    source.archived === undefined ? current.archived : source.archived === true;
+  const operationalActive = archived
+    ? false
+    : source.operationalActive === undefined
+      ? current.operationalActive
+      : source.operationalActive === true;
+  const serviceIds = teamServiceIds(
+    source.serviceIds,
+    current.serviceIds,
+    options.validServiceIds,
+  );
+  if (operationalActive && !options.notificationEmail) {
+    throw new CmsValidationError(
+      "Add a therapist notification email before enabling online assignment.",
+      {
+        notificationEmail:
+          "A valid notification email is required for an active therapist.",
+      },
+    );
+  }
+  if (operationalActive && serviceIds.length === 0) {
+    throw new CmsValidationError(
+      "Choose at least one treatment before enabling online assignment.",
+      {
+        serviceIds: "Select at least one treatment this therapist can provide.",
+      },
+    );
+  }
+
+  const imageUrlInput =
+    source.imageUrl === undefined
+      ? current.imageUrl
+      : optionalText(source.imageUrl, 2048);
+  const imageUrl =
+    !imageUrlInput || imageUrlInput.startsWith("/")
+      ? imageUrlInput
+      : validUrl(imageUrlInput, "imageUrl", false);
+  const imageAlt =
+    source.imageAlt === undefined
+      ? current.imageAlt
+      : optionalText(source.imageAlt, 180);
+  if (imageUrl && imageAlt.length < 4) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      imageAlt: "Describe the therapist image in at least 4 characters.",
+    });
+  }
+
   return {
     ...current,
+    slug:
+      source.slug === undefined ? current.slug : teamSlug(source.slug),
     name: text(source.name, "name", 2, 80),
     fullName: text(source.fullName, "fullName", 2, 120),
     publicRole: text(source.publicRole, "publicRole", 2, 120),
-    publicProfile: archived ? false : source.publicProfile !== false,
-    operationalActive: archived ? false : source.operationalActive === true,
+    shortBio:
+      source.shortBio === undefined
+        ? current.shortBio
+        : optionalText(source.shortBio, 300),
+    biography:
+      source.biography === undefined
+        ? current.biography
+        : optionalText(source.biography, 3000),
+    imageUrl,
+    imageAlt: imageUrl ? imageAlt : "",
+    specialties:
+      source.specialties === undefined
+        ? current.specialties
+        : uniqueStringList(source.specialties, "specialties", 12, 100),
+    languages:
+      source.languages === undefined
+        ? current.languages
+        : uniqueStringList(source.languages, "languages", 12, 60),
+    serviceIds,
+    publicProfile: archived
+      ? false
+      : source.publicProfile === undefined
+        ? current.publicProfile
+        : source.publicProfile === true,
+    operationalActive,
     archived,
     sortOrder: integer(source.sortOrder, "sortOrder", 0, 1000),
     version: current.version + 1,
@@ -545,13 +709,29 @@ export function parseTeamUpdate(
 export function parseTeamCreate(
   value: unknown,
   id: string,
+  options: {
+    readonly notificationEmail: string;
+    readonly validServiceIds: readonly string[];
+  },
 ): CmsTeamRecord {
+  const source =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
   const now = new Date().toISOString();
   const initial: CmsTeamRecord = {
     id,
+    slug: teamSlug(source.slug),
     name: "",
     fullName: "",
     publicRole: "Massage therapist",
+    shortBio: "",
+    biography: "",
+    imageUrl: "",
+    imageAlt: "",
+    specialties: [],
+    languages: [],
+    serviceIds: [],
     publicProfile: false,
     operationalActive: false,
     sortOrder: 0,
@@ -559,7 +739,7 @@ export function parseTeamCreate(
     updatedAt: now,
   };
 
-  return parseTeamUpdate(value, initial);
+  return parseTeamUpdate(value, initial, options);
 }
 
 export function parsePromotionUpdate(

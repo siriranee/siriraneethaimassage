@@ -14,6 +14,12 @@ type Variant = {
   readonly priceCents: number;
 };
 
+type TherapistOption = {
+  readonly id: string;
+  readonly name: string;
+  readonly serviceIds: readonly string[];
+};
+
 function createIdempotencyKey() {
   if (typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -29,10 +35,12 @@ function createIdempotencyKey() {
 export function AdminBookingForm({
   defaultDate,
   isMock,
+  therapists,
   variants,
 }: Readonly<{
   defaultDate: string;
   isMock: boolean;
+  therapists: readonly TherapistOption[];
   variants: readonly Variant[];
 }>) {
   const router = useRouter();
@@ -54,6 +62,16 @@ export function AdminBookingForm({
     () => variants.find((variant) => `${variant.serviceId}|${variant.durationMinutes}` === variantKey),
     [variantKey, variants],
   );
+  const eligibleTherapists = useMemo(
+    () =>
+      selectedVariant
+        ? therapists.filter((therapist) =>
+            therapist.serviceIds.includes(selectedVariant.serviceId),
+          )
+        : [],
+    [selectedVariant, therapists],
+  );
+  const [therapistId, setTherapistId] = useState("");
 
   useEffect(() => {
     if (!selectedVariant || !localDate) return;
@@ -63,6 +81,7 @@ export function AdminBookingForm({
       serviceId: selectedVariant.serviceId,
       durationMinutes: String(selectedVariant.durationMinutes),
       localDate,
+      ...(therapistId ? { therapistId } : {}),
     });
     void fetch(`/api/cms/availability?${params.toString()}`, {
       cache: "no-store",
@@ -84,10 +103,19 @@ export function AdminBookingForm({
       });
 
     return () => controller.abort();
-  }, [localDate, selectedVariant]);
+  }, [localDate, selectedVariant, therapistId]);
 
   function changeVariant(value: string) {
+    const [serviceId] = value.split("|");
+    const nextEligible = therapists.filter((therapist) =>
+      therapist.serviceIds.includes(serviceId),
+    );
     setVariantKey(value);
+    setTherapistId((current) =>
+      nextEligible.some((therapist) => therapist.id === current)
+        ? current
+        : "",
+    );
     setSlots([]);
     setLocalTime("");
     setAvailabilityState("loading");
@@ -141,6 +169,7 @@ export function AdminBookingForm({
           email: data.get("email"),
           customerNotes: data.get("customerNotes"),
           serviceId: selectedVariant.serviceId,
+          therapistId,
           durationMinutes: selectedVariant.durationMinutes,
           localDate,
           localTime,
@@ -185,6 +214,25 @@ export function AdminBookingForm({
                 </option>
               ))}
             </select>
+          </label>
+          <label className={styles.fullField}>Massage therapist
+            <select
+              name="therapistId"
+              onChange={(event) => {
+                setTherapistId(event.target.value);
+                setSlots([]);
+                setLocalTime("");
+                setAvailabilityState("loading");
+              }}
+              required={bookingStatus === "confirmed"}
+              value={therapistId}
+            >
+              <option value="">Unassigned (pending bookings only)</option>
+              {eligibleTherapists.map((therapist) => (
+                <option key={therapist.id} value={therapist.id}>{therapist.name}</option>
+              ))}
+            </select>
+            <small>Availability is checked for the selected therapist. Confirmed bookings require an assignment. {isMock ? "Demo mode does not send emails." : "The assigned therapist receives a separate appointment email."}</small>
           </label>
           <label className={styles.field}>Date<input min={defaultDate} onChange={(event) => changeDate(event.target.value)} required type="date" value={localDate} /></label>
           <label className={styles.field}>Available time

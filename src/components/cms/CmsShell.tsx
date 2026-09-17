@@ -11,6 +11,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  UsersRound,
   X,
 } from "lucide-react";
 import Image from "next/image";
@@ -40,6 +41,7 @@ const navigation = [
   { href: "/cms/bookings", label: "Bookings", icon: ClipboardList, permission: "bookings:view" },
   { href: "/cms/calendar", label: "Calendar", icon: CalendarDays, permission: "calendar:view" },
   { href: "/cms/services", label: "Services", icon: Sparkles, permission: "content:view" },
+  { href: "/cms/team", label: "Therapists", icon: UsersRound, permission: "content:write" },
   { href: "/cms/vouchers", label: "Vouchers", icon: Gift, permission: "content:view" },
   { href: "/cms/settings", label: "Settings", icon: Settings, permission: "settings:view" },
   { href: "/cms/admin", label: "Admin", icon: ShieldCheck, permission: "users:manage" },

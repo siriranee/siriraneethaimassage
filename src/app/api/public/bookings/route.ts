@@ -52,6 +52,7 @@ export async function POST(request: Request) {
           localTime: booking.localTime,
           timezone: booking.timezone,
           status: booking.status,
+          therapistName: booking.assignedStaffName,
         },
       },
       { status: 201 },

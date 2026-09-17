@@ -54,7 +54,7 @@ export default async function PrivacyPage() {
           <p>
             When direct website booking is enabled, the form asks for your name,
             phone number, optional email address, optional notes, selected
-            treatment, duration, date and time. It also records when you accepted
+            treatment, massage therapist, duration, date and time. It also records when you accepted
             this version of the privacy notice and limited technical information
             used to prevent abuse.
           </p>
@@ -77,9 +77,15 @@ export default async function PrivacyPage() {
             the request. If you provide an email address and the shop confirms the
             appointment, Resend also processes your name, email address,
             appointment details and published business details needed to send your
-            confirmation. The
-            customer confirmation does not include your notes or internal CMS
-            notes. Hosting and support providers may process limited information
+            confirmation. When therapist email delivery is enabled, Resend
+            separately sends the assigned therapist the booking reference,
+            treatment, duration, date, time and status after a relevant appointment
+            change. That therapist message does not include your name, phone number,
+            email address, notes or internal CMS notes. Therapist notification
+            addresses and private phone numbers are stored separately from public
+            profile content and encrypted in production. The customer confirmation
+            does not include your notes or internal CMS notes.
+            Hosting and support providers may process limited information
             only when configured for this service.
           </p>
           <p>

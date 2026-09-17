@@ -2,6 +2,7 @@ import { Plus, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 
 import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
+import { CmsBookingEmailAttentionNotice } from "@/components/cms/CmsBookingEmailAttentionNotice";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import { CmsEmptyState, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { isPendingCapacityExpired } from "@/domain/booking/status";
@@ -9,7 +10,7 @@ import { canCmsRole } from "@/domain/cms/permissions";
 import { bookingSources, bookingStatuses, type BookingSource, type BookingStatus, type CmsBooking } from "@/domain/cms/types";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
-import { listCmsBookings } from "@/server/cms/read-service";
+import { listCmsBookingEmailAttention, listCmsBookings } from "@/server/cms/read-service";
 
 import styles from "@/components/cms/CmsViews.module.css";
 
@@ -63,16 +64,23 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
   const sourceValue = single(params.source);
   const source = isBookingSource(sourceValue) ? sourceValue : undefined;
   const serviceId = single(params.serviceId).trim() || undefined;
+  const therapistId = single(params.therapistId).trim() || undefined;
   const attentionValue = single(params.attention);
-  const attention = attentionValue === "expired" ? attentionValue : undefined;
+  const attention =
+    attentionValue === "expired" || attentionValue === "unassigned"
+      ? attentionValue
+      : undefined;
   const from = safeDate(single(params.from));
   const to = safeDate(single(params.to));
-  const [bookings, content] = await Promise.all([
-    listCmsBookings({ search: search || undefined, status, source, serviceId, attention, from, to }),
+  const [bookings, content, emailAttention] = await Promise.all([
+    listCmsBookings({ search: search || undefined, status, source, serviceId, therapistId, attention, from, to }),
     getCmsContent(),
+    listCmsBookingEmailAttention(),
   ]);
+  const visibleEmailAttention = await listCmsBookingEmailAttention(bookings.map((booking) => booking.id), 500);
+  const attentionByBooking = new Map(visibleEmailAttention.map((item) => [item.bookingId, item]));
   const hasActiveFilters = Boolean(
-    search || status || source || serviceId || attention || from || to,
+    search || status || source || serviceId || therapistId || attention || from || to,
   );
 
   return (
@@ -83,6 +91,8 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
         eyebrow="Booking operations"
         title="Bookings"
       />
+
+      <CmsBookingEmailAttentionNotice items={emailAttention} />
 
       <CmsPanel>
         <details className={styles.searchDisclosure} open={hasActiveFilters || undefined}>
@@ -108,8 +118,9 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
               </select>
             </label>
             <label>Treatment<select defaultValue={serviceId ?? ""} name="serviceId"><option value="">All treatments</option>{content.services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
+            <label>Massage therapist<select defaultValue={therapistId ?? ""} name="therapistId"><option value="">All therapists</option>{content.team.filter((member) => !member.archived).sort((first, second) => first.sortOrder - second.sortOrder).map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
             <label>Source<select defaultValue={source ?? ""} name="source"><option value="">All sources</option>{bookingSources.map((item) => <option key={item} value={item}>{item.charAt(0).toUpperCase() + item.slice(1)}</option>)}</select></label>
-            <label>Needs attention<select defaultValue={attention ?? ""} name="attention"><option value="">All bookings</option><option value="expired">Expired pending holds</option></select></label>
+            <label>Needs attention<select defaultValue={attention ?? ""} name="attention"><option value="">All bookings</option><option value="expired">Expired pending holds</option><option value="unassigned">Unassigned active bookings</option></select></label>
             <label>From date<input defaultValue={from ?? ""} name="from" type="date" /></label>
             <label>To date<input defaultValue={to ?? ""} name="to" type="date" /></label>
             <div className={styles.filterActions}><button type="submit">Apply filters</button><Link href="/cms/bookings">Clear</Link></div>
@@ -139,6 +150,7 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
                 <dl className={styles.bookingCardDetails}>
                   <div><dt>Treatment</dt><dd>{booking.serviceName}</dd></div>
                   <div><dt>Duration</dt><dd>{booking.durationMinutes} min</dd></div>
+                  <div><dt>Therapist</dt><dd>{booking.assignedStaffName || "Unassigned"}</dd></div>
                   <div><dt>Phone</dt><dd>{booking.customer.phone}</dd></div>
                   <div className={styles.bookingCardNotes}>
                     <dt>Notes</dt>
@@ -151,6 +163,7 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
                   {canManageBookings ? (
                     <CmsBookingQuickActions
                       booking={booking}
+                      emailAttention={attentionByBooking.get(booking.id)}
                       hasCustomerEmail={Boolean(booking.customer.email)}
                       isMock={booking.demo}
                       key={`${booking.id}:${booking.version}`}

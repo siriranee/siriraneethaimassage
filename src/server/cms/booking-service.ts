@@ -25,7 +25,11 @@ import {
 import { appendCmsAudit } from "@/server/cms/audit";
 import { CmsValidationError } from "@/server/cms/content-validation";
 import { getCmsPiiEncryptionKey } from "@/server/cms/pii";
-import { bookingNotificationKind, recordBookingNotificationPlan } from "@/server/cms/notification-service";
+import {
+  bookingNotificationKind,
+  recordBookingNotificationPlan,
+  recordTherapistBookingEmailPlans,
+} from "@/server/cms/notification-service";
 import {
   CmsConflictError,
   getCmsRepository,
@@ -44,6 +48,7 @@ type BookingInput = {
   readonly email: string;
   readonly customerNotes: string;
   readonly serviceId: string;
+  readonly therapistId: string;
   readonly durationMinutes: number;
   readonly localDate: string;
   readonly localTime: string;
@@ -56,13 +61,12 @@ const staffAssignmentFields = [
   "assignedStaffId",
   "staffId",
   "therapist",
-  "therapistId",
 ] as const;
 
 function assertNoStaffAssignment(source: Record<string, unknown>) {
   if (staffAssignmentFields.some((field) => field in source)) {
     throw new CmsValidationError(
-      "Staff assignment is not part of Siriranee booking management.",
+      "Use therapistId to assign a therapist; stored staff fields are server-managed.",
     );
   }
 }
@@ -145,6 +149,7 @@ function parseBookingInput(value: unknown): BookingInput {
     email,
     customerNotes: optionalText(source.customerNotes, 1000),
     serviceId: requiredText(source.serviceId, "serviceId", 2, 120),
+    therapistId: optionalText(source.therapistId, 120),
     durationMinutes,
     localDate,
     localTime,
@@ -162,8 +167,9 @@ function assertPersistenceReady(repository: CmsRepository) {
 
 async function findSlot(
   repository: CmsRepository,
-  input: Pick<BookingInput, "serviceId" | "durationMinutes" | "localDate" | "localTime">,
+  input: Pick<BookingInput, "serviceId" | "therapistId" | "durationMinutes" | "localDate" | "localTime">,
   excludedBookingId?: string,
+  existingAppointment = false,
 ) {
   const content = await repository.getContent();
   const service = content.services.find(
@@ -176,6 +182,21 @@ async function findSlot(
   if (!service || !price) {
     throw new CmsValidationError("Choose a treatment and active duration.");
   }
+  const therapist = input.therapistId
+    ? content.team.find(
+        (member) =>
+          member.id === input.therapistId &&
+          member.operationalActive &&
+          !member.archived &&
+          member.serviceIds.includes(input.serviceId),
+      )
+    : undefined;
+  if (input.therapistId && !therapist) {
+    throw new CmsValidationError(
+      "Choose an active massage therapist qualified for this treatment.",
+      { therapistId: "Choose an active massage therapist." },
+    );
+  }
   if (
     repository.mode === "mongodb" &&
     (!content.bookingSettings.rulesConfirmed || !content.site.openingHoursConfirmed)
@@ -185,16 +206,23 @@ async function findSlot(
     );
   }
 
+  const now = new Date().toISOString();
   const { bookings, holds, closures } =
     await readTransactionalAvailability(
       repository,
       input.localDate,
-      new Date().toISOString(),
+      now,
     );
   const slots = getAvailabilitySlots({
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
-    settings: content.bookingSettings,
+    therapistId: therapist?.id,
+    // Existing requests can be handled near their start time. Capacity, hours,
+    // therapist eligibility and the prohibition on past slots still apply.
+    settings: existingAppointment
+      ? { ...content.bookingSettings, minimumNoticeMinutes: 0 }
+      : content.bookingSettings,
+    now,
     weeklyHours: content.site.weeklyHours,
     closures,
     bookings: bookings.filter((booking) => booking.id !== excludedBookingId),
@@ -208,7 +236,7 @@ async function findSlot(
     );
   }
 
-  return { content, price, service, slot };
+  return { content, price, service, slot, therapist };
 }
 
 function bookingReference(localDate: string) {
@@ -219,6 +247,7 @@ export async function getAdminAvailability(input: {
   readonly serviceId: string;
   readonly durationMinutes: number;
   readonly localDate: string;
+  readonly therapistId?: string;
 }) {
   if (!datePattern.test(input.localDate)) {
     throw new CmsValidationError("Choose a valid date.");
@@ -238,6 +267,20 @@ export async function getAdminAvailability(input: {
   if (!service || !price) {
     throw new CmsValidationError("Choose a treatment and active duration.");
   }
+  const therapist = input.therapistId
+    ? content.team.find(
+        (member) =>
+          member.id === input.therapistId &&
+          member.operationalActive &&
+          !member.archived &&
+          member.serviceIds.includes(input.serviceId),
+      )
+    : undefined;
+  if (input.therapistId && !therapist) {
+    throw new CmsValidationError(
+      "Choose an active massage therapist qualified for this treatment.",
+    );
+  }
 
   const [bookings, holds, closures] = await Promise.all([
     repository.listBookingOccupancy(input.localDate, input.localDate),
@@ -248,6 +291,7 @@ export async function getAdminAvailability(input: {
   return getAvailabilitySlots({
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
+    therapistId: therapist?.id,
     settings: content.bookingSettings,
     weeklyHours: content.site.weeklyHours,
     closures,
@@ -297,8 +341,15 @@ export async function createAdminBooking(
       return existing;
     }
 
+    if (input.therapistId) await transaction.lockTherapist(input.therapistId);
     await transaction.lockBookingDate(input.localDate);
-    const { price, service, slot } = await findSlot(transaction, input);
+    const { price, service, slot, therapist } = await findSlot(transaction, input);
+    if (input.status === "confirmed" && !therapist) {
+      throw new CmsValidationError(
+        "Assign an active massage therapist before confirming this booking.",
+        { therapistId: "Choose a massage therapist." },
+      );
+    }
     const now = new Date().toISOString();
     const booking: CmsBooking = {
       id: randomUUID(),
@@ -323,7 +374,8 @@ export async function createAdminBooking(
       status: input.status,
       source: input.source,
       capacityExpiresAt: "",
-      assignedStaffId: "",
+      assignedStaffId: therapist?.id ?? "",
+      assignedStaffName: therapist?.name ?? "",
       internalNotes: input.internalNotes,
       privacyAcceptedAt: "",
       privacyNoticeVersion: "admin-captured",
@@ -342,6 +394,7 @@ export async function createAdminBooking(
     if (notificationKind) {
       await recordBookingNotificationPlan(transaction, booking, notificationKind);
     }
+    await recordTherapistBookingEmailPlans(transaction, null, booking);
     await appendCmsAudit(transaction, {
       actor: context.actor,
       action: "booking.created",
@@ -395,6 +448,10 @@ export async function updateAdminBooking(
 
     const nextDate = typeof source.localDate === "string" ? source.localDate : current.localDate;
     const nextTime = typeof source.localTime === "string" ? source.localTime : current.localTime;
+    const nextTherapistId =
+      typeof source.therapistId === "string"
+        ? optionalText(source.therapistId, 120)
+        : current.assignedStaffId;
     const statusValue = typeof source.status === "string" ? source.status : current.status;
     if (!bookingStatuses.some((item) => item === statusValue)) {
       throw new CmsValidationError("Choose a valid booking status.");
@@ -405,13 +462,16 @@ export async function updateAdminBooking(
         `A ${current.status.replaceAll("-", " ")} booking cannot change to ${status.replaceAll("-", " ")}.`,
       );
     }
-    const internalNotes = optionalText(source.internalNotes, 1000);
+    const internalNotes = source.internalNotes === undefined
+      ? current.internalNotes
+      : optionalText(source.internalNotes, 1000);
     const reasonValue = typeof source.changeReason === "string" ? source.changeReason : "";
     const changeReason = bookingChangeReasons.some((reason) => reason === reasonValue)
       ? (reasonValue as BookingChangeReason)
       : undefined;
     const timeChanged =
       nextDate !== current.localDate || nextTime !== current.localTime;
+    const assignmentChanged = nextTherapistId !== current.assignedStaffId;
     if (
       timeChanged &&
       (isTerminalBookingStatus(current.status) || isTerminalBookingStatus(status))
@@ -420,38 +480,60 @@ export async function updateAdminBooking(
         "Complete the reschedule before moving a booking to a final status.",
       );
     }
-    const appointmentChanged =
-      status !== current.status ||
-      timeChanged;
-    if (appointmentChanged && !changeReason) {
+    if (
+      assignmentChanged &&
+      (isTerminalBookingStatus(current.status) || isTerminalBookingStatus(status))
+    ) {
       throw new CmsValidationError(
-        "Choose an operational reason when changing appointment status, date or time.",
+        "Reassign the therapist before moving a booking to a final status.",
       );
     }
-    const lockDates = [...new Set([current.localDate, nextDate])].sort();
-    for (const date of lockDates) await transaction.lockBookingDate(date);
+    const appointmentChanged =
+      status !== current.status ||
+      timeChanged ||
+      assignmentChanged;
+    if (appointmentChanged && status === "confirmed" && !nextTherapistId) {
+      throw new CmsValidationError(
+        "Assign an active massage therapist before confirming this booking.",
+        { therapistId: "Choose a massage therapist." },
+      );
+    }
+    if (appointmentChanged && !changeReason) {
+      throw new CmsValidationError(
+        "Choose an operational reason when changing appointment status, date, time or therapist.",
+      );
+    }
+    if (appointmentChanged) {
+      const therapistIds = [...new Set([current.assignedStaffId, nextTherapistId])]
+        .filter(Boolean)
+        .sort();
+      for (const therapistId of therapistIds) await transaction.lockTherapist(therapistId);
+      const lockDates = [...new Set([current.localDate, nextDate])].sort();
+      for (const date of lockDates) await transaction.lockBookingDate(date);
+    }
 
     let startsAt = current.startsAt;
     let endsAt = current.endsAt;
+    let assignedStaffName = current.assignedStaffName;
 
     if (
-      status === "pending" ||
-      status === "confirmed" ||
-      nextDate !== current.localDate ||
-      nextTime !== current.localTime
+      appointmentChanged && (status === "pending" || status === "confirmed")
     ) {
       const result = await findSlot(
         transaction,
         {
           serviceId: current.serviceId,
+          therapistId: nextTherapistId,
           durationMinutes: current.durationMinutes,
           localDate: nextDate,
           localTime: nextTime,
         },
         current.id,
+        !timeChanged,
       );
       startsAt = result.slot.startsAt;
       endsAt = result.slot.endsAt;
+      assignedStaffName = result.therapist?.name ?? "";
     }
 
     const updated: CmsBooking = {
@@ -463,6 +545,8 @@ export async function updateAdminBooking(
       status,
       capacityExpiresAt:
         status === "pending" ? current.capacityExpiresAt || "" : "",
+      assignedStaffId: nextTherapistId,
+      assignedStaffName,
       internalNotes,
       lastChangeReason: appointmentChanged ? changeReason : current.lastChangeReason,
       version: current.version + 1,
@@ -475,6 +559,7 @@ export async function updateAdminBooking(
     if (notificationKind) {
       await recordBookingNotificationPlan(transaction, updated, notificationKind);
     }
+    await recordTherapistBookingEmailPlans(transaction, current, updated);
     await appendCmsAudit(transaction, {
       actor: context.actor,
       action: "booking.updated",

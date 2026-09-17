@@ -2,6 +2,7 @@
 
 import { Check, LoaderCircle, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 
 import {
@@ -11,22 +12,31 @@ import {
   type CustomerBookingConfirmationEmailOutcome,
 } from "@/domain/booking/confirmation-email";
 import type { BookingStatus, CmsBooking } from "@/domain/cms/types";
+import { bookingEmailAttentionText, withTherapistEmailFeedback, type CmsBookingEmailAttention, type TherapistEmailAttempt } from "@/domain/cms/notification-presentation";
 
 import styles from "./CmsBookingQuickActions.module.css";
 
 type QuickActionBooking = Pick<
   CmsBooking,
-  "id" | "reference" | "localDate" | "localTime" | "status" | "version"
+  | "id"
+  | "reference"
+  | "localDate"
+  | "localTime"
+  | "status"
+  | "version"
+  | "assignedStaffId"
 >;
 
 export function CmsBookingQuickActions({
   booking,
   hasCustomerEmail,
   isMock,
+  emailAttention,
 }: Readonly<{
   booking: QuickActionBooking;
   hasCustomerEmail: boolean;
   isMock: boolean;
+  emailAttention?: CmsBookingEmailAttention;
 }>) {
   const router = useRouter();
   const [status, setStatus] = useState(booking.status);
@@ -36,7 +46,8 @@ export function CmsBookingQuickActions({
     readonly text: string;
     readonly tone: "success" | "warning" | "error";
   } | null>(null);
-  const canConfirm = status === "pending";
+  const canConfirm = status === "pending" && Boolean(booking.assignedStaffId);
+  const needsTherapist = status === "pending" && !booking.assignedStaffId;
   const canCancel = status === "pending" || status === "confirmed";
 
   async function updateStatus(nextStatus: "confirmed" | "cancelled") {
@@ -85,6 +96,7 @@ export function CmsBookingQuickActions({
         readonly booking?: CmsBooking;
         readonly confirmationEmail?: CustomerBookingConfirmationEmailOutcome;
         readonly cancellationEmail?: CustomerBookingCancellationEmailOutcome;
+        readonly therapistEmails?: readonly TherapistEmailAttempt[];
         readonly error?: string;
       };
 
@@ -98,7 +110,7 @@ export function CmsBookingQuickActions({
 
       setStatus(result.booking.status);
       setVersion(result.booking.version);
-      setFeedback(
+      setFeedback(withTherapistEmailFeedback(
         result.confirmationEmail
           ? customerBookingConfirmationEmailFeedback(result.confirmationEmail)
           : result.cancellationEmail
@@ -110,7 +122,8 @@ export function CmsBookingQuickActions({
                   ? "Booking confirmed."
                   : "Booking cancelled.",
             },
-      );
+        result.therapistEmails,
+      ));
       router.refresh();
     } catch {
       setFeedback({
@@ -123,7 +136,7 @@ export function CmsBookingQuickActions({
     }
   }
 
-  if (!canConfirm && !canCancel && !feedback) return null;
+  if (!canConfirm && !canCancel && !feedback && !emailAttention) return null;
 
   return (
     <div className={styles.wrap}>
@@ -194,6 +207,17 @@ export function CmsBookingQuickActions({
           role={feedback.tone === "error" ? "alert" : undefined}
         >
           {feedback.text}
+        </p>
+      ) : null}
+      {needsTherapist ? (
+        <p className={`${styles.feedback} ${styles.warning}`}>
+          Assign an eligible therapist in the booking editor before confirming this appointment.
+        </p>
+      ) : null}
+      {emailAttention ? (
+        <p aria-live="polite" className={`${styles.feedback} ${styles.warning}`}>
+          {bookingEmailAttentionText(emailAttention)}{" "}
+          <Link href={`/cms/bookings/${booking.id}`}>Review emails</Link>
         </p>
       ) : null}
     </div>

@@ -44,6 +44,7 @@ function booking(overrides: Partial<CmsBooking> = {}): CmsBooking {
     source: "website",
     capacityExpiresAt: "2026-09-03T10:30:00.000Z",
     assignedStaffId: "",
+    assignedStaffName: "",
     internalNotes: "Never include this internal note.",
     privacyAcceptedAt: "2026-09-03T10:00:00.000Z",
     privacyNoticeVersion: "2026-09-03",
@@ -289,5 +290,67 @@ test("customer cancellation email clearly closes the appointment without exposin
       `${message.html}\n${message.text}`,
       new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
     );
+  }
+});
+
+test("therapist schedule emails contain appointment details but no customer identity", async () => {
+  const { renderTherapistBookingEmail } = await import(
+    "@/server/booking/booking-email"
+  );
+  const assigned = booking({
+    status: "confirmed",
+    assignedStaffId: "therapist-waen",
+    assignedStaffName: "Waen",
+  });
+  const expectations = [
+    ["assigned", "Assigned to you"],
+    ["rescheduled", "Date or time updated"],
+    ["removed", "No longer assigned to you"],
+    ["cancelled", "Cancelled"],
+  ] as const;
+
+  for (const [event, expectedStatus] of expectations) {
+    const message = renderTherapistBookingEmail(assigned, {
+      event,
+      therapistName: "Waen <script>alert(1)</script>\u202E",
+      businessName: "Siriranee Thai Massage",
+      cmsUrl: "https://siriranee.com/cms",
+    });
+    const rendered = `${message.subject}\n${message.html}\n${message.text}`;
+
+    for (const expected of [
+      expectedStatus,
+      "SRN-20260910-ABC123",
+      "Traditional Thai Massage",
+      "60 minutes",
+      "Thursday 10 September 2026",
+      "10:00 (Dublin time)",
+      "https://siriranee.com/cms",
+    ]) {
+      assert.match(
+        rendered,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      );
+    }
+    assert.match(message.html, /Waen &lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+    assert.doesNotMatch(message.html, /\u202E|<script>/);
+    assert.doesNotMatch(message.text, /\u202E/);
+
+    for (const forbidden of [
+      "Nok Example",
+      "nok@example.com",
+      "+353 85 123 4567",
+      "Quiet room if possible.",
+      "Never include this internal note.",
+      "11111111-2222-4333-8444-555555555555",
+      "secret-hold-hash",
+      "secret-idempotency-hash",
+      "secret-fingerprint-hash",
+    ]) {
+      assert.doesNotMatch(
+        rendered,
+        new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      );
+    }
   }
 });

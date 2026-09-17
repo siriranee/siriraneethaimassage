@@ -79,7 +79,7 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/masseuses",
-        destination: "/therapists",
+        destination: "/book",
         permanent: true,
       },
     ];

@@ -121,6 +121,12 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
                     <dt>Listed price</dt>
                     <dd>{formatAppointmentPrice(appointmentPreference.priceEur)}</dd>
                   </div>
+                  {appointmentPreference.therapistName ? (
+                    <div>
+                      <dt>Preferred therapist</dt>
+                      <dd>{appointmentPreference.therapistName}</dd>
+                    </div>
+                  ) : null}
                   {appointmentPreference.preferredDate ? (
                     <div>
                       <dt>Preferred date</dt>

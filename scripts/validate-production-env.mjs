@@ -248,6 +248,11 @@ if (configuredResendNames.length === resendEnvironmentNames.length) {
 }
 
 const readyValue = process.env.CMS_PUBLIC_BOOKING_READY?.trim().toLowerCase() ?? "";
+const webhookSecret = process.env.RESEND_WEBHOOK_SECRET?.trim() ?? "";
+if (webhookSecret && !/^whsec_[A-Za-z0-9+/=_-]{20,}$/.test(webhookSecret)) {
+  console.error("Hosted build blocked: RESEND_WEBHOOK_SECRET must be the signing secret from Resend, not the sending API key.");
+  process.exit(1);
+}
 if (readyValue && !["true", "false"].includes(readyValue)) {
   console.error(
     "Hosted build blocked: CMS_PUBLIC_BOOKING_READY must be true or false.",

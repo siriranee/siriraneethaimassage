@@ -4,7 +4,7 @@ import type { CmsServiceHero } from "@/domain/cms/service-hero";
 export type { CmsServiceGalleryImage } from "@/domain/cms/service-gallery";
 export type { CmsServiceHero } from "@/domain/cms/service-hero";
 
-export const CMS_CONTENT_SCHEMA_VERSION = 7 as const;
+export const CMS_CONTENT_SCHEMA_VERSION = 8 as const;
 
 export const cmsRoles = ["administrator", "staff"] as const;
 export type CmsRole = (typeof cmsRoles)[number];
@@ -12,6 +12,7 @@ export type CmsRole = (typeof cmsRoles)[number];
 export const cmsMediaScopes = [
   "service-cover",
   "service-gallery",
+  "therapist-profile",
   "voucher-image",
 ] as const;
 export type CmsMediaScope = (typeof cmsMediaScopes)[number];
@@ -163,15 +164,38 @@ export type CmsBookingSettings = {
 
 export type CmsTeamRecord = {
   readonly id: string;
+  readonly slug: string;
   readonly name: string;
   readonly fullName: string;
   readonly publicRole: string;
+  readonly shortBio: string;
+  readonly biography: string;
+  readonly imageUrl: string;
+  readonly imageAlt: string;
+  readonly specialties: readonly string[];
+  readonly languages: readonly string[];
+  readonly serviceIds: readonly string[];
   readonly publicProfile: boolean;
   readonly operationalActive: boolean;
   readonly archived?: boolean;
   readonly sortOrder: number;
   readonly version: number;
   readonly updatedAt: string;
+};
+
+export type CmsTherapistContact = {
+  readonly id: string;
+  readonly notificationEmail: string;
+  readonly contactPhone: string;
+  readonly version: number;
+  readonly updatedAt: string;
+  readonly updatedBy: string;
+};
+
+export type CmsTeamEditorRecord = CmsTeamRecord & {
+  readonly notificationEmail: string;
+  readonly contactPhone: string;
+  readonly contactVersion: number;
 };
 
 export type CmsPromotionRecord = {
@@ -198,7 +222,7 @@ export type CmsVoucherRecord = {
 
 export type CmsContentState = {
   readonly id: "siriranee-content";
-  readonly schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  readonly schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   readonly revision: number;
   readonly services: readonly CmsServiceRecord[];
   readonly site: CmsSiteSettings;
@@ -303,6 +327,7 @@ export type CmsBooking = {
   readonly source: BookingSource;
   readonly capacityExpiresAt: string;
   readonly assignedStaffId: string;
+  readonly assignedStaffName: string;
   readonly internalNotes: string;
   readonly lastChangeReason?: BookingChangeReason;
   readonly privacyAcceptedAt: string;
@@ -324,7 +349,13 @@ export type CmsBookingOccupancy = {
   readonly endsAt: string;
   readonly status: BookingStatus;
   readonly expiresAt: string;
+  readonly assignedStaffId: string;
 };
+
+export type CmsFutureTherapistBooking = Pick<
+  CmsBooking,
+  "reference" | "serviceId"
+>;
 
 export type CmsBookingHold = {
   readonly id: string;
@@ -334,6 +365,7 @@ export type CmsBookingHold = {
   readonly startsAt: string;
   readonly endsAt: string;
   readonly localDate: string;
+  readonly assignedStaffId: string;
   readonly status: "active" | "consumed" | "expired" | "released";
   readonly expiresAt: string;
   readonly createdAt: string;
@@ -359,6 +391,8 @@ export type CmsNotificationChannel = (typeof cmsNotificationChannels)[number];
 
 export const cmsNotificationKinds = [
   "booking-requested",
+  "booking-assigned",
+  "booking-unassigned",
   "booking-confirmed",
   "booking-rescheduled",
   "booking-cancelled",
@@ -367,12 +401,33 @@ export const cmsNotificationKinds = [
 ] as const;
 export type CmsNotificationKind = (typeof cmsNotificationKinds)[number];
 
+export type CmsEmailDeliveryStatus =
+  | "delivered" | "bounced" | "failed" | "delayed" | "complained" | "suppressed";
+
+/** Provider metadata only: never store recipients or raw webhook payloads. */
+export type CmsEmailDeliveryEvent = {
+  readonly id: string;
+  readonly providerMessageId: string;
+  readonly deliveryStatus: CmsEmailDeliveryStatus;
+  readonly occurredAt: string;
+  readonly receivedAt: string;
+};
+
+/** Immutable operational details only; no customer data, recipient or notes. */
+export type CmsTherapistRemovedAppointment = Pick<
+  CmsBooking,
+  "assignedStaffId" | "serviceName" | "durationMinutes" | "localDate" | "localTime" | "timezone"
+>;
+
 export type CmsBookingNotification = {
   readonly id: string;
   readonly bookingId: string;
   readonly bookingReference: string;
   readonly channel: CmsNotificationChannel;
-  readonly audience?: "customer" | "owner";
+  readonly audience?: "customer" | "owner" | "therapist";
+  readonly targetTeamMemberId?: string;
+  readonly bookingVersion?: number;
+  readonly therapistRemovedAppointment?: CmsTherapistRemovedAppointment;
   readonly kind: CmsNotificationKind;
   readonly status:
     | "preview"
@@ -383,6 +438,9 @@ export type CmsBookingNotification = {
     | "indeterminate";
   readonly provider?: "resend";
   readonly providerMessageId?: string;
+  readonly deliveryStatus?: CmsEmailDeliveryStatus;
+  readonly providerEventAt?: string;
+  readonly providerEventId?: string;
   readonly attemptCount: number;
   readonly firstAttemptedAt?: string;
   readonly attemptedAt?: string;
@@ -400,6 +458,7 @@ export type CmsNotificationBellItem = {
   readonly bookingId: string;
   readonly bookingReference: string;
   readonly kind: CmsNotificationKind;
+  readonly currentStatus?: BookingStatus;
   readonly createdAt: string;
 };
 
@@ -409,6 +468,7 @@ export type CmsBookingQuery = {
   readonly status?: BookingStatus;
   readonly source?: BookingSource;
   readonly serviceId?: string;
+  readonly therapistId?: string;
   readonly attention?: "expired" | "unassigned";
   readonly search?: string;
 };

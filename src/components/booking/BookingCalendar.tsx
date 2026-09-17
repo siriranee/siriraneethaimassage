@@ -47,6 +47,7 @@ type CalendarResponse = {
 
 type BookingCalendarProps = {
   readonly serviceId: string;
+  readonly therapistId: string;
   readonly durationMinutes: number;
   readonly minimumDate: string;
   readonly selectedDate: string;
@@ -94,6 +95,7 @@ function stateClass(state: CalendarDayState | undefined) {
 
 export function BookingCalendar({
   serviceId,
+  therapistId,
   durationMinutes,
   minimumDate,
   selectedDate,
@@ -116,7 +118,7 @@ export function BookingCalendar({
   const [earliestDate, setEarliestDate] = useState(minimumDate);
   const [latestDate, setLatestDate] = useState("");
   const [retryKey, setRetryKey] = useState(0);
-  const requestKey = `${serviceId}:${durationMinutes}:${viewMonth}:${refreshKey}:${retryKey}`;
+  const requestKey = `${serviceId}:${therapistId}:${durationMinutes}:${viewMonth}:${refreshKey}:${retryKey}`;
   const [resolvedRequestKey, setResolvedRequestKey] = useState("");
   const selectedDateRef = useRef(selectedDate);
   const selectDateRef = useRef(onSelectDate);
@@ -127,11 +129,12 @@ export function BookingCalendar({
   }, [onSelectDate, selectedDate]);
 
   useEffect(() => {
-    if (!viewMonth || !serviceId || !durationMinutes) return;
+    if (!viewMonth || !serviceId || !therapistId || !durationMinutes) return;
 
     const controller = new AbortController();
     const params = new URLSearchParams({
       serviceId,
+      therapistId,
       durationMinutes: String(durationMinutes),
       month: viewMonth,
     });
@@ -213,12 +216,19 @@ export function BookingCalendar({
       });
 
     return () => controller.abort();
-  }, [durationMinutes, minimumDate, requestKey, serviceId, viewMonth]);
+  }, [durationMinutes, minimumDate, requestKey, serviceId, therapistId, viewMonth]);
 
-  const visibleCalendarState =
-    resolvedRequestKey === requestKey ? calendarState : "loading";
-  const visibleCalendarMessage =
-    resolvedRequestKey === requestKey
+  const hasRequiredSelection = Boolean(
+    serviceId && therapistId && durationMinutes,
+  );
+  const visibleCalendarState = !hasRequiredSelection
+    ? "ready"
+    : resolvedRequestKey === requestKey
+      ? calendarState
+      : "loading";
+  const visibleCalendarMessage = !therapistId
+    ? "Choose a therapist to see available days."
+    : resolvedRequestKey === requestKey
       ? calendarMessage
       : "Checking available days...";
   const dayMap = useMemo(
@@ -240,10 +250,10 @@ export function BookingCalendar({
   const previousMonth = shiftCalendarMonth(viewMonth, -1);
   const nextMonth = shiftCalendarMonth(viewMonth, 1);
   const previousDisabled = Boolean(
-    disabled || (earliestMonth && previousMonth < earliestMonth),
+    disabled || !hasRequiredSelection || (earliestMonth && previousMonth < earliestMonth),
   );
   const nextDisabled = Boolean(
-    disabled || (latestMonth && nextMonth > latestMonth),
+    disabled || !hasRequiredSelection || (latestMonth && nextMonth > latestMonth),
   );
 
   return (
@@ -277,7 +287,9 @@ export function BookingCalendar({
           <button
             className={styles.todayButton}
             disabled={
-              disabled || viewMonth === monthFromCalendarDate(minimumDate)
+              disabled ||
+              !hasRequiredSelection ||
+              viewMonth === monthFromCalendarDate(minimumDate)
             }
             onClick={() => setViewMonth(monthFromCalendarDate(minimumDate))}
             type="button"
@@ -331,7 +343,9 @@ export function BookingCalendar({
                 loading ? styles.dayLoading : ""
               }`}
               data-state={day?.state ?? "loading"}
-              disabled={disabled || loading || !selectable}
+              disabled={
+                disabled || !hasRequiredSelection || loading || !selectable
+              }
               key={localDate}
               onClick={() => selectDateRef.current(localDate)}
               type="button"

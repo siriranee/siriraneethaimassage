@@ -21,10 +21,10 @@ export class InvalidJsonBodyError extends Error {
   }
 }
 
-export async function readJsonBody(
+export async function readRawJsonBody(
   request: Request,
   maximumBytes: number,
-): Promise<unknown> {
+): Promise<string> {
   const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
   if (!contentType.includes("application/json")) {
     throw new UnsupportedRequestBodyError();
@@ -71,7 +71,16 @@ export async function readJsonBody(
   }
 
   try {
-    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(combined)) as unknown;
+    return new TextDecoder("utf-8", { fatal: true }).decode(combined);
+  } catch {
+    throw new InvalidJsonBodyError();
+  }
+}
+
+export async function readJsonBody(request: Request, maximumBytes: number): Promise<unknown> {
+  const raw = await readRawJsonBody(request, maximumBytes);
+  try {
+    return JSON.parse(raw) as unknown;
   } catch {
     throw new InvalidJsonBodyError();
   }

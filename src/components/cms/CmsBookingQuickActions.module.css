@@ -89,6 +89,19 @@
   color: var(--color-danger);
 }
 
+.attentionList {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.75rem 0;
+  padding-left: 1.15rem;
+  overflow-wrap: anywhere;
+}
+
+.attentionList li > a {
+  margin-right: 0.6rem;
+  font-weight: 800;
+}
+
 .spinner {
   animation: spin 700ms linear infinite;
 }

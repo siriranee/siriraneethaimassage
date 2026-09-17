@@ -29,11 +29,23 @@ export async function resolvePublishedAppointmentPreference(
   if (!service || !price) {
     return null;
   }
+  const therapist = input.therapistSlug
+    ? content.team.find(
+        (candidate) =>
+          candidate.slug === input.therapistSlug &&
+          candidate.publicProfile &&
+          candidate.operationalActive &&
+          !candidate.archived &&
+          candidate.serviceIds.includes(service.id),
+      )
+    : undefined;
 
   return {
     ...input,
     serviceSlug: service.slug,
     serviceName: service.name,
     priceEur: price.priceCents / 100,
+    therapistSlug: therapist?.slug,
+    therapistName: therapist?.name,
   };
 }

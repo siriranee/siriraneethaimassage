@@ -84,7 +84,12 @@ test("isolated launch verification covers services, ten bookings and administrat
     { loginCmsMockDemo, loginCmsUser },
     { createPublicBooking },
     { createAdminBooking, deleteAdminBooking, updateAdminBooking },
-    { createCmsService, updateCmsService },
+    {
+      createCmsService,
+      createCmsTeamMember,
+      updateCmsService,
+      updateCmsTeamMember,
+    },
     { CmsValidationError },
     { CmsConflictError, getCmsRepository },
     {
@@ -92,6 +97,7 @@ test("isolated launch verification covers services, ten bookings and administrat
       attemptCustomerBookingConfirmationEmail,
       customerBookingCancellationEmailNotificationId,
       customerBookingConfirmationEmailNotificationId,
+      therapistBookingEmailNotificationId,
     },
     {
       createManagedCmsUser,
@@ -157,6 +163,68 @@ test("isolated launch verification covers services, ten bookings and administrat
     2,
   );
 
+  const primaryTherapist = await createCmsTeamMember(
+    {
+      slug: "launch-test-therapist",
+      name: "Demo Therapist",
+      fullName: "Demo Launch Therapist",
+      publicRole: "Massage therapist",
+      shortBio: "A fictional therapist used only by isolated launch verification.",
+      biography:
+        "This fictional profile verifies therapist publishing, assignment and private email delivery without contacting a live provider.",
+      imageUrl: "",
+      imageAlt: "",
+      specialties: ["Launch workflow verification"],
+      languages: ["English"],
+      serviceIds: services.map((service) => service.id),
+      notificationEmail: "demo.therapist@example.invalid",
+      contactPhone: "+353 00 000 0101",
+      publicProfile: true,
+      operationalActive: true,
+      archived: false,
+      sortOrder: 0,
+    },
+    context,
+  );
+  const limitedTherapist = await createCmsTeamMember(
+    {
+      slug: "launch-test-limited-therapist",
+      name: "Demo Limited Therapist",
+      fullName: "Demo Limited Therapist",
+      publicRole: "Massage therapist",
+      shortBio: "A fictional therapist with one eligible treatment.",
+      biography: "This fictional profile verifies treatment eligibility checks.",
+      imageUrl: "",
+      imageAlt: "",
+      specialties: ["Eligibility verification"],
+      languages: ["English"],
+      serviceIds: [services[0].id],
+      notificationEmail: "demo.limited.therapist@example.invalid",
+      contactPhone: "",
+      publicProfile: true,
+      operationalActive: true,
+      archived: false,
+      sortOrder: 1,
+    },
+    context,
+  );
+  assert.equal(primaryTherapist.operationalActive, true);
+  assert.equal(limitedTherapist.serviceIds.length, 1);
+  const storedTherapist = (await repository.getContent()).team.find(
+    (member) => member.id === primaryTherapist.id,
+  );
+  assert.ok(storedTherapist);
+  assert.equal("notificationEmail" in storedTherapist, false);
+  assert.equal(
+    (await repository.getTherapistContact(primaryTherapist.id))
+      ?.notificationEmail,
+    "demo.therapist@example.invalid",
+  );
+  assert.equal(
+    (await repository.getTherapistContact(primaryTherapist.id))?.contactPhone,
+    "+353 00 000 0101",
+  );
+
   await repository.transaction(async (transaction) => {
     const current = await transaction.getContent();
     const prepared = {
@@ -214,6 +282,7 @@ test("isolated launch verification covers services, ten bookings and administrat
           email: `demo.launch.${index + 1}@example.invalid`,
           customerNotes: "Fictional customer created by isolated launch tests.",
           serviceId: service.id,
+          therapistId: primaryTherapist.id,
           durationMinutes: 60,
           localDate,
           localTime,
@@ -233,13 +302,20 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.equal(new Set(bookings.map((booking) => booking.id)).size, 10);
   assert.equal(new Set(bookings.map((booking) => booking.reference)).size, 10);
   assert.ok(bookings.every((booking) => booking.demo));
-  assert.ok(bookings.every((booking) => booking.assignedStaffId === ""));
+  assert.ok(
+    bookings.every(
+      (booking) =>
+        booking.assignedStaffId === primaryTherapist.id &&
+        booking.assignedStaffName === primaryTherapist.name,
+    ),
+  );
   const repeatedBookingInput = {
     customerName: "Demo Launch Guest 1",
     phone: "+353 85 000 0000",
     email: "demo.launch.1@example.invalid",
     customerNotes: "Fictional customer created by isolated launch tests.",
     serviceId: services[0].id,
+    therapistId: primaryTherapist.id,
     durationMinutes: 60,
     localDate,
     localTime: times[0],
@@ -272,7 +348,51 @@ test("isolated launch verification covers services, ten bookings and administrat
     (await repository.listBookingOccupancy(localDate, localDate)).length,
     10,
   );
-  assert.equal((await repository.listNotifications(undefined, 100)).length, 30);
+  const createdBookingNotifications = await repository.listNotifications(
+    undefined,
+    100,
+  );
+  assert.equal(createdBookingNotifications.length, 40);
+  for (const booking of bookings) {
+    assert.ok(
+      createdBookingNotifications.some(
+        (notification) =>
+          notification.id ===
+            therapistBookingEmailNotificationId(
+              "assigned",
+              booking.id,
+              primaryTherapist.id,
+              booking.version,
+            ) &&
+          notification.audience === "therapist" &&
+          notification.targetTeamMemberId === primaryTherapist.id &&
+          notification.status === "queued",
+      ),
+    );
+  }
+
+  await assert.rejects(
+    () =>
+      updateCmsTeamMember(
+        primaryTherapist.id,
+        {
+          name: primaryTherapist.name,
+          fullName: primaryTherapist.fullName,
+          publicRole: primaryTherapist.publicRole,
+          operationalActive: false,
+          sortOrder: primaryTherapist.sortOrder,
+        },
+        primaryTherapist.version,
+        context,
+      ),
+    CmsConflictError,
+  );
+  assert.equal(
+    (await repository.getContent()).team.find(
+      (member) => member.id === primaryTherapist.id,
+    )?.operationalActive,
+    true,
+  );
 
   const completedBooking = await updateAdminBooking(
     bookings[0].id,
@@ -445,6 +565,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     email: "demo.public@example.invalid",
     notes: "Fictional public booking used only in isolated launch verification.",
     serviceId: services[1].id,
+    therapistId: primaryTherapist.id,
     durationMinutes: 60,
     localDate: publicDate,
     localTime: "08:00",
@@ -460,6 +581,42 @@ test("isolated launch verification covers services, ten bookings and administrat
       providerMessageId: "isolated-resend-email-id",
     };
   };
+  await assert.rejects(
+    () =>
+      createPublicBooking(
+        { ...publicRequest, therapistId: "" },
+        {
+          idempotencyKey: "isolated-public-booking-missing-therapist",
+          requestId: "isolated-public-booking-missing-therapist",
+          sendOwnerBookingEmail,
+        },
+      ),
+    CmsValidationError,
+  );
+  await assert.rejects(
+    () =>
+      createPublicBooking(
+        { ...publicRequest, therapistId: "waen" },
+        {
+          idempotencyKey: "isolated-public-booking-inactive-therapist",
+          requestId: "isolated-public-booking-inactive-therapist",
+          sendOwnerBookingEmail,
+        },
+      ),
+    CmsValidationError,
+  );
+  await assert.rejects(
+    () =>
+      createPublicBooking(
+        { ...publicRequest, therapistId: limitedTherapist.id },
+        {
+          idempotencyKey: "isolated-public-booking-wrong-treatment",
+          requestId: "isolated-public-booking-wrong-treatment",
+          sendOwnerBookingEmail,
+        },
+      ),
+    CmsValidationError,
+  );
   const publicBooking = await createPublicBooking(publicRequest, {
     idempotencyKey: "isolated-public-booking-request-0001",
     requestId: "isolated-public-booking",
@@ -468,6 +625,8 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.equal(publicBooking.source, "website");
   assert.equal(publicBooking.status, "pending");
   assert.equal(publicBooking.demo, false);
+  assert.equal(publicBooking.assignedStaffId, primaryTherapist.id);
+  assert.equal(publicBooking.assignedStaffName, primaryTherapist.name);
   assert.ok(publicBooking.privacyAcceptedAt);
   assert.ok(publicBooking.capacityExpiresAt > publicBooking.createdAt);
 
@@ -723,4 +882,55 @@ test("isolated launch verification covers services, ten bookings and administrat
   ]) {
     assert.ok(audits.some((event) => event.action === action), action);
   }
+
+  const queryNow = Date.now();
+  const futureStartsAt = new Date(queryNow + 86_400_000).toISOString();
+  const futureEndsAt = new Date(queryNow + 90_000_000).toISOString();
+  const expiredAt = new Date(queryNow - 60_000).toISOString();
+  const unassignedFixture = {
+    ...cancelledPublicBooking,
+    id: "isolated-unassigned-active",
+    reference: "SIR-UNASSIGNED-ACTIVE",
+    status: "confirmed" as const,
+    startsAt: futureStartsAt,
+    endsAt: futureEndsAt,
+    assignedStaffId: "",
+    assignedStaffName: "",
+    capacityExpiresAt: "",
+    version: 1,
+  };
+  await repository.saveBooking(unassignedFixture);
+  await repository.saveBooking({
+    ...unassignedFixture,
+    id: "isolated-unassigned-expired",
+    reference: "SIR-UNASSIGNED-EXPIRED",
+    status: "pending",
+    capacityExpiresAt: expiredAt,
+  });
+  await repository.saveBooking({
+    ...unassignedFixture,
+    id: "isolated-unassigned-cancelled",
+    reference: "SIR-UNASSIGNED-CANCELLED",
+    status: "cancelled",
+  });
+  await repository.saveBooking({
+    ...unassignedFixture,
+    id: "isolated-assigned-active",
+    reference: "SIR-ASSIGNED-ACTIVE",
+    assignedStaffId: primaryTherapist.id,
+    assignedStaffName: primaryTherapist.name,
+  });
+
+  const attentionBookingIds = (
+    await repository.listBookings({ attention: "unassigned" })
+  ).map((booking) => booking.id);
+  assert.deepEqual(attentionBookingIds, [unassignedFixture.id]);
+  assert.ok(
+    (
+      await repository.listFutureActiveTherapistBookings(
+        primaryTherapist.id,
+        new Date(queryNow).toISOString(),
+      )
+    ).some((booking) => booking.reference === "SIR-ASSIGNED-ACTIVE"),
+  );
 });

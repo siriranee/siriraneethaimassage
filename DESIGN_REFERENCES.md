@@ -6,7 +6,7 @@ The visual source of truth is the flattened desktop design set at:
 
 - `Home.png`
 - `Services.png`
-- `Masseuse.png` (implemented publicly as **Therapists**)
+- `Masseuse.png` (public **Therapists** page removed; therapist choice remains in booking)
 - `Book.png`
 - `CMS-Masseuse.png` (implemented as **Therapists** in the admin prototype)
 - `CMS-Book.png`

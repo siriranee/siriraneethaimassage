@@ -10,7 +10,6 @@ export const pageIds = [
   "privacy",
   "promotions",
   "gallery",
-  "therapists",
 ] as const;
 
 export type PageId = (typeof pageIds)[number];
@@ -91,14 +90,6 @@ const pageCopy = {
     seoTitle: "Siriranee Thai Massage Gallery | Howth, Dublin",
     seoDescription:
       "Preview the calm visual direction for Siriranee Thai Massage in Howth, Dublin, with illustrative treatment and spa imagery.",
-  },
-  therapists: {
-    eyebrow: "Your comfort comes first",
-    title: "The Siriranee Team",
-    description: "Friendly, thoughtful care from the moment you arrive.",
-    seoTitle: "Siriranee Thai Massage Team | Howth, Dublin",
-    seoDescription:
-      "Learn about the Siriranee Thai Massage team and our comfort-led approach to massage treatments in Howth, Dublin.",
   },
 } as const satisfies Readonly<
   Record<

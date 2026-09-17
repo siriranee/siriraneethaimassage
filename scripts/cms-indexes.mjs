@@ -280,6 +280,10 @@ try {
       { name: "cms_bookings_staff_starts_at" },
     ),
     db.collection("cmsBookings").createIndex(
+      { assignedStaffId: 1, status: 1, endsAt: 1 },
+      { name: "cms_bookings_staff_status_end" },
+    ),
+    db.collection("cmsBookings").createIndex(
       { retentionExpiresAtDate: 1 },
       { name: "cms_bookings_retention_ttl", expireAfterSeconds: 0 },
     ),
@@ -310,6 +314,18 @@ try {
     db.collection("cmsBookingNotifications").createIndex(
       { channel: 1, createdAt: -1 },
       { name: "cms_notifications_channel_created" },
+    ),
+    db.collection("cmsBookingNotifications").createIndex(
+      { providerMessageId: 1 },
+      { name: "cms_notifications_provider_message_id" },
+    ),
+    db.collection("cmsBookingEmailDeliveryEvents").createIndex(
+      { providerMessageId: 1 },
+      { name: "cms_email_delivery_events_provider_message_id" },
+    ),
+    db.collection("cmsBookingEmailDeliveryEvents").createIndex(
+      { expiresAtDate: 1 },
+      { name: "cms_email_delivery_events_expiry_ttl", expireAfterSeconds: 0 },
     ),
     db.collection("cmsBookingNotifications").createIndex(
       { expiresAtDate: 1 },

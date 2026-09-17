@@ -37,10 +37,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getPublicPromotions(),
   ]);
   const publishedAt = validLastModified(lastModified);
-  const indexedStaticRoutes =
-    promotions.length > 0
-      ? [...staticRoutes, promotionsRoute]
-      : staticRoutes;
+  const indexedStaticRoutes = [
+    ...staticRoutes,
+    ...(promotions.length > 0 ? [promotionsRoute] : []),
+  ];
   const staticEntries: MetadataRoute.Sitemap = indexedStaticRoutes.map(
     (route) => ({
       url: new URL(route.path, `${siteConfig.canonicalUrl}/`).toString(),
@@ -55,6 +55,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.78,
     ...(publishedAt ? { lastModified: publishedAt } : {}),
   }));
-
   return [...staticEntries, ...serviceEntries];
 }

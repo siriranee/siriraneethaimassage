@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, X } from "lucide-react";
+import { Bell, Clock3, History, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -8,11 +8,14 @@ import type {
   CmsNotificationBellItem,
   CmsNotificationKind,
 } from "@/domain/cms/types";
+import { bookingActivityStatusLabel } from "@/domain/cms/notification-presentation";
 
 import styles from "./CmsNotificationBell.module.css";
 
 const notificationLabels: Readonly<Record<CmsNotificationKind, string>> = {
-  "booking-requested": "New booking request",
+  "booking-requested": "Booking request received",
+  "booking-assigned": "Therapist assigned",
+  "booking-unassigned": "Therapist unassigned",
   "booking-confirmed": "Booking confirmed",
   "booking-rescheduled": "Booking rescheduled",
   "booking-cancelled": "Booking cancelled",
@@ -96,9 +99,9 @@ export function CmsNotificationBell({
         type="button"
       >
         <Bell aria-hidden="true" />
-        {items.length ? (
+        {items.some((item) => item.currentStatus === "pending") ? (
           <span className={styles.activityDot}>
-            <span className="sr-only">{recentLabel}</span>
+            <span className="sr-only">A recent booking needs review</span>
           </span>
         ) : null}
       </button>
@@ -112,7 +115,7 @@ export function CmsNotificationBell({
       >
         <header className={styles.panelHeader}>
           <div>
-            <span>Notifications</span>
+            <span>Booking history</span>
             <h2>Recent booking activity</h2>
           </div>
           <button
@@ -137,11 +140,23 @@ export function CmsNotificationBell({
                   onClick={() => setOpen(false)}
                 >
                   <span className={styles.itemIcon} aria-hidden="true">
-                    <Bell />
+                    <History />
                   </span>
                   <span className={styles.itemCopy}>
-                    <strong>{notificationLabels[item.kind]}</strong>
-                    <span>{item.bookingReference}</span>
+                    <strong>{item.bookingReference}</strong>
+                    <span
+                      className={
+                        item.currentStatus === "pending"
+                          ? styles.pendingStatus
+                          : styles.currentStatus
+                      }
+                    >
+                      {item.currentStatus === "pending" ? <Clock3 aria-hidden="true" /> : null}
+                      {bookingActivityStatusLabel(item.currentStatus)}
+                    </span>
+                    <span className={styles.historyEvent}>
+                      History: {notificationLabels[item.kind]}
+                    </span>
                     <time dateTime={item.createdAt}>
                       {formatDublinTimestamp(item.createdAt)}
                     </time>
@@ -158,7 +173,10 @@ export function CmsNotificationBell({
           </div>
         )}
 
-        <p className={styles.refreshNote}>Loaded when this page opened · Dublin time</p>
+        <p className={styles.refreshNote}>
+          Past events remain in history after confirmation. Open a booking to see its latest status.
+          <br />Loaded when this page opened · Dublin time
+        </p>
       </section>
     </div>
   );

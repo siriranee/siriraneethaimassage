@@ -16,9 +16,18 @@ export type PublicTreatmentNavigationItem = {
 };
 
 export type PublicTeamMember = {
+  readonly id: string;
   readonly slug: string;
   readonly name: string;
   readonly role: string;
+  readonly shortBio: string;
+  readonly biography: string;
+  readonly imageUrl: string;
+  readonly imageAlt: string;
+  readonly specialties: readonly string[];
+  readonly languages: readonly string[];
+  readonly serviceIds: readonly string[];
+  readonly bookable: boolean;
 };
 
 export type PublicVoucher = {

@@ -8,10 +8,12 @@ import type { CmsBookingSettings } from "@/domain/cms/types";
 import styles from "./CmsEditorForm.module.css";
 
 export function BookingSettingsForm({
+  hasBookableTherapist,
   openingHoursConfirmed,
   settings,
 }: Readonly<{
   openingHoursConfirmed: boolean;
+  hasBookableTherapist: boolean;
   settings: CmsBookingSettings;
 }>) {
   const router = useRouter();
@@ -22,7 +24,8 @@ export function BookingSettingsForm({
   );
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const canEnablePublicBooking = openingHoursConfirmed && rulesConfirmed;
+  const canEnablePublicBooking =
+    openingHoursConfirmed && rulesConfirmed && hasBookableTherapist;
 
   function changeRulesConfirmed(confirmed: boolean) {
     setRulesConfirmed(confirmed);
@@ -123,7 +126,9 @@ export function BookingSettingsForm({
               <small>
                 {canEnablePublicBooking
                   ? "This publishes the owner decision immediately. The server booking switch, MongoDB and customer-data encryption must also be ready."
-                  : "Confirm both the opening hours and booking rules before enabling this setting."}
+                  : !hasBookableTherapist
+                    ? "Create a public, active therapist with an email and at least one eligible treatment first."
+                    : "Confirm both the opening hours and booking rules before enabling this setting."}
               </small>
             </span>
           </label>

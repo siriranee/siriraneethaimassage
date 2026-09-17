@@ -12,6 +12,7 @@ const MIGRATION_ACTOR_ID = "system-voucher-migration";
 const MIGRATION_ACTOR_NAME = "Voucher migration";
 const MEDIA_SCOPE = "voucher-image";
 const MINIMUM_CONTENT_SCHEMA_VERSION = 7;
+const SUPPORTED_CONTENT_SCHEMA_VERSIONS = new Set([6, 7, 8]);
 const AUDIT_RETENTION_DAYS = 365;
 const MAXIMUM_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAXIMUM_IMAGE_EDGE = 4_096;
@@ -335,6 +336,18 @@ function hasExactTopLevelFields(value, expectedFields) {
   return isDeepStrictEqual(Object.keys(value ?? {}).sort(), expectedFields);
 }
 
+function migratedSchemaVersion(schemaVersion) {
+  if (!SUPPORTED_CONTENT_SCHEMA_VERSIONS.has(schemaVersion)) {
+    throw new Error("Unsupported CMS content schema version.");
+  }
+
+  // This voucher-only migration knows how to canonicalise the v6 document
+  // shape to v7. Schema v8 adds therapist data that is normalised by the
+  // application, so preserve an existing v8 marker instead of downgrading it
+  // or claiming that a legacy v6/v7 team record has already been migrated.
+  return Math.max(MINIMUM_CONTENT_SCHEMA_VERSION, schemaVersion);
+}
+
 function assertContentDocument(content) {
   if (!content || content._id !== "siriranee-content") {
     throw new Error("The current Siriranee CMS content document was not found.");
@@ -354,10 +367,10 @@ function assertContentDocument(content) {
   }
   if (
     !Number.isInteger(content.schemaVersion) ||
-    ![6, 7].includes(content.schemaVersion)
+    !SUPPORTED_CONTENT_SCHEMA_VERSIONS.has(content.schemaVersion)
   ) {
     throw new Error(
-      "The current CMS content must use supported schema version 6 or 7.",
+      "The current CMS content must use supported schema version 6, 7 or 8.",
     );
   }
 }
@@ -374,10 +387,10 @@ export function assertSupportedPublicationSnapshot(snapshot) {
   }
   if (
     !Number.isInteger(snapshot.schemaVersion) ||
-    ![6, 7].includes(snapshot.schemaVersion)
+    !SUPPORTED_CONTENT_SCHEMA_VERSIONS.has(snapshot.schemaVersion)
   ) {
     throw new Error(
-      "The current CMS publication must use supported schema version 6 or 7.",
+      "The current CMS publication must use supported schema version 6, 7 or 8.",
     );
   }
   if (!Number.isInteger(snapshot.revision) || snapshot.revision < 1) {
@@ -891,7 +904,7 @@ function createMediaRecord(asset, submissionId, timestamp) {
 export function createContentDocument(current, vouchers, revision, timestamp) {
   return {
     _id: "siriranee-content",
-    schemaVersion: MINIMUM_CONTENT_SCHEMA_VERSION,
+    schemaVersion: migratedSchemaVersion(current.schemaVersion),
     revision,
     services: structuredClone(current.services),
     site: structuredClone(current.site),
@@ -914,7 +927,7 @@ export function createPublicationSnapshot(
 
   return {
     id: "siriranee-content",
-    schemaVersion: MINIMUM_CONTENT_SCHEMA_VERSION,
+    schemaVersion: migratedSchemaVersion(publishedBase.schemaVersion),
     revision: nextContent.revision,
     services: structuredClone(publishedBase.services),
     site: structuredClone(publishedBase.site),
@@ -1131,6 +1144,9 @@ async function commitMongoMigration({
           replacementVouchers,
         );
         const currentSchemaVersion = Number(current.schemaVersion);
+        const publicationSchemaVersion = Number(
+          publicationState.publication.snapshot.schemaVersion,
+        );
         const contentNeedsUpdate =
           !sameVouchers ||
           !hasExactTopLevelFields(current, STORED_CONTENT_FIELDS) ||
@@ -1138,8 +1154,7 @@ async function commitMongoMigration({
           currentSchemaVersion < MINIMUM_CONTENT_SCHEMA_VERSION;
 
         const publicationNeedsUpdate =
-          publicationState.publication.snapshot.schemaVersion !==
-            MINIMUM_CONTENT_SCHEMA_VERSION ||
+          publicationSchemaVersion < MINIMUM_CONTENT_SCHEMA_VERSION ||
           !hasExactTopLevelFields(
             publicationState.publication.snapshot,
             PUBLICATION_SNAPSHOT_FIELDS,
@@ -1333,8 +1348,8 @@ async function verifyCommittedMongoMigration({
     .collection("cmsContent")
     .findOne({ _id: "siriranee-content" });
   assertContentDocument(content);
-  if (content.schemaVersion !== MINIMUM_CONTENT_SCHEMA_VERSION) {
-    throw new Error("CMS content verification requires schema version 7.");
+  if (content.schemaVersion < MINIMUM_CONTENT_SCHEMA_VERSION) {
+    throw new Error("CMS content verification requires schema version 7 or 8.");
   }
   if (!hasExactTopLevelFields(content, STORED_CONTENT_FIELDS)) {
     throw new Error("Verification found unsupported fields in CMS content.");
@@ -1375,7 +1390,7 @@ async function verifyCommittedMongoMigration({
     pointer.revision !== content.revision ||
     publication.revision !== content.revision ||
     publication.snapshot.revision !== content.revision ||
-    publication.snapshot.schemaVersion !== MINIMUM_CONTENT_SCHEMA_VERSION ||
+    publication.snapshot.schemaVersion < MINIMUM_CONTENT_SCHEMA_VERSION ||
     !hasExactTopLevelFields(
       publication.snapshot,
       PUBLICATION_SNAPSHOT_FIELDS,

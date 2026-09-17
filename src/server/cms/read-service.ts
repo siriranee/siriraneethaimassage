@@ -38,6 +38,10 @@ export async function getCmsDashboardData() {
       booking.status !== "no-show" &&
       !isPendingCapacityExpired(booking, now),
   );
+  const [emailAttention, upcomingEmailAttention] = await Promise.all([
+    repository.listBookingEmailAttention(undefined, 8),
+    repository.listBookingEmailAttention(upcoming.slice(0, 6).map((booking) => booking.id), 6),
+  ]);
 
   return {
     content,
@@ -51,11 +55,14 @@ export async function getCmsDashboardData() {
       ).length,
       expiredPendingCount: expiredPending.length,
       upcomingCount: upcoming.length,
+      unassignedCount: upcoming.filter((booking) => !booking.assignedStaffId).length,
       activeServiceCount: content.services.filter(
         (service) => service.prices.some((price) => price.active),
       ).length,
     },
     upcoming: upcoming.slice(0, 6),
+    emailAttention,
+    upcomingEmailAttention,
   };
 }
 
@@ -75,16 +82,28 @@ export async function listCmsNotifications(bookingId?: string, limit = 200) {
   return getCmsRepository().listNotifications(bookingId, limit);
 }
 
+export async function listCmsBookingEmailAttention(bookingIds?: readonly string[], limit = 8) {
+  return getCmsRepository().listBookingEmailAttention(bookingIds, limit);
+}
+
 export async function listCmsNotificationBellItems(
   limit = 8,
 ): Promise<readonly CmsNotificationBellItem[]> {
-  const notifications = await getCmsRepository().listDashboardNotifications(limit);
+  const repository = getCmsRepository();
+  const notifications = await repository.listDashboardNotifications(limit);
+  const bookings = await Promise.all(
+    [...new Set(notifications.map((notification) => notification.bookingId))].map(
+      async (id) => [id, (await repository.getBooking(id))?.status] as const,
+    ),
+  );
+  const currentStatuses = new Map(bookings);
   return notifications.map((notification) => ({
     id: notification.id,
     bookingId: notification.bookingId,
     bookingReference: notification.bookingReference,
     kind: notification.kind,
     createdAt: notification.createdAt,
+    currentStatus: currentStatuses.get(notification.bookingId),
   }));
 }
 

@@ -9,6 +9,7 @@ const CMS_MEDIA_MAX_PIXELS = 16_000_000;
 const CMS_MEDIA_SCOPES = new Set<CmsMediaScope>([
   "service-cover",
   "service-gallery",
+  "therapist-profile",
   "voucher-image",
 ]);
 const CMS_MEDIA_CONTENT_TYPES = new Set([

@@ -154,6 +154,67 @@ test("remaining capacity is reported when concurrent capacity is greater than on
   );
 });
 
+test("a therapist cannot be assigned to overlapping appointments", () => {
+  const result = slots({
+    therapistId: "therapist-a",
+    settings: settings({ maxConcurrentBookings: 3 }),
+    bookings: [
+      {
+        startsAt: "2026-06-01T09:00:00Z",
+        endsAt: "2026-06-01T10:00:00Z",
+        assignedStaffId: "therapist-a",
+        status: "confirmed",
+      },
+    ],
+  });
+
+  assert.ok(!result.some((slot) => slot.localTime === "10:00"));
+  assert.ok(result.some((slot) => slot.localTime === "11:00"));
+});
+
+test("different therapists can work concurrently while spa capacity remains", () => {
+  const result = slots({
+    therapistId: "therapist-b",
+    settings: settings({ maxConcurrentBookings: 2 }),
+    bookings: [
+      {
+        startsAt: "2026-06-01T09:00:00Z",
+        endsAt: "2026-06-01T10:00:00Z",
+        assignedStaffId: "therapist-a",
+        status: "confirmed",
+      },
+    ],
+  });
+
+  assert.equal(
+    result.find((slot) => slot.localTime === "10:00")?.remainingCapacity,
+    1,
+  );
+});
+
+test("global spa capacity still blocks a free therapist", () => {
+  const result = slots({
+    therapistId: "therapist-c",
+    settings: settings({ maxConcurrentBookings: 2 }),
+    bookings: [
+      {
+        startsAt: "2026-06-01T09:00:00Z",
+        endsAt: "2026-06-01T10:00:00Z",
+        assignedStaffId: "therapist-a",
+        status: "confirmed",
+      },
+      {
+        startsAt: "2026-06-01T09:00:00Z",
+        endsAt: "2026-06-01T10:00:00Z",
+        assignedStaffId: "therapist-b",
+        status: "confirmed",
+      },
+    ],
+  });
+
+  assert.ok(!result.some((slot) => slot.localTime === "10:00"));
+});
+
 test("partial and all-day closures remove intersecting slots", () => {
   const partial: CmsClosure = {
     id: "closure-1",

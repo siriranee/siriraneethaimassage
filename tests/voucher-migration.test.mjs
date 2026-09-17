@@ -129,7 +129,7 @@ test("voucher migration commits content, publication, media and audit in one ses
   assert.match(script, /verifyCommittedMigration/);
 });
 
-test("voucher publication upgrades only a validated v6/v7 published snapshot", async () => {
+test("voucher publication upgrades legacy snapshots without downgrading schema v8", async () => {
   const {
     assertSupportedPublicationSnapshot,
     createContentDocument,
@@ -210,6 +210,7 @@ test("voucher publication upgrades only a validated v6/v7 published snapshot", a
     8,
     "2026-09-03T00:00:00.000Z",
   );
+  assert.equal(storedContent.schemaVersion, 7);
   assert.deepEqual(Object.keys(storedContent).sort(), [
     "_id",
     "bookingSettings",
@@ -226,14 +227,41 @@ test("voucher publication upgrades only a validated v6/v7 published snapshot", a
   assert.deepEqual(storedContent.services, nextContent.services);
   assert.notEqual(storedContent.services, nextContent.services);
 
-  for (const unsupportedSchemaVersion of [5, 8, "6"]) {
+  const currentV8 = {
+    ...nextContent,
+    schemaVersion: 8,
+    team: [
+      {
+        id: "published-team-member",
+        slug: "published-team-member",
+        serviceIds: ["published-service"],
+      },
+    ],
+  };
+  const storedV8 = createContentDocument(
+    { _id: "siriranee-content", ...currentV8 },
+    desiredVouchers,
+    9,
+    "2026-09-04T00:00:00.000Z",
+  );
+  const publishedV8 = createPublicationSnapshot(
+    { snapshot: { ...publishedSnapshot, ...currentV8 } },
+    storedV8,
+    desiredVouchers,
+  );
+  assert.equal(storedV8.schemaVersion, 8);
+  assert.equal(publishedV8.schemaVersion, 8);
+  assert.deepEqual(storedV8.team, currentV8.team);
+  assert.deepEqual(publishedV8.team, currentV8.team);
+
+  for (const unsupportedSchemaVersion of [5, 9, "6"]) {
     assert.throws(
       () =>
         assertSupportedPublicationSnapshot({
           ...publishedSnapshot,
           schemaVersion: unsupportedSchemaVersion,
         }),
-      /supported schema version 6 or 7/,
+      /supported schema version 6, 7 or 8/,
     );
   }
   assert.throws(

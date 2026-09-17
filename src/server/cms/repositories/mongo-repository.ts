@@ -1,6 +1,12 @@
 import "server-only";
 
 import {
+  bookingEmailAttentionStatuses,
+  bookingEmailAttentionDeliveryStatuses,
+  type CmsBookingEmailAttention,
+} from "@/domain/cms/notification-presentation";
+
+import {
   MongoServerError,
   type ClientSession,
   type Db,
@@ -11,8 +17,10 @@ import {
 import type {
   CmsAuditEvent,
   CmsBooking,
+  CmsFutureTherapistBooking,
   CmsBookingHold,
   CmsBookingNotification,
+  CmsEmailDeliveryEvent,
   CmsBookingOccupancy,
   CmsBookingQuery,
   CmsClosure,
@@ -21,6 +29,7 @@ import type {
   CmsMediaAsset,
   CmsPublication,
   CmsSession,
+  CmsTherapistContact,
   CmsUser,
 } from "@/domain/cms/types";
 import {
@@ -45,10 +54,12 @@ import {
   type CmsRepository,
 } from "@/server/cms/repositories/repository";
 import { cmsContentReferencesMediaAsset } from "@/server/media/references";
+import { applyEmailDeliveryEvent } from "@/domain/booking/email-delivery";
 
 const collections = {
   content: "cmsContent",
   publications: "cmsPublications",
+  therapistContacts: "cmsTherapistContacts",
   mediaAssets: "cmsMediaAssets",
   meta: "cmsMeta",
   users: "cmsUsers",
@@ -59,7 +70,9 @@ const collections = {
   closures: "cmsClosures",
   holds: "cmsBookingHolds",
   notifications: "cmsBookingNotifications",
+  emailDeliveryEvents: "cmsBookingEmailDeliveryEvents",
   dayLocks: "cmsBookingDayLocks",
+  therapistLocks: "cmsTherapistLocks",
 } as const;
 
 type Identified = { readonly id: string };
@@ -113,8 +126,51 @@ function decodeBooking(value: Document | null): CmsBooking | null {
   return {
     id: String(_id),
     ...rest,
+    assignedStaffId:
+      typeof rest.assignedStaffId === "string" ? rest.assignedStaffId : "",
+    assignedStaffName:
+      typeof rest.assignedStaffName === "string" ? rest.assignedStaffName : "",
     customer,
   } as CmsBooking;
+}
+
+function encodeTherapistContact(
+  value: CmsTherapistContact,
+): CmsMongoDocument {
+  const { id, notificationEmail, contactPhone, ...rest } = value;
+  return {
+    _id: id,
+    ...rest,
+    contactEncrypted: encryptCmsPii(
+      JSON.stringify({ notificationEmail, contactPhone }),
+    ),
+  };
+}
+
+function decodeTherapistContact(
+  value: Document | null,
+): CmsTherapistContact | null {
+  if (!value) return null;
+  const { _id, contactEncrypted, ...rest } = value;
+  if (typeof contactEncrypted !== "string") {
+    throw new Error("Therapist contact data is not encrypted.");
+  }
+
+  const contact = JSON.parse(decryptCmsPii(contactEncrypted)) as {
+    readonly notificationEmail?: unknown;
+    readonly contactPhone?: unknown;
+  };
+  if (typeof contact.notificationEmail !== "string") {
+    throw new Error("Therapist contact data is invalid.");
+  }
+
+  return {
+    id: String(_id),
+    ...rest,
+    notificationEmail: contact.notificationEmail,
+    contactPhone:
+      typeof contact.contactPhone === "string" ? contact.contactPhone : "",
+  } as CmsTherapistContact;
 }
 
 function encodeNotification(value: CmsBookingNotification): CmsMongoDocument {
@@ -138,6 +194,7 @@ function bookingIncludesSearch(booking: CmsBooking, search: string) {
     booking.customer.phone,
     booking.customer.email,
     booking.serviceName,
+    booking.assignedStaffName,
   ]
     .join(" ")
     .toLowerCase()
@@ -278,6 +335,48 @@ export class MongoCmsRepository implements CmsRepository {
       { _id: { $nin: retained.map((item) => String(item._id)) } },
       this.options(),
     );
+  }
+
+  async getTherapistContact(id: string) {
+    const db = await this.db();
+    return decodeTherapistContact(
+      await db
+        .collection<CmsMongoDocument>(collections.therapistContacts)
+        .findOne({ _id: id }, this.options()),
+    );
+  }
+
+  async saveTherapistContact(
+    contact: CmsTherapistContact,
+    expectedVersion?: number,
+  ) {
+    const db = await this.db();
+    const collection = db.collection<CmsMongoDocument>(
+      collections.therapistContacts,
+    );
+
+    if (expectedVersion === undefined) {
+      try {
+        await collection.insertOne(
+          encodeTherapistContact(contact),
+          this.options(),
+        );
+      } catch (error) {
+        if (error instanceof MongoServerError && error.code === 11_000) {
+          throw new CmsConflictError();
+        }
+        throw error;
+      }
+      return contact;
+    }
+
+    const result = await collection.replaceOne(
+      { _id: contact.id, version: expectedVersion },
+      encodeTherapistContact(contact),
+      this.options(),
+    );
+    if (result.matchedCount !== 1) throw new CmsConflictError();
+    return contact;
   }
 
   async getMediaAsset(publicId: string) {
@@ -603,6 +702,7 @@ export class MongoCmsRepository implements CmsRepository {
             endsAt: 1,
             status: 1,
             capacityExpiresAt: 1,
+            assignedStaffId: 1,
           },
         },
       )
@@ -619,12 +719,15 @@ export class MongoCmsRepository implements CmsRepository {
         typeof row.capacityExpiresAt === "string"
           ? row.capacityExpiresAt
           : "",
+      assignedStaffId:
+        typeof row.assignedStaffId === "string" ? row.assignedStaffId : "",
     }));
   }
 
   async listBookings(query: CmsBookingQuery = {}) {
     const db = await this.db();
     const filter: Filter<CmsMongoDocument> = {};
+    const nowIso = new Date().toISOString();
 
     if (query.from || query.to) {
       filter.localDate = {
@@ -635,6 +738,33 @@ export class MongoCmsRepository implements CmsRepository {
     if (query.status) filter.status = query.status;
     if (query.source) filter.source = query.source;
     if (query.serviceId) filter.serviceId = query.serviceId;
+    if (query.therapistId) filter.assignedStaffId = query.therapistId;
+    if (query.attention === "unassigned") {
+      filter.$and = [
+        {
+          $or: [
+            { assignedStaffId: "" },
+            { assignedStaffId: null },
+            { assignedStaffId: { $exists: false } },
+          ],
+        },
+        { endsAt: { $gt: nowIso } },
+        {
+          $or: [
+            { status: "confirmed" },
+            {
+              status: "pending",
+              $or: [
+                { capacityExpiresAt: "" },
+                { capacityExpiresAt: null },
+                { capacityExpiresAt: { $exists: false } },
+                { capacityExpiresAt: { $gt: nowIso } },
+              ],
+            },
+          ],
+        },
+      ];
+    }
     const rows = await db
       .collection<CmsMongoDocument>(collections.bookings)
       .find(filter, this.options())
@@ -650,11 +780,50 @@ export class MongoCmsRepository implements CmsRepository {
         !(
           booking.status === "pending" &&
           booking.capacityExpiresAt &&
-          booking.capacityExpiresAt <= new Date().toISOString()
+          booking.capacityExpiresAt <= nowIso
         )
       ) return false;
       return true;
     });
+  }
+
+  async listFutureActiveTherapistBookings(
+    therapistId: string,
+    afterIso: string,
+  ): Promise<readonly CmsFutureTherapistBooking[]> {
+    const db = await this.db();
+    const rows = await db
+      .collection<CmsMongoDocument>(collections.bookings)
+      .find(
+        {
+          assignedStaffId: therapistId,
+          endsAt: { $gt: afterIso },
+          $or: [
+            { status: "confirmed" },
+            {
+              status: "pending",
+              $or: [
+                { capacityExpiresAt: "" },
+                { capacityExpiresAt: null },
+                { capacityExpiresAt: { $exists: false } },
+                { capacityExpiresAt: { $gt: afterIso } },
+              ],
+            },
+          ],
+        },
+        {
+          ...this.options(),
+          projection: { _id: 0, reference: 1, serviceId: 1 },
+        },
+      )
+      .sort({ startsAt: 1 })
+      .toArray();
+
+    return rows.flatMap((row) =>
+      typeof row.reference === "string" && typeof row.serviceId === "string"
+        ? [{ reference: row.reference, serviceId: row.serviceId }]
+        : [],
+    );
   }
 
   async getBooking(id: string) {
@@ -797,6 +966,40 @@ export class MongoCmsRepository implements CmsRepository {
     return rows.map((row) => decodeNotification(row)!);
   }
 
+  async listBookingEmailAttention(bookingIds?: readonly string[], limit = 8) {
+    if (bookingIds && !bookingIds.length) return [];
+    const db = await this.db();
+    return db.collection<CmsMongoDocument>(collections.notifications)
+      .aggregate<CmsBookingEmailAttention>([
+        { $match: {
+          channel: "email", provider: "resend",
+          ...(bookingIds ? { bookingId: { $in: [...new Set(bookingIds)].slice(0, 500) } } : {}),
+          $or: [
+            { status: { $in: [...bookingEmailAttentionStatuses] } },
+            { deliveryStatus: { $in: [...bookingEmailAttentionDeliveryStatuses] } },
+          ],
+        } },
+        // Inspect operational state only; never fetch/decrypt customer details.
+        { $lookup: {
+          from: collections.bookings, localField: "bookingId", foreignField: "_id", as: "bookingState",
+          pipeline: [{ $project: { _id: 0, status: 1, demo: 1 } }],
+        } },
+        { $unwind: "$bookingState" },
+        { $match: {
+          "bookingState.demo": { $ne: true },
+          $nor: [{ audience: "owner", kind: "booking-requested", "bookingState.status": { $ne: "pending" } }],
+        } },
+        { $group: {
+          _id: "$bookingId", bookingReference: { $first: "$bookingReference" },
+          count: { $sum: 1 }, audiences: { $addToSet: { $ifNull: ["$audience", "customer"] } },
+          updatedAt: { $max: "$updatedAt" },
+        } },
+        { $sort: { updatedAt: -1, _id: 1 } },
+        { $limit: Math.max(1, Math.min(limit, 500)) },
+        { $project: { _id: 0, bookingId: "$_id", bookingReference: 1, count: 1, audiences: 1, updatedAt: 1 } },
+      ], this.options()).toArray();
+  }
+
   async getNotification(id: string) {
     const db = await this.db();
     return decodeNotification(
@@ -813,6 +1016,45 @@ export class MongoCmsRepository implements CmsRepository {
       encodeNotification(notification),
       { ...this.options(), upsert: true },
     );
+  }
+
+  async recordEmailDeliveryEvent(event: CmsEmailDeliveryEvent) {
+    const db = await this.db();
+    await db.collection<CmsMongoDocument>(collections.emailDeliveryEvents).updateOne(
+      { _id: event.id },
+      { $setOnInsert: {
+        ...encode(event),
+        expiresAtDate: new Date(Date.parse(event.receivedAt) + 30 * 86400_000),
+      } },
+      { ...this.options(), upsert: true },
+    );
+    await this.reconcileEmailDeliveryEvents(event.providerMessageId);
+  }
+
+  async reconcileEmailDeliveryEvents(providerMessageId: string) {
+    const db = await this.db();
+    const rows = await db.collection<CmsMongoDocument>(collections.emailDeliveryEvents)
+      .find({ providerMessageId }, this.options()).toArray();
+    const events = rows.map((row) => decode<CmsEmailDeliveryEvent>(row)!);
+    if (!events.length) return;
+    const notifications = db.collection<CmsMongoDocument>(collections.notifications);
+    // Metadata-only compare-and-swap never replaces a concurrent send result.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const current = decodeNotification(await notifications.findOne({ providerMessageId }, this.options()));
+      if (!current) return; // The provider can deliver before its send response is saved.
+      const updated = events.reduce(applyEmailDeliveryEvent, current);
+      if (updated === current) return;
+      const result = await notifications.updateOne({
+        _id: current.id, providerMessageId,
+        providerEventId: current.providerEventId ?? { $exists: false },
+      }, { $set: {
+        deliveryStatus: updated.deliveryStatus,
+        providerEventAt: updated.providerEventAt,
+        providerEventId: updated.providerEventId,
+      } }, this.options());
+      if (result.matchedCount === 1) return;
+    }
+    throw new Error("Email delivery metadata changed concurrently. Retry the event.");
   }
 
   async saveNotificationIfAbsent(notification: CmsBookingNotification) {
@@ -878,6 +1120,9 @@ export class MongoCmsRepository implements CmsRepository {
         encodeNotification(notification),
         this.options(),
       );
+    if (result.matchedCount === 1 && notification.providerMessageId) {
+      await this.reconcileEmailDeliveryEvents(notification.providerMessageId);
+    }
     return result.matchedCount === 1;
   }
 
@@ -890,16 +1135,32 @@ export class MongoCmsRepository implements CmsRepository {
         this.options(),
       )
       .toArray();
-    return rows.map((row) => decode<CmsBookingHold>(row)!);
+    return rows.map((row) => {
+      const hold = decode<CmsBookingHold>(row)!;
+      return {
+        ...hold,
+        assignedStaffId:
+          typeof hold.assignedStaffId === "string" ? hold.assignedStaffId : "",
+      };
+    });
   }
 
   async findHoldByTokenHash(tokenHash: string) {
     const db = await this.db();
-    return decode<CmsBookingHold>(
+    const hold = decode<CmsBookingHold>(
       await db
         .collection<CmsMongoDocument>(collections.holds)
         .findOne({ tokenHash }, this.options()),
     );
+    return hold
+      ? {
+          ...hold,
+          assignedStaffId:
+            typeof hold.assignedStaffId === "string"
+              ? hold.assignedStaffId
+              : "",
+        }
+      : null;
   }
 
   async saveHold(hold: CmsBookingHold) {
@@ -930,5 +1191,29 @@ export class MongoCmsRepository implements CmsRepository {
       },
       { ...this.options(), upsert: true },
     );
+  }
+
+  async lockTherapist(therapistId: string) {
+    if (!this.session) throw new Error("Therapist locks require a transaction.");
+    const db = await this.db();
+    const now = new Date().toISOString();
+    try {
+      await db.collection<CmsMongoDocument>(collections.therapistLocks).updateOne(
+        { _id: therapistId },
+        {
+          $inc: { version: 1 },
+          $set: { updatedAt: now },
+          $setOnInsert: { createdAt: now },
+        },
+        { ...this.options(), upsert: true },
+      );
+    } catch (error) {
+      // Two first-time assignments may both try to create this lock. Retry the
+      // entire transaction so eligibility and occupancy use a fresh snapshot.
+      if (error instanceof MongoServerError && error.code === 11000) {
+        error.addErrorLabel("TransientTransactionError");
+      }
+      throw error;
+    }
   }
 }

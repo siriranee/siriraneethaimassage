@@ -27,6 +27,7 @@ const relevantKeys = [
   "RESEND_API_KEY",
   "RESEND_FROM_EMAIL",
   "RESEND_BOOKING_TO_EMAIL",
+  "RESEND_WEBHOOK_SECRET",
 ];
 
 function run(overrides: Record<string, string> = {}) {
@@ -55,6 +56,14 @@ const resend = {
   RESEND_FROM_EMAIL: "Siriranee Bookings <bookings@siriranee.example>",
   RESEND_BOOKING_TO_EMAIL: "owner@siriranee.example",
 };
+
+test("delivery webhook is optional but a sending API key is not a signing secret", () => {
+  assert.equal(run({ CMS_MODE: "disabled", NEXT_PUBLIC_SITE_URL: validOrigin }).status, 0);
+  const invalid = run({ CMS_MODE: "disabled", NEXT_PUBLIC_SITE_URL: validOrigin, RESEND_WEBHOOK_SECRET: "re_wrong_secret" });
+  assert.equal(invalid.status, 1);
+  assert.match(invalid.stderr, /RESEND_WEBHOOK_SECRET/);
+  assert.equal(run({ CMS_MODE: "disabled", NEXT_PUBLIC_SITE_URL: validOrigin, RESEND_WEBHOOK_SECRET: `whsec_${Buffer.alloc(32, 42).toString("base64")}` }).status, 0);
+});
 
 test("hosted builds require a clean HTTPS production origin", () => {
   assert.equal(run({ CMS_MODE: "disabled" }).status, 1);

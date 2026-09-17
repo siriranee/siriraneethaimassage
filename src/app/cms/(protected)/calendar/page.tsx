@@ -1,4 +1,5 @@
 import { Ban, Clock3 } from "lucide-react";
+import { CmsBookingEmailAttentionNotice } from "@/components/cms/CmsBookingEmailAttentionNotice";
 
 import {
   CmsCalendar,
@@ -20,7 +21,7 @@ import {
 import { canCmsRole } from "@/domain/cms/permissions";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
-import { listCmsBookings, listCmsClosures } from "@/server/cms/read-service";
+import { listCmsBookingEmailAttention, listCmsBookings, listCmsClosures } from "@/server/cms/read-service";
 
 type PageProps = {
   readonly searchParams: Promise<
@@ -51,11 +52,14 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
       : monthFromCalendarDate(today) === month
         ? today
         : range.from;
-  const [content, bookings, closures] = await Promise.all([
+  const [content, bookings, closures, emailAttention] = await Promise.all([
     getCmsContent(),
     listCmsBookings({ from: range.from, to: range.to }),
     listCmsClosures(range.from, range.to),
+    listCmsBookingEmailAttention(),
   ]);
+  const visibleEmailAttention = await listCmsBookingEmailAttention(bookings.map((booking) => booking.id), 500);
+  const attentionByBooking = new Map(visibleEmailAttention.map((item) => [item.bookingId, item]));
   const calendarBookings: readonly CmsCalendarBooking[] = bookings
     .filter(
       (booking) =>
@@ -70,12 +74,15 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
       hasCustomerEmail: Boolean(booking.customer.email),
       customerNotes: booking.customer.notes,
       serviceName: booking.serviceName,
+      assignedStaffId: booking.assignedStaffId,
+      therapistName: booking.assignedStaffName,
       durationMinutes: booking.durationMinutes,
       localDate: booking.localDate,
       localTime: booking.localTime,
       status: booking.status,
       version: booking.version,
       demo: booking.demo,
+      emailAttention: attentionByBooking.get(booking.id),
     }));
   const calendarClosures: readonly CmsCalendarClosure[] = closures
     .filter((closure) => closure.active)
@@ -109,6 +116,8 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
         </CmsNotice>
       ) : null}
 
+      <CmsBookingEmailAttentionNotice items={emailAttention} />
+
       <CmsCalendar
         bookings={calendarBookings}
         canManageBookings={canManageBookings}
@@ -121,8 +130,8 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
       />
 
       <CmsNotice title="Customer booking rule">
-        <Clock3 aria-hidden="true" /> Customers select only the treatment, date
-        and time. New website requests appear here as pending appointments.
+        <Clock3 aria-hidden="true" /> Customers select a treatment, qualified
+        massage therapist, date and time. New website requests appear here as pending appointments.
       </CmsNotice>
     </>
   );

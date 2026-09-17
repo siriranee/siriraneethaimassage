@@ -64,24 +64,21 @@ test("contact map remains click-to-load", async () => {
   assert.match(mapEmbed, /useState\(false\)/);
 });
 
-test("sitemap excludes the team page and conditionally includes promotions", async () => {
+test("sitemap excludes removed therapist pages and conditionally includes promotions", async () => {
   const sitemapSource = await source("src/app/sitemap.ts");
 
-  assert.doesNotMatch(sitemapSource, /path:\s*"\/therapists"/);
+  assert.doesNotMatch(sitemapSource, /\/therapists/);
+  assert.doesNotMatch(sitemapSource, /getPublicTeam/);
   assert.match(sitemapSource, /getPublicPromotions/);
   assert.match(sitemapSource, /promotions\.length > 0/);
   assert.match(sitemapSource, /path:\s*"\/promotions"/);
 });
 
-test("the team page hides an empty profile grid and blocks indexing until profiles exist", async () => {
-  const teamPage = await source("src/app/(site)/therapists/page.tsx");
-
-  assert.match(teamPage, /noIndex:\s*teamMembers\.length === 0/);
-  assert.match(teamPage, /\{teamMembers\.length \? \(/);
-  assert.doesNotMatch(
-    teamPage,
-    /The spa assigns the team member for each appointment/,
-  );
+test("public therapist pages are removed from routes and navigation", async () => {
+  const navigation = await source("src/components/layout/navigation.ts");
+  assert.doesNotMatch(navigation, /href:\s*"\/therapists"/);
+  await assert.rejects(source("src/app/(site)/therapists/page.tsx"), { code: "ENOENT" });
+  await assert.rejects(source("src/app/(site)/therapists/[slug]/page.tsx"), { code: "ENOENT" });
 });
 
 test("Vercel previews block indexing without changing local or production robots", () => {
@@ -121,7 +118,6 @@ test("public marketing copy avoids unsupported qualification claims", async () =
     await Promise.all([
       source("src/app/(site)/page.tsx"),
       source("src/app/(site)/about/page.tsx"),
-      source("src/app/(site)/therapists/page.tsx"),
       source("src/app/opengraph-image.tsx"),
       source("src/server/cms/default-content.ts"),
     ])

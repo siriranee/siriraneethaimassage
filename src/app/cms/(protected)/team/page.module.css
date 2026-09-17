@@ -1,0 +1,310 @@
+.headerActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.teamGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.memberCard {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  box-shadow: 0 0.8rem 2.25rem rgb(var(--color-purple-950-rgb) / 0.055);
+}
+
+.portraitFrame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-purple-100);
+}
+
+.portrait {
+  object-fit: cover;
+}
+
+.portraitFallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1rem;
+  background:
+    radial-gradient(circle at 50% 32%, rgb(var(--color-gold-500-rgb) / 0.24), transparent 30%),
+    linear-gradient(155deg, var(--color-purple-700), var(--color-purple-950));
+  color: var(--color-on-brand);
+}
+
+.portraitFallback > span {
+  display: grid;
+  width: 5rem;
+  height: 5rem;
+  border: 1px solid rgb(var(--color-gold-500-rgb) / 0.5);
+  border-radius: 50%;
+  background: rgb(var(--color-purple-950-rgb) / 0.25);
+  color: var(--color-gold-400);
+  font-family: var(--font-serif);
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  place-items: center;
+}
+
+.portraitFallback small {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--fs-sm);
+  font-weight: 750;
+}
+
+.portraitFallback small svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.badges {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.badges > span {
+  box-shadow: 0 0.35rem 1rem rgb(var(--color-purple-950-rgb) / 0.14);
+}
+
+.cardBody {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  padding: 1.15rem;
+  gap: 1rem;
+}
+
+.identity > span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--color-gold-text);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.identity h2 {
+  margin-bottom: 0.45rem;
+  color: var(--color-purple-950);
+  font-size: var(--fs-lg);
+  line-height: 1.22;
+}
+
+.identity p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.specialties {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+.specialties li {
+  padding: 0.32rem 0.55rem;
+  border: 1px solid rgb(var(--color-purple-800-rgb) / 0.12);
+  border-radius: var(--radius-pill);
+  background: var(--color-purple-50);
+  color: var(--color-purple-800);
+  font-size: var(--fs-xs);
+  font-weight: 750;
+}
+
+.facts {
+  display: grid;
+  margin: auto 0 0;
+  gap: 0.5rem;
+}
+
+.facts > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.62rem 0.7rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.65rem;
+  background: var(--color-purple-50);
+}
+
+.facts dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.facts dt svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  color: var(--color-purple-600);
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--fs-sm);
+  font-weight: 850;
+  text-align: right;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-line);
+}
+
+.editLink {
+  display: inline-flex;
+  min-height: 2.7rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  padding: 0.5rem 0.78rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.62rem;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.editLink {
+  margin-left: auto;
+  border-color: var(--color-purple-700);
+  background: var(--color-purple-700);
+  color: var(--color-on-brand);
+}
+
+.editLink svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.editLink:hover,
+.editLink:focus-visible {
+  background: var(--color-purple-800);
+}
+
+.editLink:focus-visible {
+  outline: 0.18rem solid var(--color-surface);
+  outline-offset: 0.1rem;
+  box-shadow: 0 0 0 0.43rem var(--color-purple-700);
+}
+
+.emptyState {
+  display: grid;
+  min-height: 19rem;
+  align-content: center;
+  justify-items: center;
+  padding: 2rem;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(var(--color-gold-500-rgb) / 0.12), transparent 45%),
+    var(--color-surface);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin-bottom: 1rem;
+  border-radius: 50%;
+  background: var(--color-purple-100);
+  color: var(--color-purple-700);
+  place-items: center;
+}
+
+.emptyIcon svg {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+.emptyState h2 {
+  margin-bottom: 0.45rem;
+  color: var(--color-purple-950);
+  font-size: var(--fs-lg);
+}
+
+.emptyState p {
+  inline-size: min(100%, 36rem);
+  margin: 0 0 1.1rem;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+@media (max-width: 1280px) {
+  .teamGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .teamGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .headerActions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .cardActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .editLink {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editLink {
+    transition: none;
+  }
+}
