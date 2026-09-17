@@ -183,6 +183,7 @@ test("service validation rejects list overflow and URL collisions without retire
   assert.match(priceValidation, /duration option ID must be unique/i);
 
   for (const slug of [
+    "back-neck-massage",
     "back-neck-shoulder-massage",
     "full-body-massage",
     "couples-massage",

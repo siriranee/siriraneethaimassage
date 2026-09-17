@@ -197,7 +197,7 @@ export const siteConfig = {
   seo: {
     homeTitle: "Thai Massage in Howth, Dublin | Siriranee",
     homeDescription:
-      "Traditional Thai, hot oil, deep tissue and hot stone massage at Siriranee Thai Massage in Howth, Dublin. View prices and book your appointment.",
+      "Explore Thai massage, hot oil, deep tissue, back and neck massage, head spa and foot reflexology treatments at Siriranee in Howth, Dublin.",
     defaultTitle: "Siriranee Thai Massage | Howth, Dublin",
     defaultDescription:
       "Explore massage treatments, clear prices and appointment booking at Siriranee Thai Massage in Howth, Dublin.",

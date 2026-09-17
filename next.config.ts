@@ -48,6 +48,11 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
+        source: "/services/back-neck-massage",
+        destination: "/services/neck-shoulder-upper-back-massage",
+        permanent: true,
+      },
+      {
         source: "/services/full-body-massage",
         destination: "/services",
         permanent: true,
@@ -59,12 +64,12 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/services/head-massage",
-        destination: "/services",
+        destination: "/services/head-spa",
         permanent: true,
       },
       {
         source: "/services/foot-massage-reflexology",
-        destination: "/services",
+        destination: "/services/foot-reflexology-spa",
         permanent: true,
       },
       {

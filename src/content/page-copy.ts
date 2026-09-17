@@ -21,7 +21,7 @@ const pageCopy = {
     description: "Ease tension, restore balance and leave feeling renewed.",
     seoTitle: "Thai Massage in Howth, Dublin | Siriranee",
     seoDescription:
-      "Traditional Thai, hot oil, deep tissue and hot stone massage at Siriranee Thai Massage in Howth, Dublin. View prices and book your appointment.",
+      "Explore Thai massage, hot oil, deep tissue, back and neck massage, head spa and foot reflexology treatments at Siriranee in Howth, Dublin.",
     heroSlides: defaultHomeHeroSlides,
   },
   services: {
@@ -30,7 +30,7 @@ const pageCopy = {
     description: "Clear options for every schedule and preference.",
     seoTitle: "Massage Treatments in Howth, Dublin",
     seoDescription:
-      "Explore traditional Thai, hot oil, deep tissue, hot stone and focused upper-body massage at Siriranee Thai Massage in Howth, Dublin.",
+      "Explore Thai massage, hot oil, deep tissue, hot stone, back and neck massage, head spa and foot reflexology treatments in Howth, Dublin.",
   },
   book: {
     eyebrow: "Massage appointments in Howth",
@@ -77,10 +77,10 @@ const pageCopy = {
   promotions: {
     eyebrow: "Treat someone",
     title: "Massage Gifts & Offers",
-    description: "See confirmed gift and offer information when available.",
+    description: "Explore Siriranee gift vouchers and any current offers.",
     seoTitle: "Massage Gift Ideas & Offers in Howth, Dublin",
     seoDescription:
-      "Explore confirmed massage gift information and current offers from Siriranee Thai Massage in Howth, Dublin.",
+      "Arrange a Siriranee massage or spa gift voucher and explore current offers in Howth, Dublin.",
   },
   gallery: {
     eyebrow: "Gallery",

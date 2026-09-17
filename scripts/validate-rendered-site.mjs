@@ -19,6 +19,8 @@ const publicRoutes = [
   "/services/neck-shoulder-upper-back-massage",
   "/services/deep-tissue-massage",
   "/services/hot-stone-massage",
+  "/services/head-spa",
+  "/services/foot-reflexology-spa",
   "/visit",
 ];
 
@@ -290,7 +292,11 @@ if (homeMarkup.includes('id="voucher-section-title"')) {
   const voucherMarkup = homeMarkup.slice(sectionStart, sectionEnd + 10);
 
   for (const voucherText of [
-    "Give someone time to unwind",
+    "Give the gift of calm",
+    "Popular gift occasions",
+    "How it works",
+    "Arrange a gift voucher",
+    "Gift envelopes can be collected from Siriranee in Howth.",
     'aria-label="Gift vouchers"',
     'aria-roledescription="carousel"',
     "Drag horizontally, swipe, or use the left and right arrow keys",
@@ -307,6 +313,10 @@ if (homeMarkup.includes('id="voucher-section-title"')) {
   check(
     !/<button(?:\s|>)/i.test(voucherMarkup),
     "Published voucher slider contains navigation buttons",
+  );
+  check(
+    !/\b(?:Malahide|instant(?:ly)?)\b/i.test(voucherMarkup),
+    "Published voucher section contains reference-business or unsupported instant-delivery copy",
   );
 }
 check(
@@ -622,12 +632,9 @@ if (sitemap) {
     !sitemap.body.includes("/therapists"),
     "Sitemap contains the removed therapist pages",
   );
-  const promotionsArePublished =
-    (pages.get("/promotions") ?? "").includes('id="current-offers-heading"');
   check(
-    sitemap.body.includes(`<loc>${canonicalOrigin}/promotions</loc>`) ===
-      promotionsArePublished,
-    "Sitemap promotion visibility does not match published promotions",
+    sitemap.body.includes(`<loc>${canonicalOrigin}/promotions</loc>`),
+    "Sitemap is missing the evergreen /promotions gift page",
   );
   for (const route of publicRoutes.filter(
     (route) =>
@@ -781,6 +788,9 @@ check(!homeResponse.headers.has("x-powered-by"), "X-Powered-By header is exposed
 
 for (const [source, destination] of [
   ["/services/back-neck-shoulder-massage", "/services/neck-shoulder-upper-back-massage"],
+  ["/services/back-neck-massage", "/services/neck-shoulder-upper-back-massage"],
+  ["/services/head-massage", "/services/head-spa"],
+  ["/services/foot-massage-reflexology", "/services/foot-reflexology-spa"],
   ["/masseuses", "/book"],
 ]) {
   const result = await request(source, { redirect: "manual" });

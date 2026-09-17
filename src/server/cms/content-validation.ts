@@ -21,6 +21,7 @@ import {
 } from "@/domain/cms/types";
 
 export const RESERVED_LEGACY_SERVICE_SLUGS = [
+  "back-neck-massage",
   "back-neck-shoulder-massage",
   "full-body-massage",
   "couples-massage",

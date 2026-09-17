@@ -372,6 +372,15 @@ test("image-only vouchers publish on save and render in a navigation-free drag s
   assert.match(adapter, /imageUrl:\s*voucher\.imageUrl/);
   assert.match(adapter, /imageAlt:\s*voucher\.imageAlt/);
   assert.match(home, /<VoucherSlider vouchers=\{vouchers\} \/>/);
+  const voucherSection = home.slice(
+    home.indexOf('id="voucher-section-title"'),
+    home.indexOf('id="service-areas-title"'),
+  );
+  assert.match(voucherSection, /Give the gift of calm/);
+  assert.match(voucherSection, /Popular gift occasions/);
+  assert.match(voucherSection, /How it works/);
+  assert.match(voucherSection, /Gift envelopes can be collected from Siriranee in Howth/);
+  assert.doesNotMatch(voucherSection, /\b(?:Malahide|instant(?:ly)?)\b/i);
   assert.match(slider, /onPointerDown/);
   assert.match(slider, /onPointerMove/);
   assert.match(slider, /onKeyDown=\{handleKeyDown\}/);

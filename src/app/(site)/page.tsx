@@ -2,6 +2,7 @@ import {
   ArrowRight,
   CalendarCheck,
   Clock3,
+  Gift,
   HeartHandshake,
   Leaf,
   MapPin,
@@ -92,7 +93,7 @@ function buildFaqs(address: string, hasVouchers: boolean) {
   ...(hasVouchers ? [{
     question: "Can I arrange a massage gift voucher?",
     answer:
-      "Yes. Browse the current voucher information on this page, then contact the Siriranee team directly to arrange the voucher and confirm the latest details. Vouchers are not purchased through this website.",
+      "Yes. Browse the current voucher designs, then contact the Siriranee team to choose a value and format. Gift vouchers can be used towards any current massage or spa treatment and arranged by email or prepared in a gift envelope for collection in Howth. Vouchers are not purchased through this website.",
   }] : []),
 ] as const;
 }
@@ -234,15 +235,70 @@ export default async function HomePage() {
         <section aria-labelledby="voucher-section-title" className={`section ${styles.voucherSection}`}>
           <div className="container">
             <header className={`${styles.sectionHeader} ${styles.voucherHeader}`}>
-              <span className="eyebrow">A thoughtful massage gift</span>
-              <h2 id="voucher-section-title">Give someone time to unwind</h2>
+              <span className="eyebrow">Siriranee gift vouchers</span>
+              <h2 id="voucher-section-title">Give the gift of calm</h2>
               <p className="lead">
-                Choose a voucher idea below, then speak with the Siriranee team to
-                arrange it and confirm the current details.
+                Treat someone special to time for themselves. A Siriranee gift
+                voucher lets them choose how they would like to unwind, whether
+                that is a soothing hot oil massage, Head Spa, Back &amp; Neck
+                Massage or Foot &amp; Reflexology Spa.
               </p>
             </header>
 
-            <VoucherSlider vouchers={vouchers} />
+            <div className={styles.voucherDetails}>
+              <article className={`${styles.voucherPanel} ${styles.voucherOccasions}`}>
+                <h3 className={styles.voucherKicker}>
+                  <Gift aria-hidden="true" /> Popular gift occasions
+                </h3>
+                <ul aria-label="Popular gift occasions" className={styles.voucherOccasionList}>
+                  <li>Birthdays</li>
+                  <li>Anniversaries</li>
+                  <li>Mother&apos;s Day</li>
+                  <li>Valentine&apos;s Day</li>
+                  <li>Christmas</li>
+                  <li>Thank-you gifts</li>
+                  <li>Just-because moments</li>
+                </ul>
+                <p className={styles.voucherMessage}>
+                  Everyone deserves a little time to relax.
+                </p>
+              </article>
+
+              <article className={styles.voucherPanel}>
+                <h3 className={styles.voucherKicker}>
+                  <Sparkles aria-hidden="true" /> How it works
+                </h3>
+                <ol className={styles.voucherSteps}>
+                  <li>
+                    <span aria-hidden="true">1</span>
+                    Choose the voucher value with the Siriranee team.
+                  </li>
+                  <li>
+                    <span aria-hidden="true">2</span>
+                    Use it towards any massage or spa treatment on the current menu.
+                  </li>
+                  <li>
+                    <span aria-hidden="true">3</span>
+                    Arrange a digital voucher by email or a gift envelope for
+                    collection.
+                  </li>
+                </ol>
+                <p className={styles.voucherCollection}>
+                  <MapPin aria-hidden="true" />
+                  Gift envelopes can be collected from Siriranee in Howth.
+                </p>
+                <ButtonLink
+                  href="/contact"
+                  icon={<ArrowRight aria-hidden="true" />}
+                >
+                  Arrange a gift voucher
+                </ButtonLink>
+              </article>
+            </div>
+
+            <div className={styles.voucherSliderWrap}>
+              <VoucherSlider vouchers={vouchers} />
+            </div>
           </div>
         </section>
       ) : null}

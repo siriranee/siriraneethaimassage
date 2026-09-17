@@ -64,13 +64,13 @@ test("contact map remains click-to-load", async () => {
   assert.match(mapEmbed, /useState\(false\)/);
 });
 
-test("sitemap excludes removed therapist pages and conditionally includes promotions", async () => {
+test("sitemap excludes removed therapist pages and includes the evergreen gift page", async () => {
   const sitemapSource = await source("src/app/sitemap.ts");
 
   assert.doesNotMatch(sitemapSource, /\/therapists/);
   assert.doesNotMatch(sitemapSource, /getPublicTeam/);
-  assert.match(sitemapSource, /getPublicPromotions/);
-  assert.match(sitemapSource, /promotions\.length > 0/);
+  assert.doesNotMatch(sitemapSource, /getPublicPromotions/);
+  assert.doesNotMatch(sitemapSource, /promotions\.length > 0/);
   assert.match(sitemapSource, /path:\s*"\/promotions"/);
 });
 

@@ -1,8 +1,8 @@
 import {
   ArrowUpRight,
   CalendarDays,
-  Clock3,
   Gift,
+  Mail,
   Megaphone,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -65,40 +65,44 @@ export default async function PromotionsPage() {
             <div className={styles.cardBody}>
               <span className={styles.icon}><Gift aria-hidden="true" /></span>
               <p className={styles.kicker}>A thoughtful gesture</p>
-              <h2>Arrange a massage gift</h2>
+              <h2>Give the gift of calm</h2>
               <p>
-                Contact the team before purchasing so the available gift format,
-                treatment choices and terms can be confirmed directly with you.
+                A Siriranee gift voucher lets someone choose how they would like
+                to unwind, whether that is a soothing hot oil massage, Head Spa,
+                Back &amp; Neck Massage or Foot &amp; Reflexology Spa. Choose the
+                value with our team and use it towards any current treatment.
               </p>
               <Link href="/contact">
-                Ask about a gift <ArrowUpRight aria-hidden="true" />
+                Arrange a gift voucher <ArrowUpRight aria-hidden="true" />
               </Link>
             </div>
           </article>
 
           <article className={styles.simpleCard}>
-            <span className={styles.icon}><Clock3 aria-hidden="true" /></span>
-            <p className={styles.kicker}>More unhurried time</p>
-            <h2>Choose a 90-minute treatment</h2>
+            <span className={styles.icon}><Gift aria-hidden="true" /></span>
+            <p className={styles.kicker}>For meaningful moments</p>
+            <h2>A gift for any occasion</h2>
             <p>
-              Traditional Thai, hot oil, deep tissue and hot stone massage each
-              include a confirmed 90-minute option in the current menu.
+              A thoughtful choice for birthdays, anniversaries, Mother&apos;s Day,
+              Valentine&apos;s Day, Christmas, thank-you gifts or a simple
+              just-because moment.
             </p>
-            <Link href="/services">
-              Compare treatments <ArrowUpRight aria-hidden="true" />
+            <Link href="/contact">
+              Ask the team <ArrowUpRight aria-hidden="true" />
             </Link>
           </article>
 
           <article className={styles.simpleCard}>
-            <span className={styles.icon}><Megaphone aria-hidden="true" /></span>
-            <p className={styles.kicker}>Seasonal news</p>
-            <h2>Offers will appear here when confirmed</h2>
+            <span className={styles.icon}><Mail aria-hidden="true" /></span>
+            <p className={styles.kicker}>Email or collection</p>
+            <h2>Choose the format that suits you</h2>
             <p>
-              There is no placeholder promotion running. Current owner-approved
-              offers will appear here when available.
+              Arrange a digital voucher by email or ask for a gift envelope to
+              collect from Siriranee in Howth. Contact the team to confirm the
+              current details before purchase.
             </p>
             <Link href="/contact">
-              View current contact details <ArrowUpRight aria-hidden="true" />
+              View contact details <ArrowUpRight aria-hidden="true" />
             </Link>
           </article>
 
@@ -107,8 +111,8 @@ export default async function PromotionsPage() {
             <p className={styles.kicker}>Ready when you are</p>
             <h2>Ready for your next appointment?</h2>
             <p>
-              Choose one of the five confirmed treatments and your preferred
-              duration, then contact the team to request a suitable time.
+              Choose a current treatment and your preferred duration, then
+              contact the team to request a suitable time.
             </p>
             <Link href="/book">
               Book Now <ArrowUpRight aria-hidden="true" />

@@ -82,7 +82,7 @@ export default async function ServicesPage() {
         <div className={styles.container}>
           <BookingCta
             title="Not sure which massage to choose?"
-            description="Contact the Siriranee team and tell us your preferred massage style, pressure and appointment length. We will help you choose from the five treatments."
+            description="Contact the Siriranee team and tell us your preferred massage style, pressure and appointment length. We will help you choose from the current treatment menu."
           />
         </div>
       </section>

@@ -339,9 +339,9 @@ check(
 check(
   !sitemapSource.includes("/therapists") &&
     !sitemapSource.includes("getPublicTeam") &&
-    sitemapSource.includes("getPublicPromotions") &&
-    sitemapSource.includes("promotions.length > 0"),
-  "Sitemap must exclude removed therapist pages and include promotions only when published",
+    !sitemapSource.includes("getPublicPromotions") &&
+    sitemapSource.includes('{ path: "/promotions"'),
+  "Sitemap must exclude removed therapist pages and include the evergreen gift page",
 );
 check(
   robotsSource.includes('process.env.VERCEL_ENV === "preview"') &&

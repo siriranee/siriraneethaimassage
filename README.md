@@ -6,7 +6,7 @@ Howth, Dublin, Ireland.
 ## What is implemented
 
 - Responsive public website for mobile, tablet and desktop.
-- Five confirmed massage services, durations and EUR prices.
+- A CMS-managed massage and spa treatment menu with published durations and EUR prices.
 - Local SEO for Thai massage in Howth and nearby Dublin areas.
 - Treatment, price, business-detail, service-gallery, promotion and voucher
   publishing from immutable CMS publication snapshots. Successful content
