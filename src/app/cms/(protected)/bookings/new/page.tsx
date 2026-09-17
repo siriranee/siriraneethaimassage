@@ -5,6 +5,7 @@ import {
   normalizeCalendarDate,
   shiftCalendarDate,
 } from "@/domain/booking/calendar-month";
+import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsMode } from "@/server/cms/config";
 import { getCmsContent } from "@/server/cms/content-service";
@@ -39,7 +40,7 @@ export default async function CmsNewBookingPage({ searchParams }: PageProps) {
     );
   const therapists = content.team
     .filter((member) => member.operationalActive && !member.archived)
-    .sort((first, second) => first.sortOrder - second.sortOrder)
+    .sort(compareCmsTeamMembersByName)
     .map((member) => ({
       id: member.id,
       name: member.name,

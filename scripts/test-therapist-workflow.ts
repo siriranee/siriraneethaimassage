@@ -144,7 +144,6 @@ async function main() {
               fullName: therapist!.fullName,
               publicRole: therapist!.publicRole,
               operationalActive: false,
-              sortOrder: therapist!.sortOrder,
             },
             therapist!.version,
             { actor, requestId: `therapist-workflow:lifecycle:${therapist!.slug}` },

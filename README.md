@@ -182,10 +182,10 @@ prerequisite keeps direct booking safely off.
 
 Use **CMS > Therapists** to create a therapist record or edit an existing one.
 Customer-facing fields include the booking-link slug, display name, role, short
-introduction, biography, specialties, languages and display order. The public
-therapist listing/profile pages are intentionally not published. Select only
-treatments the therapist is qualified to provide. An empty treatment list keeps
-the therapist unavailable for booking.
+introduction and portrait. Therapist lists are ordered alphabetically. The
+public therapist listing/profile pages are intentionally not published. Select
+only treatments the therapist is qualified to provide. An empty treatment list
+keeps the therapist unavailable for booking.
 
 The two visibility controls have separate purposes:
 
@@ -206,6 +206,13 @@ entering a remote URL; the browser prepares it and the CMS uploads it only when
 the entire record save succeeds. Booking choices without a portrait use the
 designed initials fallback. Add useful portrait alt text whenever a photo is
 present.
+
+After deploying the schema-version-9 application, remove the retired biography,
+specialties, languages and manual display-order keys from current content and
+retained publication snapshots. Run
+`npm run cms:remove-retired-therapist-fields` first, review the printed plan,
+then rerun with `-- --apply --expected-plan=<printed-hash>`. Do not apply this
+cleanup while an older CMS version can still write content.
 
 The notification address and optional phone number are operational data, not
 customer-facing content. In MongoDB they are stored separately with AES-256-GCM

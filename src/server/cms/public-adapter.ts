@@ -15,6 +15,7 @@ import type {
   PublicTeamMember,
   PublicVoucher,
 } from "@/domain/public-site";
+import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import type { Service } from "@/domain/service";
 import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
 import { isLivePublicBookingReady } from "@/server/booking/readiness";
@@ -146,21 +147,18 @@ export const getPublicTeam = cache(
 
     return [...content.team]
       .filter((member) => member.publicProfile && !member.archived)
-      .sort((first, second) => first.sortOrder - second.sortOrder)
+      .sort(compareCmsTeamMembersByName)
       .map((member) => ({
         id: member.id,
         slug: member.slug,
         name: member.name,
         role: member.publicRole,
         shortBio: member.shortBio,
-        biography: member.biography,
         imageUrl:
           member.imageUrl && isPublicProjectImage(member.imageUrl)
             ? member.imageUrl
             : "",
         imageAlt: member.imageAlt,
-        specialties: member.specialties,
-        languages: member.languages,
         serviceIds: member.serviceIds,
         bookable: member.operationalActive && !member.archived,
       }));

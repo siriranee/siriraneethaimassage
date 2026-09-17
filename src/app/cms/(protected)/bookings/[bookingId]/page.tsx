@@ -11,6 +11,7 @@ import { bookingEmailDeliveryFeedback } from "@/domain/cms/notification-presenta
 import { isPendingCapacityExpired } from "@/domain/booking/status";
 import { isBookingEmailDeliveryUncertain } from "@/domain/booking/email-retry-policy";
 import { canCmsRole } from "@/domain/cms/permissions";
+import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { canRetryBookingEmailNotification } from "@/server/cms/notification-service";
 import { getCmsContent } from "@/server/cms/content-service";
@@ -53,7 +54,7 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
         !member.archived &&
         member.serviceIds.includes(booking.serviceId),
     )
-    .sort((first, second) => first.sortOrder - second.sortOrder)
+    .sort(compareCmsTeamMembersByName)
     .map((member) => ({ id: member.id, name: member.name }));
   const therapistOptions =
     booking.assignedStaffId &&

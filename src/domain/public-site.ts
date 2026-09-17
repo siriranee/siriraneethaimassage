@@ -21,11 +21,8 @@ export type PublicTeamMember = {
   readonly name: string;
   readonly role: string;
   readonly shortBio: string;
-  readonly biography: string;
   readonly imageUrl: string;
   readonly imageAlt: string;
-  readonly specialties: readonly string[];
-  readonly languages: readonly string[];
   readonly serviceIds: readonly string[];
   readonly bookable: boolean;
 };

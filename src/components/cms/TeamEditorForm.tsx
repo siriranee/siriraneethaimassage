@@ -52,13 +52,6 @@ type TeamDeleteResponse = Readonly<{
   deleted?: unknown;
 }>;
 
-function lines(value: FormDataEntryValue | null) {
-  return String(value ?? "")
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function safeFieldErrors(value: unknown): FieldErrors {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return Object.fromEntries(
@@ -77,8 +70,6 @@ function isTeamEditorRecord(value: unknown): value is CmsTeamEditorRecord {
     typeof member.slug === "string" &&
     typeof member.name === "string" &&
     typeof member.imageUrl === "string" &&
-    Array.isArray(member.specialties) &&
-    Array.isArray(member.languages) &&
     Array.isArray(member.serviceIds) &&
     typeof member.notificationEmail === "string" &&
     typeof member.contactPhone === "string" &&
@@ -199,18 +190,14 @@ export function TeamEditorForm({
         fullName: data.get("fullName"),
         publicRole: data.get("publicRole"),
         shortBio: data.get("shortBio"),
-        biography: data.get("biography"),
         imageUrl: nextImageUrl,
         imageAlt: data.get("imageAlt"),
-        specialties: lines(data.get("specialties")),
-        languages: lines(data.get("languages")),
         serviceIds: data.getAll("serviceIds"),
         notificationEmail: data.get("notificationEmail"),
         contactPhone: data.get("contactPhone"),
         publicProfile: data.get("publicProfile") === "on",
         operationalActive: data.get("operationalActive") === "on",
         archived: data.get("archived") === "on",
-        sortOrder: Number(data.get("sortOrder")),
         ...(submissionId && stagedAssets.length
           ? { mediaSubmission: createCmsMediaSubmissionEnvelope(submissionId, stagedAssets) }
           : {}),
@@ -381,10 +368,6 @@ export function TeamEditorForm({
               <small id="therapist-short-bio-hint">A concise introduction for profile cards and booking choices.</small>
               {fieldError("shortBio") ? <small className={teamStyles.fieldError} id="shortBio-error">{fieldError("shortBio")}</small> : null}
             </label>
-            <label className={styles.fullField}>Full biography
-              <textarea aria-describedby={describedBy("biography")} aria-invalid={Boolean(fieldError("biography"))} defaultValue={member.biography} maxLength={2000} minLength={40} name="biography" required rows={7} />
-              {fieldError("biography") ? <small className={teamStyles.fieldError} id="biography-error">{fieldError("biography")}</small> : null}
-            </label>
           </div>
         </section>
 
@@ -426,18 +409,10 @@ export function TeamEditorForm({
 
         <section className={styles.section}>
           <header className={styles.sectionHeader}>
-            <h2>Expertise &amp; treatments</h2>
-            <p>Help customers understand this therapist’s approach and which published treatments they can provide.</p>
+            <h2>Treatments offered</h2>
+            <p>Choose which published treatments customers and staff can book with this therapist.</p>
           </header>
           <div className={styles.grid}>
-            <label className={styles.field}>Specialties
-              <textarea defaultValue={member.specialties.join("\n")} maxLength={1000} name="specialties" placeholder={"Traditional Thai massage\nDeep tissue massage"} rows={5} />
-              <small>One specialty per line.</small>
-            </label>
-            <label className={styles.field}>Languages
-              <textarea defaultValue={member.languages.join("\n")} maxLength={500} name="languages" placeholder={"English\nThai"} rows={5} />
-              <small>One language per line.</small>
-            </label>
             <fieldset
               aria-describedby={fieldError("serviceIds") ? "serviceIds-error" : undefined}
               aria-invalid={Boolean(fieldError("serviceIds"))}
@@ -483,10 +458,6 @@ export function TeamEditorForm({
             <label className={styles.checkbox}>
               <input checked={publicProfile} disabled={archived} name="publicProfile" onChange={(event) => setPublicProfile(event.target.checked)} type="checkbox" />
               <span>Show in online booking<small>Allows customers to see and select this therapist on the booking form.</small></span>
-            </label>
-            <label className={styles.field}>Display order
-              <input defaultValue={member.sortOrder} max={1000} min={0} name="sortOrder" required type="number" />
-              <small>Lower numbers appear first.</small>
             </label>
             <label className={`${styles.checkbox} ${teamStyles.archiveChoice}`}>
               <input checked={archived} name="archived" onChange={(event) => {

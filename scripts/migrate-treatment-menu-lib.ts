@@ -181,9 +181,9 @@ export function sha256(value: string | Uint8Array) {
 }
 
 export function contentStateHash(content: CmsContentState) {
-  // Team records are identity-based and public display uses sortOrder. Immediate
-  // publication can move the edited record to the end without changing state,
-  // so compare this collection by ID while keeping service/menu order strict.
+  // Team records are identity-based and consumers display them alphabetically.
+  // Immediate publication can move an edited record without changing state, so
+  // compare this collection by ID while keeping service/menu order strict.
   const comparable = {
     ...content,
     team: [...content.team].sort((first, second) =>

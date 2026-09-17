@@ -12,7 +12,7 @@ const MIGRATION_ACTOR_ID = "system-voucher-migration";
 const MIGRATION_ACTOR_NAME = "Voucher migration";
 const MEDIA_SCOPE = "voucher-image";
 const MINIMUM_CONTENT_SCHEMA_VERSION = 7;
-const SUPPORTED_CONTENT_SCHEMA_VERSIONS = new Set([6, 7, 8]);
+const SUPPORTED_CONTENT_SCHEMA_VERSIONS = new Set([6, 7, 8, 9]);
 const AUDIT_RETENTION_DAYS = 365;
 const MAXIMUM_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAXIMUM_IMAGE_EDGE = 4_096;
@@ -342,9 +342,9 @@ function migratedSchemaVersion(schemaVersion) {
   }
 
   // This voucher-only migration knows how to canonicalise the v6 document
-  // shape to v7. Schema v8 adds therapist data that is normalised by the
-  // application, so preserve an existing v8 marker instead of downgrading it
-  // or claiming that a legacy v6/v7 team record has already been migrated.
+  // shape to v7. Later schemas are normalised by the application, so preserve
+  // an existing v8/v9 marker instead of downgrading it or claiming that a
+  // legacy v6/v7 record has already been migrated.
   return Math.max(MINIMUM_CONTENT_SCHEMA_VERSION, schemaVersion);
 }
 
@@ -370,7 +370,7 @@ function assertContentDocument(content) {
     !SUPPORTED_CONTENT_SCHEMA_VERSIONS.has(content.schemaVersion)
   ) {
     throw new Error(
-      "The current CMS content must use supported schema version 6, 7 or 8.",
+      "The current CMS content must use supported schema version 6, 7, 8 or 9.",
     );
   }
 }
@@ -390,7 +390,7 @@ export function assertSupportedPublicationSnapshot(snapshot) {
     !SUPPORTED_CONTENT_SCHEMA_VERSIONS.has(snapshot.schemaVersion)
   ) {
     throw new Error(
-      "The current CMS publication must use supported schema version 6, 7 or 8.",
+      "The current CMS publication must use supported schema version 6, 7, 8 or 9.",
     );
   }
   if (!Number.isInteger(snapshot.revision) || snapshot.revision < 1) {
@@ -1349,7 +1349,9 @@ async function verifyCommittedMongoMigration({
     .findOne({ _id: "siriranee-content" });
   assertContentDocument(content);
   if (content.schemaVersion < MINIMUM_CONTENT_SCHEMA_VERSION) {
-    throw new Error("CMS content verification requires schema version 7 or 8.");
+    throw new Error(
+      "CMS content verification requires schema version 7, 8 or 9.",
+    );
   }
   if (!hasExactTopLevelFields(content, STORED_CONTENT_FIELDS)) {
     throw new Error("Verification found unsupported fields in CMS content.");

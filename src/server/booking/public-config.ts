@@ -1,5 +1,6 @@
 import "server-only";
 
+import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
 import { getPublishedCmsContent } from "@/server/cms/content-service";
 
@@ -37,7 +38,7 @@ export async function getPublicBookingPlannerData() {
         !member.archived &&
         member.serviceIds.some((serviceId) => activeServiceIds.has(serviceId)),
     )
-    .sort((first, second) => first.sortOrder - second.sortOrder)
+    .sort(compareCmsTeamMembersByName)
     .map((member) => ({
       id: member.id,
       slug: member.slug,

@@ -4,7 +4,7 @@ import type { CmsServiceHero } from "@/domain/cms/service-hero";
 export type { CmsServiceGalleryImage } from "@/domain/cms/service-gallery";
 export type { CmsServiceHero } from "@/domain/cms/service-hero";
 
-export const CMS_CONTENT_SCHEMA_VERSION = 8 as const;
+export const CMS_CONTENT_SCHEMA_VERSION = 9 as const;
 
 export const cmsRoles = ["administrator", "staff"] as const;
 export type CmsRole = (typeof cmsRoles)[number];
@@ -169,16 +169,12 @@ export type CmsTeamRecord = {
   readonly fullName: string;
   readonly publicRole: string;
   readonly shortBio: string;
-  readonly biography: string;
   readonly imageUrl: string;
   readonly imageAlt: string;
-  readonly specialties: readonly string[];
-  readonly languages: readonly string[];
   readonly serviceIds: readonly string[];
   readonly publicProfile: boolean;
   readonly operationalActive: boolean;
   readonly archived?: boolean;
-  readonly sortOrder: number;
   readonly version: number;
   readonly updatedAt: string;
 };
@@ -227,7 +223,7 @@ export type CmsVoucherRecord = {
 
 export type CmsContentState = {
   readonly id: "siriranee-content";
-  readonly schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  readonly schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   readonly revision: number;
   readonly services: readonly CmsServiceRecord[];
   readonly site: CmsSiteSettings;

@@ -196,26 +196,6 @@ function stringList(
   return items;
 }
 
-function uniqueStringList(
-  value: unknown,
-  field: string,
-  maximumItems: number,
-  maximumLength: number,
-) {
-  const items = stringList(value, field, maximumItems, maximumLength);
-  const seen = new Set<string>();
-  const unique: string[] = [];
-
-  for (const item of items) {
-    const key = item.toLocaleLowerCase("en-IE");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(item);
-  }
-
-  return unique;
-}
-
 function teamServiceIds(
   value: unknown,
   current: readonly string[],
@@ -679,20 +659,8 @@ export function parseTeamUpdate(
       source.shortBio === undefined
         ? current.shortBio
         : optionalText(source.shortBio, 300),
-    biography:
-      source.biography === undefined
-        ? current.biography
-        : optionalText(source.biography, 3000),
     imageUrl,
     imageAlt: imageUrl ? imageAlt : "",
-    specialties:
-      source.specialties === undefined
-        ? current.specialties
-        : uniqueStringList(source.specialties, "specialties", 12, 100),
-    languages:
-      source.languages === undefined
-        ? current.languages
-        : uniqueStringList(source.languages, "languages", 12, 60),
     serviceIds,
     publicProfile: archived
       ? false
@@ -701,7 +669,6 @@ export function parseTeamUpdate(
         : source.publicProfile === true,
     operationalActive,
     archived,
-    sortOrder: integer(source.sortOrder, "sortOrder", 0, 1000),
     version: current.version + 1,
     updatedAt: new Date().toISOString(),
   };
@@ -727,15 +694,11 @@ export function parseTeamCreate(
     fullName: "",
     publicRole: "Massage therapist",
     shortBio: "",
-    biography: "",
     imageUrl: "",
     imageAlt: "",
-    specialties: [],
-    languages: [],
     serviceIds: [],
     publicProfile: false,
     operationalActive: false,
-    sortOrder: 0,
     version: 0,
     updatedAt: now,
   };

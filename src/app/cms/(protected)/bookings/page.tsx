@@ -8,6 +8,7 @@ import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import { CmsEmptyState, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { isPendingCapacityExpired } from "@/domain/booking/status";
 import { canCmsRole } from "@/domain/cms/permissions";
+import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import { bookingSources, bookingStatuses, type BookingSource, type BookingStatus, type CmsBooking } from "@/domain/cms/types";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
@@ -139,7 +140,7 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
               </select>
             </label>
             <label>Treatment<select defaultValue={serviceId ?? ""} name="serviceId"><option value="">All treatments</option>{content.services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
-            <label>Massage therapist<select defaultValue={therapistId ?? ""} name="therapistId"><option value="">All therapists</option>{content.team.filter((member) => !member.archived).sort((first, second) => first.sortOrder - second.sortOrder).map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
+            <label>Massage therapist<select defaultValue={therapistId ?? ""} name="therapistId"><option value="">All therapists</option>{content.team.filter((member) => !member.archived).sort(compareCmsTeamMembersByName).map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
             <label>Source<select defaultValue={source ?? ""} name="source"><option value="">All sources</option>{bookingSources.map((item) => <option key={item} value={item}>{item.charAt(0).toUpperCase() + item.slice(1)}</option>)}</select></label>
             <label>Needs attention<select defaultValue={attention ?? ""} name="attention"><option value="">All bookings</option><option value="expired">Expired pending holds</option><option value="unassigned">Unassigned active bookings</option></select></label>
             <label>From date<input defaultValue={from ?? ""} name="from" type="date" /></label>

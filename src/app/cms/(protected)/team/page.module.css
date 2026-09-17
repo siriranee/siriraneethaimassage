@@ -127,25 +127,6 @@
   -webkit-line-clamp: 3;
 }
 
-.specialties {
-  display: flex;
-  margin: 0;
-  padding: 0;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  list-style: none;
-}
-
-.specialties li {
-  padding: 0.32rem 0.55rem;
-  border: 1px solid rgb(var(--color-purple-800-rgb) / 0.12);
-  border-radius: var(--radius-pill);
-  background: var(--color-purple-50);
-  color: var(--color-purple-800);
-  font-size: var(--fs-xs);
-  font-weight: 750;
-}
-
 .facts {
   display: grid;
   margin: 0;

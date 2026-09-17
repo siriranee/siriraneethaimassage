@@ -66,22 +66,18 @@ const bookingSettings: CmsBookingSettings = {
   updatedAt: seededAt,
 };
 
-const team: readonly CmsTeamRecord[] = teamMembers.map((member, index) => ({
+const team: readonly CmsTeamRecord[] = teamMembers.map((member) => ({
   id: member.slug,
   slug: member.slug,
   name: member.name,
   fullName: member.fullName ?? member.name,
   publicRole: member.role === "Owner" ? "Owner & massage therapist" : "Massage therapist",
   shortBio: "",
-  biography: "",
   imageUrl: "",
   imageAlt: "",
-  specialties: [],
-  languages: [],
   serviceIds: [],
   publicProfile: true,
   operationalActive: false,
-  sortOrder: index,
   version: 1,
   updatedAt: seededAt,
 }));

@@ -24,7 +24,6 @@ const desiredTherapists = [
     fullName: "Siriranee",
     notificationEmail: "psasi558@gmail.com",
     contactPhone: "",
-    sortOrder: 0,
     legacySlugs: [],
   },
   {
@@ -33,7 +32,6 @@ const desiredTherapists = [
     fullName: "Mon (Ubon)",
     notificationEmail: "crookubon@gmail.com",
     contactPhone: "0899894916",
-    sortOrder: 1,
     legacySlugs: ["ubon", "therapist-ubon"],
   },
 ] as const;
@@ -99,7 +97,6 @@ async function main() {
         archived: true,
         operationalActive: false,
         publicProfile: false,
-        sortOrder: member.sortOrder,
       },
       member.version,
       { actor, requestId: `therapist-seed:archive:${member.slug}` },
@@ -123,18 +120,14 @@ async function main() {
       shortBio:
         existing?.shortBio ||
         "Massage therapist at Siriranee Thai Massage in Howth.",
-      biography: existing?.biography ?? "",
       imageUrl: existing?.imageUrl ?? "",
       imageAlt: existing?.imageAlt ?? "",
-      specialties: existing?.specialties ?? [],
-      languages: existing?.languages ?? [],
       serviceIds,
       notificationEmail: desired.notificationEmail,
       contactPhone: desired.contactPhone,
       publicProfile: true,
       operationalActive: true,
       archived: false,
-      sortOrder: desired.sortOrder,
     };
 
     const unchanged =
@@ -143,16 +136,12 @@ async function main() {
       existing.fullName === input.fullName &&
       existing.publicRole === input.publicRole &&
       existing.shortBio === input.shortBio &&
-      existing.biography === input.biography &&
       existing.imageUrl === input.imageUrl &&
       existing.imageAlt === input.imageAlt &&
-      JSON.stringify(existing.specialties) === JSON.stringify(input.specialties) &&
-      JSON.stringify(existing.languages) === JSON.stringify(input.languages) &&
       JSON.stringify(existing.serviceIds) === JSON.stringify(input.serviceIds) &&
       existing.publicProfile === input.publicProfile &&
       existing.operationalActive === input.operationalActive &&
       !existing.archived &&
-      existing.sortOrder === input.sortOrder &&
       contact?.notificationEmail === input.notificationEmail &&
       (contact?.contactPhone ?? "") === input.contactPhone;
 

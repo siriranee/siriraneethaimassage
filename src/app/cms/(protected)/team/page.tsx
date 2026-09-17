@@ -15,6 +15,7 @@ import {
   CmsPrimaryLink,
   CmsStatusBadge,
 } from "@/components/cms/CmsUi";
+import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import { isApprovedImageUrlForOwnership } from "@/lib/media/cloudinary-delivery";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { listCmsTeamEditorRecords } from "@/server/cms/content-service";
@@ -37,11 +38,7 @@ export default async function CmsTeamPage() {
     listCmsTeamEditorRecords(),
     Promise.resolve(getCloudinaryMediaOwnershipConfig()),
   ]);
-  const members = [...team].sort(
-    (first, second) =>
-      first.sortOrder - second.sortOrder ||
-      first.name.localeCompare(second.name, "en-IE"),
-  );
+  const members = [...team].sort(compareCmsTeamMembersByName);
 
   const headerActions = (
     <div className={styles.headerActions}>
@@ -112,17 +109,6 @@ export default async function CmsTeamPage() {
                     <h2>{member.name}</h2>
                     <p>{member.shortBio || "Add a short public introduction."}</p>
                   </div>
-
-                  {member.specialties.length ? (
-                    <ul aria-label={`${member.name} specialties`} className={styles.specialties}>
-                      {member.specialties.slice(0, 3).map((specialty) => (
-                        <li key={specialty}>{specialty}</li>
-                      ))}
-                      {member.specialties.length > 3 ? (
-                        <li>+{member.specialties.length - 3} more</li>
-                      ) : null}
-                    </ul>
-                  ) : null}
 
                   <dl className={styles.facts}>
                     <div>

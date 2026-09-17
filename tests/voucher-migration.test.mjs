@@ -254,14 +254,29 @@ test("voucher publication upgrades legacy snapshots without downgrading schema v
   assert.deepEqual(storedV8.team, currentV8.team);
   assert.deepEqual(publishedV8.team, currentV8.team);
 
-  for (const unsupportedSchemaVersion of [5, 9, "6"]) {
+  const currentV9 = { ...currentV8, schemaVersion: 9 };
+  const storedV9 = createContentDocument(
+    { _id: "siriranee-content", ...currentV9 },
+    desiredVouchers,
+    10,
+    "2026-09-05T00:00:00.000Z",
+  );
+  const publishedV9 = createPublicationSnapshot(
+    { snapshot: { ...publishedSnapshot, ...currentV9 } },
+    storedV9,
+    desiredVouchers,
+  );
+  assert.equal(storedV9.schemaVersion, 9);
+  assert.equal(publishedV9.schemaVersion, 9);
+
+  for (const unsupportedSchemaVersion of [5, 10, "6"]) {
     assert.throws(
       () =>
         assertSupportedPublicationSnapshot({
           ...publishedSnapshot,
           schemaVersion: unsupportedSchemaVersion,
         }),
-      /supported schema version 6, 7 or 8/,
+      /supported schema version 6, 7, 8 or 9/,
     );
   }
   assert.throws(

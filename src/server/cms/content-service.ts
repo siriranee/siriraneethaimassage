@@ -338,11 +338,8 @@ function normaliseTeamRecords(
     const stored = member as CmsTeamRecord & {
       readonly slug?: unknown;
       readonly shortBio?: unknown;
-      readonly biography?: unknown;
       readonly imageUrl?: unknown;
       readonly imageAlt?: unknown;
-      readonly specialties?: unknown;
-      readonly languages?: unknown;
       readonly serviceIds?: unknown;
     };
     const id = typeof stored.id === "string" ? stored.id : `therapist-${index + 1}`;
@@ -375,23 +372,15 @@ function normaliseTeamRecords(
           : "Massage therapist",
       shortBio:
         typeof stored.shortBio === "string" ? stored.shortBio.trim() : "",
-      biography:
-        typeof stored.biography === "string" ? stored.biography.trim() : "",
       imageUrl:
         typeof stored.imageUrl === "string" ? stored.imageUrl.trim() : "",
       imageAlt:
         typeof stored.imageAlt === "string" ? stored.imageAlt.trim() : "",
-      specialties: normaliseStoredStringList(stored.specialties),
-      languages: normaliseStoredStringList(stored.languages),
       serviceIds,
       publicProfile: !archived && stored.publicProfile === true,
       operationalActive:
         !archived && stored.operationalActive === true && serviceIds.length > 0,
       archived,
-      sortOrder:
-        Number.isInteger(stored.sortOrder) && stored.sortOrder >= 0
-          ? stored.sortOrder
-          : index,
       version:
         Number.isInteger(stored.version) && stored.version >= 1
           ? stored.version
@@ -402,7 +391,7 @@ function normaliseTeamRecords(
   });
 }
 
-function normaliseCmsContent(content: CmsContentState): CmsContentState {
+export function normaliseCmsContent(content: CmsContentState): CmsContentState {
   const defaults = createDefaultContentState();
   const storedSchemaVersion = Number.isInteger(content.schemaVersion)
     ? content.schemaVersion
