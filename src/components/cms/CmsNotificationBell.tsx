@@ -14,6 +14,8 @@ import styles from "./CmsNotificationBell.module.css";
 
 const notificationLabels: Readonly<Record<CmsNotificationKind, string>> = {
   "booking-requested": "Booking request received",
+  "booking-request-updated": "Pending request updated",
+  "booking-request-withdrawn": "Pending request withdrawn",
   "booking-assigned": "Therapist assigned",
   "booking-unassigned": "Therapist unassigned",
   "booking-confirmed": "Booking confirmed",

@@ -37,7 +37,7 @@ import {
 } from "@/server/cms/repositories";
 
 type MutationContext = {
-  readonly actor: CmsUser;
+  readonly actor: Pick<CmsUser, "id" | "displayName">;
   readonly requestId?: string;
   readonly idempotencyKey?: string;
 };

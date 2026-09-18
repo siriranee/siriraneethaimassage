@@ -78,9 +78,12 @@ export default async function PrivacyPage() {
             appointment, Resend also processes your name, email address,
             appointment details and published business details needed to send your
             confirmation. When therapist email delivery is enabled, Resend
-            separately sends the assigned therapist the booking reference,
-            treatment, duration, date, time and status after a relevant appointment
-            change. That therapist message does not include your name, phone number,
+            separately sends the selected therapist the booking reference,
+            treatment, duration, date, time and pending status when the request is
+            submitted, followed by relevant appointment updates. A private,
+            time-limited link lets the selected therapist review those appointment
+            details and confirm the request without signing in. Those therapist
+            messages and review pages do not include your name, phone number,
             email address, notes or internal CMS notes. Therapist notification
             addresses and private phone numbers are stored separately from public
             profile content and encrypted in production. The customer confirmation

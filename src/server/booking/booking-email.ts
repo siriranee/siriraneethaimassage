@@ -38,6 +38,9 @@ type CustomerBookingEmailInput = Pick<
 };
 
 export type TherapistBookingEmailEvent =
+  | "requested"
+  | "request-updated"
+  | "request-withdrawn"
   | "assigned"
   | "rescheduled"
   | "removed"
@@ -167,9 +170,15 @@ function section(input: {
   readonly warning: string;
   readonly buttonLabel: string;
   readonly cmsBookingUrl?: string;
+  readonly confirmationButtonLabel: string;
+  readonly confirmationUrl?: string;
+  readonly confirmationNote: string;
 }) {
-  const button = input.cmsBookingUrl
-    ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 4px;"><tr><td style="border-radius:999px;background:#6e2aa0;"><a href="${escapeHtml(input.cmsBookingUrl)}" style="display:inline-block;padding:13px 22px;color:#fffdf7;font-size:15px;font-weight:700;line-height:1.2;text-decoration:none;">${escapeHtml(input.buttonLabel)}</a></td></tr></table>`
+  const confirmationButton = input.confirmationUrl
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 4px;"><tr><td style="border-radius:999px;background:#5c2288;"><a href="${escapeHtml(input.confirmationUrl)}" style="display:inline-block;padding:14px 24px;color:#fffdf7;font-size:15px;font-weight:800;line-height:1.2;text-decoration:none;">${escapeHtml(input.confirmationButtonLabel)}</a></td></tr></table><p style="margin:9px 0 0;color:#675d64;font-size:12px;line-height:1.55;">${escapeHtml(input.confirmationNote)}</p>`
+    : "";
+  const cmsButton = input.cmsBookingUrl
+    ? `<p style="margin:${input.confirmationUrl ? "18px" : "24px"} 0 4px;"><a href="${escapeHtml(input.cmsBookingUrl)}" style="color:#5c2288;font-size:14px;font-weight:800;line-height:1.5;text-decoration:underline;">${escapeHtml(input.buttonLabel)}</a></p>`
     : "";
 
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;"><tr><td lang="${input.language}" style="padding:30px 30px 32px;">
@@ -187,13 +196,17 @@ function section(input: {
     <h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">${escapeHtml(input.requestHeading)}</h2>
     <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">${input.requestRows.map(([label, value]) => detailRow(label, value)).join("")}</table>
     <p style="margin:22px 0 0;padding-left:13px;border-left:4px solid #d5b350;color:#5c2288;font-size:15px;font-weight:700;line-height:1.55;">${escapeHtml(input.warning)}</p>
-    ${button}
+    ${confirmationButton}
+    ${cmsButton}
   </td></tr></table>`;
 }
 
 export function renderOwnerBookingRequestedEmail(
   booking: BookingEmailInput,
-  options: { readonly cmsBookingUrl?: string } = {},
+  options: {
+    readonly cmsBookingUrl?: string;
+    readonly confirmationUrl?: string;
+  } = {},
 ): BookingEmailMessage {
   const customerName = cleanDisplayText(booking.customer.name);
   const customerPhone = cleanDisplayText(booking.customer.phone);
@@ -204,9 +217,8 @@ export function renderOwnerBookingRequestedEmail(
   const bookingId = cleanDisplayText(booking.id);
   const localTime = cleanDisplayText(booking.localTime);
   const therapistName = cleanDisplayText(booking.assignedStaffName);
-  const cmsBookingUrl = options.cmsBookingUrl
-    ? cleanDisplayText(options.cmsBookingUrl)
-    : undefined;
+  const cmsBookingUrl = safeHttpUrl(options.cmsBookingUrl);
+  const confirmationUrl = safeHttpUrl(options.confirmationUrl);
 
   const thaiDate = formatBookingDate(
     booking.localDate,
@@ -260,6 +272,9 @@ export function renderOwnerBookingRequestedEmail(
     warning: "อีเมลนี้บันทึกข้อมูลตอนลูกค้าส่งคำขอ กรุณาเปิด CMS เพื่อดูสถานะล่าสุด หากยืนยันแล้ว ไม่ต้องยืนยันซ้ำ",
     buttonLabel: "เปิดรายการจองใน CMS",
     cmsBookingUrl,
+    confirmationButtonLabel: "ตรวจสอบและยืนยันการจอง",
+    confirmationUrl,
+    confirmationNote: "ลิงก์จะเปิดหน้าตรวจสอบที่ปลอดภัย การเปิดอีเมลหรือลิงก์เพียงอย่างเดียวจะไม่ยืนยันการจอง",
   });
 
   const english = section({
@@ -294,6 +309,9 @@ export function renderOwnerBookingRequestedEmail(
     warning: "This email records the original request. Open the CMS for the latest status. If it is already confirmed, no further confirmation is needed.",
     buttonLabel: "Open booking in CMS",
     cmsBookingUrl,
+    confirmationButtonLabel: "Review and confirm booking",
+    confirmationUrl,
+    confirmationNote: "This opens a secure review page. Opening the email or link alone will not confirm the booking.",
   });
 
   const html = `<!doctype html>
@@ -344,6 +362,7 @@ export function renderOwnerBookingRequestedEmail(
 ข้อมูลคำขอ
 รหัสภายใน: ${bookingId}
 ส่งคำขอเมื่อ: ${thaiRequestedAt} (เวลาดับลิน)
+${confirmationUrl ? `ตรวจสอบและยืนยันการจอง: ${confirmationUrl}\n` : ""}
 ${cmsBookingUrl ? `เปิดรายการจองใน CMS: ${cmsBookingUrl}\n` : ""}
 อีเมลนี้บันทึกข้อมูลตอนลูกค้าส่งคำขอ กรุณาเปิด CMS เพื่อดูสถานะล่าสุด หากยืนยันแล้ว ไม่ต้องยืนยันซ้ำ
 
@@ -372,6 +391,7 @@ Notes: ${customerNotes || "Not provided"}
 Request information
 Internal booking ID: ${bookingId}
 Submitted: ${englishRequestedAt} (Dublin time)
+${confirmationUrl ? `Review and confirm booking: ${confirmationUrl}\nOpening this link alone will not confirm the booking.\n` : ""}
 ${cmsBookingUrl ? `Open booking in CMS: ${cmsBookingUrl}\n` : ""}
 This email records the original request. Open the CMS for the latest status. If it is already confirmed, no further confirmation is needed.`;
 
@@ -667,6 +687,33 @@ const therapistEmailEventCopy: Readonly<
     }
   >
 > = {
+  requested: {
+    eyebrow: "New booking request",
+    heading: "A customer has requested an appointment with you",
+    status: "Pending confirmation",
+    introduction: (therapistName) =>
+      `Hi ${therapistName}, a customer selected you for this booking request. The appointment is not confirmed yet.`,
+    subject: (reference, businessName) =>
+      `New booking request · ${reference} · ${businessName}`,
+  },
+  "request-updated": {
+    eyebrow: "Pending request updated",
+    heading: "A pending booking request has changed",
+    status: "Pending — updated request",
+    introduction: (therapistName) =>
+      `Hi ${therapistName}, a customer request assigned to you has updated appointment details. It is still pending and is not a confirmed appointment.`,
+    subject: (reference, businessName) =>
+      `PENDING request updated · ${reference} · ${businessName}`,
+  },
+  "request-withdrawn": {
+    eyebrow: "Pending request withdrawn",
+    heading: "A pending booking request is no longer assigned to you",
+    status: "Pending request withdrawn",
+    introduction: (therapistName) =>
+      `Hi ${therapistName}, the original pending request below has been withdrawn from you. It was not a confirmed appointment.`,
+    subject: (reference, businessName) =>
+      `Pending request withdrawn · ${reference} · ${businessName}`,
+  },
   assigned: {
     eyebrow: "Confirmed appointment",
     heading: "A new appointment has been assigned to you",
@@ -712,6 +759,7 @@ export function renderTherapistBookingEmail(
     readonly therapistName: string;
     readonly businessName: string;
     readonly cmsUrl?: string;
+    readonly confirmationUrl?: string;
   },
 ): BookingEmailMessage {
   const copy = therapistEmailEventCopy[input.event];
@@ -723,9 +771,18 @@ export function renderTherapistBookingEmail(
   const serviceName = cleanDisplayText(booking.serviceName);
   const localTime = cleanDisplayText(booking.localTime);
   const cmsUrl = safeHttpUrl(input.cmsUrl);
+  const confirmationUrl = safeHttpUrl(input.confirmationUrl);
+  const isPendingRequest =
+    input.event === "requested" || input.event === "request-updated";
   const formattedDate = formatBookingDate(booking.localDate, "en-IE");
   const subject = copy.subject(reference, businessName);
-  const detailsHeading = input.event === "removed" ? "Original appointment removed" : "Appointment details";
+  const detailsHeading = input.event === "removed"
+    ? "Original appointment removed"
+    : input.event === "request-withdrawn"
+      ? "Original request withdrawn"
+      : input.event === "requested" || input.event === "request-updated"
+      ? "Requested appointment"
+      : "Appointment details";
   const preheader = `${copy.status}: ${formattedDate} at ${localTime} (Dublin time).`;
   const rows = [
     ["Booking reference", reference],
@@ -734,6 +791,25 @@ export function renderTherapistBookingEmail(
     ["Date", formattedDate],
     ["Time", `${localTime} (Dublin time)`],
   ] as const;
+  const callToActionHtml = isPendingRequest
+    ? confirmationUrl
+      ? `<p style="margin:24px 0 0;text-align:center;"><a href="${escapeHtml(confirmationUrl)}" style="display:inline-block;border-radius:999px;background:#5c2288;color:#fffdf7;font-size:15px;font-weight:800;line-height:1.2;padding:13px 22px;text-decoration:none;">Review and confirm booking</a></p><p style="margin:10px 0 0;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">No CMS login is required. Opening this link only shows the appointment; press Confirm booking on the next page to approve it. Do not forward or share this private confirmation link.</p>`
+      : ""
+    : cmsUrl
+      ? `<p style="margin:24px 0 0;text-align:center;"><a href="${escapeHtml(cmsUrl)}" style="display:inline-block;border-radius:999px;background:#5c2288;color:#fffdf7;font-size:15px;font-weight:800;line-height:1.2;padding:13px 22px;text-decoration:none;">Open the staff CMS</a></p><p style="margin:10px 0 0;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">This link contains no access token. Sign in with your authorised account if needed.</p>`
+      : "";
+  const callToActionText = isPendingRequest && confirmationUrl
+    ? `Review and confirm booking (no login required): ${confirmationUrl}\nOpening this link alone will not confirm the booking. Press Confirm booking on the review page to approve it. Do not forward or share this private confirmation link.\n`
+    : !isPendingRequest && cmsUrl
+      ? `Staff CMS (sign-in required): ${cmsUrl}\n`
+      : "";
+  const operationalGuidance = isPendingRequest
+    ? confirmationUrl
+      ? `Confirm only if you can take this appointment. If the details are wrong, contact ${businessName} instead.`
+      : `This email cannot confirm the request. Contact ${businessName} before treating it as confirmed.`
+    : input.event === "request-withdrawn"
+      ? "Do not treat this request as an active appointment. Check the staff CMS if you believe it was withdrawn in error."
+      : `Please contact ${businessName} directly if this schedule update looks incorrect.`;
 
   const html = `<!doctype html>
 <html lang="en-IE">
@@ -762,8 +838,8 @@ export function renderTherapistBookingEmail(
               <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">
                 ${rows.map(([label, value]) => detailRow(label, value)).join("")}
               </table>
-              ${cmsUrl ? `<p style="margin:24px 0 0;text-align:center;"><a href="${escapeHtml(cmsUrl)}" style="display:inline-block;border-radius:999px;background:#5c2288;color:#fffdf7;font-size:15px;font-weight:800;line-height:1.2;padding:13px 22px;text-decoration:none;">Open the staff CMS</a></p><p style="margin:10px 0 0;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">This link contains no access token. Sign in with your authorised account if needed.</p>` : ""}
-              <p style="margin:24px 0 0;color:#675d64;font-size:14px;line-height:1.6;">Please contact ${escapeHtml(businessName)} directly if this schedule update looks incorrect.</p>
+              ${callToActionHtml}
+              <p style="margin:24px 0 0;color:#675d64;font-size:14px;line-height:1.6;">${escapeHtml(operationalGuidance)}</p>
             </td></tr>
             <tr><td style="padding:17px 30px;background:#efe4f7;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">This operational email contains only the appointment details needed for your work. Please handle customer information privately.</td></tr>
           </table>
@@ -782,9 +858,9 @@ Schedule status: ${copy.status}
 ${detailsHeading}
 ${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}
 
-${cmsUrl ? `Staff CMS (sign-in required): ${cmsUrl}\n` : ""}
+${callToActionText}
 
-Please contact ${businessName} directly if this schedule update looks incorrect.
+${operationalGuidance}
 
 This operational email contains only the appointment details needed for your work. Please handle customer information privately.`;
 

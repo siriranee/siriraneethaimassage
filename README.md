@@ -25,9 +25,11 @@ Howth, Dublin, Ireland.
   website unchanged.
 - URL-based booking filters, per-booking activity timelines, unsaved-change
   warnings and metadata-only notification records. A newly stored website
-  request triggers one owner Resend alert in Thai and English. When the shop
-  confirms a booking, Resend sends the customer an English confirmation with
-  the appointment, published business contact details and safe public links.
+  request triggers one owner Resend alert in Thai and English plus a separate
+  privacy-minimised request email to the selected therapist. Either signed
+  review flow can confirm without a CMS login. When the booking is confirmed,
+  Resend sends the customer an English confirmation with the appointment,
+  published business contact details and safe public links.
   Confirmed therapist assignment, reschedule, removal and cancellation events
   are stored in a durable private outbox and sent after saving, using
   privacy-minimised Resend templates.
@@ -123,9 +125,14 @@ The normal production sequence is:
    `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and `RESEND_BOOKING_TO_EMAIL` in the
    deployment secret manager. Use a sender address on `siriranee.com`.
    `RESEND_BOOKING_TO_EMAIL` is the owner address that receives every new
-   website booking request; confirmed customer emails go to the optional email
-   stored with that booking. Therapist messages
-   go separately to the private address saved on the assigned therapist record.
+   website booking request. That email includes a signed, time-limited review
+   link; opening it never changes the booking, and the owner must press the
+   confirmation button on the review page. Confirmed customer emails go to the
+   optional email stored with that booking. Therapist messages go separately to
+   the private address saved on the assigned therapist record. Pending-request
+   messages include their own therapist-bound review button. The selected
+   therapist can review and confirm without a CMS login; opening the link alone
+   never confirms the booking.
    No additional therapist email environment variable is required. For testing
    with Resend's shared domain, each recipient must satisfy Resend's account
    restrictions.
@@ -153,8 +160,11 @@ The normal production sequence is:
    approved photography is available.
 12. Test image preparation, upload, direct publication and failed-save cleanup, then
    set CMS_MEDIA_UPLOAD_READY=true.
-13. Send a test booking to the owner address and confirm the Thai section,
-   English section, reply-to address and CMS booking link. Then confirm that
+13. Send a test booking and confirm the owner email's Thai section, English
+   section, reply-to address, secure review button and CMS booking link. Confirm
+   that the selected therapist receives one separate privacy-minimised pending
+   request email, can open its review button without signing in, and must press
+   the confirmation button on the page. Then confirm that
    changing the booking from pending to confirmed sends one customer email with
    the correct Dublin appointment time and public links. Test
    the separate therapist assignment, reschedule, reassignment and cancellation
@@ -217,18 +227,22 @@ cleanup while an older CMS version can still write content.
 The notification address and optional phone number are operational data, not
 customer-facing content. In MongoDB they are stored separately with AES-256-GCM
 encryption under the existing `CMS_PII_ENCRYPTION_KEY`; they are excluded from
-publication snapshots and public APIs. A pending website request does not notify the therapist. After the shop
-confirms and assigns the booking, the durable outbox sends a separate
-therapist message for assignment and distinct messages for rescheduling,
-removal or reassignment, and cancellation. The existing `RESEND_API_KEY` and
-`RESEND_FROM_EMAIL` are reused, so therapist notifications add no environment
-variable.
+publication snapshots and public APIs. A pending website request sends the
+selected therapist a privacy-minimised message that clearly says the appointment
+is not yet confirmed. After the shop confirms it, the durable outbox sends a
+separate assignment message and distinct messages for rescheduling, removal or
+reassignment, and cancellation. If the owner and therapist addresses are the
+same, the initial therapist copy is suppressed and the richer owner email is
+sent once. The existing `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are reused, so
+therapist notifications add no environment variable.
 
 ### Booking email operations and delivery tracking
 
 Saving a booking always finishes before contacting Resend. A website request
-alerts the owner once; it does not confirm the customer or notify the therapist.
-Confirming sends the customer confirmation and a separate therapist assignment.
+alerts the owner and selected therapist once, without confirming the customer.
+The owner email opens a safe review page, so automated email link scanners cannot
+confirm the appointment. Confirming sends the customer confirmation and a
+separate therapist assignment.
 Changing a confirmed appointment or its therapist sends updated customer details
 and the appropriate therapist update/removal/assignment messages. Cancellation
 sends separate customer and assigned-therapist notices. Saving notes alone sends

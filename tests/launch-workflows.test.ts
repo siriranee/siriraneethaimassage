@@ -581,6 +581,27 @@ test("isolated launch verification covers services, ten bookings and administrat
       providerMessageId: "isolated-resend-email-id",
     };
   };
+  const therapistEmailAttempts: Array<{
+    readonly bookingId: string;
+    readonly therapistId: string;
+    readonly event: string;
+  }> = [];
+  const sendTherapistBookingEmail = async (
+    booking: { readonly id: string },
+    recipient: { readonly id: string },
+    event: string,
+  ) => {
+    therapistEmailAttempts.push({
+      bookingId: booking.id,
+      therapistId: recipient.id,
+      event,
+    });
+    return {
+      status: "sent" as const,
+      attempted: true as const,
+      providerMessageId: `isolated-therapist-email-${booking.id}`,
+    };
+  };
   await assert.rejects(
     () =>
       createPublicBooking(
@@ -589,6 +610,7 @@ test("isolated launch verification covers services, ten bookings and administrat
           idempotencyKey: "isolated-public-booking-missing-therapist",
           requestId: "isolated-public-booking-missing-therapist",
           sendOwnerBookingEmail,
+          sendTherapistBookingEmail,
         },
       ),
     CmsValidationError,
@@ -601,6 +623,7 @@ test("isolated launch verification covers services, ten bookings and administrat
           idempotencyKey: "isolated-public-booking-inactive-therapist",
           requestId: "isolated-public-booking-inactive-therapist",
           sendOwnerBookingEmail,
+          sendTherapistBookingEmail,
         },
       ),
     CmsValidationError,
@@ -613,6 +636,7 @@ test("isolated launch verification covers services, ten bookings and administrat
           idempotencyKey: "isolated-public-booking-wrong-treatment",
           requestId: "isolated-public-booking-wrong-treatment",
           sendOwnerBookingEmail,
+          sendTherapistBookingEmail,
         },
       ),
     CmsValidationError,
@@ -621,6 +645,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     idempotencyKey: "isolated-public-booking-request-0001",
     requestId: "isolated-public-booking",
     sendOwnerBookingEmail,
+    sendTherapistBookingEmail,
   });
   assert.equal(publicBooking.source, "website");
   assert.equal(publicBooking.status, "pending");
@@ -629,10 +654,21 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.equal(publicBooking.assignedStaffName, primaryTherapist.name);
   assert.ok(publicBooking.privacyAcceptedAt);
 
+  await repository.saveBooking(
+    {
+      ...publicBooking,
+      internalNotes: "Notes-only update before an idempotent browser replay.",
+      version: publicBooking.version + 1,
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor.id,
+    },
+    publicBooking.version,
+  );
   const idempotentRetry = await createPublicBooking(publicRequest, {
     idempotencyKey: "isolated-public-booking-request-0001",
     requestId: "isolated-public-booking-retry",
     sendOwnerBookingEmail,
+    sendTherapistBookingEmail,
   });
   assert.equal(idempotentRetry.id, publicBooking.id);
   assert.equal(
@@ -649,6 +685,7 @@ test("isolated launch verification covers services, ten bookings and administrat
           idempotencyKey: "isolated-public-booking-request-0001",
           requestId: "isolated-public-booking-conflict",
           sendOwnerBookingEmail,
+          sendTherapistBookingEmail,
         },
       ),
     CmsConflictError,
@@ -657,6 +694,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     idempotencyKey: "isolated-public-booking-request-0002",
     requestId: "isolated-public-booking-overlap",
     sendOwnerBookingEmail,
+    sendTherapistBookingEmail,
   });
   assert.equal(overlappingPublicBooking.status, "pending");
   assert.equal(overlappingPublicBooking.startsAt, publicBooking.startsAt);
@@ -691,6 +729,7 @@ test("isolated launch verification covers services, ten bookings and administrat
         failedEmailAttempts += 1;
         throw new Error("Simulated provider outage");
       },
+      sendTherapistBookingEmail,
     },
   );
   assert.equal(bookingWithFailedEmail.status, "pending");
@@ -717,13 +756,37 @@ test("isolated launch verification covers services, ten bookings and administrat
     publicBooking.id,
     20,
   );
-  assert.equal(publicNotifications.length, 2);
+  assert.equal(publicNotifications.length, 3);
   assert.ok(
     publicNotifications.some(
       (notification) =>
         notification.channel === "dashboard" &&
         notification.status === "preview",
     ),
+  );
+  assert.ok(
+    publicNotifications.some(
+      (notification) =>
+        notification.audience === "therapist" &&
+        notification.kind === "booking-requested" &&
+        notification.channel === "email" &&
+        notification.status === "sent" &&
+        notification.providerMessageId ===
+          `isolated-therapist-email-${publicBooking.id}` &&
+        notification.attemptCount === 1,
+    ),
+  );
+  assert.deepEqual(
+    therapistEmailAttempts.filter(
+      (attempt) => attempt.bookingId === publicBooking.id,
+    ),
+    [
+      {
+        bookingId: publicBooking.id,
+        therapistId: primaryTherapist.id,
+        event: "requested",
+      },
+    ],
   );
   assert.ok(
     publicNotifications.some(
@@ -743,7 +806,7 @@ test("isolated launch verification covers services, ten bookings and administrat
       internalNotes: "",
       changeReason: "other-operational",
     },
-    publicBooking.version,
+    idempotentRetry.version,
     context,
   );
   assert.equal(confirmedPublicBooking.status, "confirmed");
@@ -753,6 +816,7 @@ test("isolated launch verification covers services, ten bookings and administrat
         idempotencyKey: "isolated-public-booking-request-0004",
         requestId: "isolated-public-booking-confirmed-conflict",
         sendOwnerBookingEmail,
+        sendTherapistBookingEmail,
       }),
     (error: unknown) =>
       error instanceof CmsConflictError &&

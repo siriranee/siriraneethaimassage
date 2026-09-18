@@ -46,12 +46,26 @@ test("a shared owner/therapist inbox receives one message per event, with custom
     reschedule: { sender: customer }, therapist: { sender: therapist },
   };
   await notifications.recordOwnerBookingRequestEmail(fixture.repository, booking);
+  assert.deepEqual(
+    await notifications.recordTherapistBookingEmailPlans(
+      fixture.repository,
+      null,
+      booking,
+    ),
+    [],
+  );
   const ownerSender = async () => {
     calls.push({ audience: "owner", event: "requested", to: "owner@example.invalid" });
     return sent();
   };
   await notifications.deliverOwnerBookingRequestEmail(fixture.repository, booking, ownerSender);
   await notifications.deliverOwnerBookingRequestEmail(fixture.repository, booking, ownerSender);
+  await notifications.dispatchBookingMutationEmails(
+    fixture.repository,
+    null,
+    booking,
+    options,
+  );
   assert.deepEqual(calls.map((call) => call.event), ["requested"]);
   let previous = booking;
   booking = await updateAdminBooking(booking.id, { status: "confirmed", changeReason: "customer-request" }, booking.version, fixture.context);

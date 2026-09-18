@@ -1045,12 +1045,26 @@ export class MongoCmsRepository implements CmsRepository {
         // Inspect operational state only; never fetch/decrypt customer details.
         { $lookup: {
           from: collections.bookings, localField: "bookingId", foreignField: "_id", as: "bookingState",
-          pipeline: [{ $project: { _id: 0, status: 1, demo: 1 } }],
+          pipeline: [{ $project: { _id: 0, status: 1, demo: 1, assignedStaffId: 1 } }],
         } },
         { $unwind: "$bookingState" },
         { $match: {
           "bookingState.demo": { $ne: true },
-          $nor: [{ audience: "owner", kind: "booking-requested", "bookingState.status": { $ne: "pending" } }],
+          $nor: [
+          {
+            audience: "owner",
+            kind: "booking-requested",
+            "bookingState.status": { $ne: "pending" },
+          },
+          {
+            audience: "therapist",
+            kind: { $in: ["booking-requested", "booking-request-updated"] },
+            $or: [
+              { "bookingState.status": { $ne: "pending" } },
+              { $expr: { $ne: ["$targetTeamMemberId", "$bookingState.assignedStaffId"] } },
+            ],
+          },
+          ],
         } },
         { $group: {
           _id: "$bookingId", bookingReference: { $first: "$bookingReference" },

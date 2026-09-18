@@ -383,7 +383,23 @@ test("Resend therapist emails use a separate recipient, event key and privacy-mi
       },
     },
   };
+  const therapistDependencies = {
+    configuration,
+    client,
+    fingerprintSecret: "test-only-therapist-email-secret",
+  };
 
+  assert.equal(
+    (await sendTherapistBookingEmail(
+      { ...confirmed, status: "pending" as const },
+      recipient,
+      "requested",
+      1,
+      customerEmailBusiness,
+      therapistDependencies,
+    )).status,
+    "sent",
+  );
   assert.equal(
     (await sendTherapistBookingEmail(
       confirmed,
@@ -391,7 +407,7 @@ test("Resend therapist emails use a separate recipient, event key and privacy-mi
       "assigned",
       4,
       customerEmailBusiness,
-      { configuration, client },
+      therapistDependencies,
     )).status,
     "sent",
   );
@@ -402,30 +418,38 @@ test("Resend therapist emails use a separate recipient, event key and privacy-mi
       "rescheduled",
       5,
       customerEmailBusiness,
-      { configuration, client },
+      therapistDependencies,
     )).status,
     "sent",
   );
 
-  assert.equal(captured.length, 2);
+  assert.equal(captured.length, 3);
   assert.deepEqual(captured[0]?.payload.to, [recipient.notificationEmail]);
   assert.equal(captured[0]?.payload.from, configuration.from);
   assert.equal(captured[0]?.payload.replyTo, customerEmailBusiness.email);
   assert.deepEqual(captured[0]?.payload.tags, [
-    { name: "event", value: "booking-assigned" },
+    { name: "event", value: "booking-requested" },
     { name: "audience", value: "therapist" },
   ]);
   assert.equal(
     captured[0]?.options?.idempotencyKey,
+    "therapist-booking-requested/11111111-2222-4333-8444-555555555555/therapist-waen/1",
+  );
+  assert.deepEqual(captured[1]?.payload.tags, [
+    { name: "event", value: "booking-assigned" },
+    { name: "audience", value: "therapist" },
+  ]);
+  assert.equal(
+    captured[1]?.options?.idempotencyKey,
     "therapist-booking-assigned/11111111-2222-4333-8444-555555555555/therapist-waen/4",
   );
   assert.equal(
-    captured[1]?.options?.idempotencyKey,
+    captured[2]?.options?.idempotencyKey,
     "therapist-booking-rescheduled/11111111-2222-4333-8444-555555555555/therapist-waen/5",
   );
   assert.notEqual(
-    captured[0]?.options?.idempotencyKey,
     captured[1]?.options?.idempotencyKey,
+    captured[2]?.options?.idempotencyKey,
   );
   const rendered = `${String(captured[0]?.payload.html)}\n${String(captured[0]?.payload.text)}`;
   for (const expected of [
@@ -434,7 +458,11 @@ test("Resend therapist emails use a separate recipient, event key and privacy-mi
     "60 minutes",
     "Thursday 10 September 2026",
     "10:00 (Dublin time)",
-    "https://siriranee.example/cms",
+    "Review and confirm booking",
+    "no login required",
+    "/book/confirm?token=",
+    "Pending confirmation",
+    "not confirmed yet",
   ]) {
     assert.match(
       rendered,

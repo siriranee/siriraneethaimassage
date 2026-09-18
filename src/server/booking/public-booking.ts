@@ -14,11 +14,17 @@ import { CmsConflictError } from "@/server/cms/repositories/repository";
 import {
   deliverOwnerBookingRequestEmail,
   ensureOwnerBookingRequestEmail,
+  getTherapistBookingEmailPlans,
   recordBookingNotificationPlan,
   recordOwnerBookingRequestEmail,
+  recordTherapistBookingEmailPlans,
   shouldRetryOwnerBookingEmail,
+  attemptTherapistBookingEmail,
 } from "@/server/cms/notification-service";
-import type { OwnerBookingEmailSender } from "@/server/booking/resend-booking-email";
+import type {
+  OwnerBookingEmailSender,
+  TherapistBookingEmailSender,
+} from "@/server/booking/resend-booking-email";
 
 export class PublicBookingRateLimitError extends Error {
   constructor() {
@@ -92,6 +98,7 @@ export async function createPublicBooking(
     readonly idempotencyKey: string;
     readonly requestId: string;
     readonly sendOwnerBookingEmail?: OwnerBookingEmailSender;
+    readonly sendTherapistBookingEmail?: TherapistBookingEmailSender;
   },
 ) {
   const source = value && typeof value === "object"
@@ -283,6 +290,7 @@ export async function createPublicBooking(
         transaction,
         booking,
       );
+      await recordTherapistBookingEmailPlans(transaction, null, booking);
       await appendCmsAudit(transaction, {
         actor: { id: "public-booking", displayName: "Public booking form" },
         action: "booking.requested",
@@ -321,9 +329,32 @@ export async function createPublicBooking(
     }
   };
 
+  const attemptTherapistEmail = async (booking: CmsBooking) => {
+    for (const plan of getTherapistBookingEmailPlans(null, booking)) {
+      try {
+        await attemptTherapistBookingEmail(repository, booking, plan, {
+          ...(input.sendTherapistBookingEmail
+            ? { sender: input.sendTherapistBookingEmail }
+            : {}),
+        });
+      } catch {
+        console.error(
+          `Failed to update the therapist booking email outbox for booking ${booking.id}.`,
+        );
+      }
+    }
+  };
+
+  const attemptRequestEmails = async (booking: CmsBooking) => {
+    await Promise.all([
+      attemptOwnerEmail(booking),
+      attemptTherapistEmail(booking),
+    ]);
+  };
+
   try {
     const result = await create();
-    await attemptOwnerEmail(result.booking);
+    await attemptRequestEmails(result.booking);
     return result.booking;
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
@@ -342,7 +373,7 @@ export async function createPublicBooking(
           `Failed to repair the owner booking email outbox for booking ${existing.id}.`,
         );
       }
-      await attemptOwnerEmail(existing);
+      await attemptRequestEmails(existing);
       return existing;
     }
 

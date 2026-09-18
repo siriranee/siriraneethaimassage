@@ -65,6 +65,8 @@ test("owner booking email renders Thai first and English second with complete op
   const message = renderOwnerBookingRequestedEmail(booking(), {
     cmsBookingUrl:
       "https://siriranee.example/cms/bookings/11111111-2222-4333-8444-555555555555",
+    confirmationUrl:
+      "https://siriranee.example/book/confirm?token=signed-test-token",
   });
 
   assert.ok(
@@ -92,6 +94,9 @@ test("owner booking email renders Thai first and English second with complete op
   assert.match(message.html, /scope="row"/);
   assert.match(message.html, /Open booking in CMS/);
   assert.match(message.text, /Open booking in CMS: https:\/\/siriranee\.example/);
+  assert.match(message.html, /Review and confirm booking/);
+  assert.match(message.text, /Review and confirm booking: https:\/\/siriranee\.example\/book\/confirm\?token=signed-test-token/);
+  assert.match(message.text, /Opening this link alone will not confirm the booking/);
   assert.match(message.text, /2026/);
   assert.doesNotMatch(message.text, /2569/);
   assert.doesNotMatch(message.html, /Temporary capacity|กันคิวชั่วคราว/);
@@ -300,6 +305,7 @@ test("therapist schedule emails contain appointment details but no customer iden
     assignedStaffName: "Waen",
   });
   const expectations = [
+    ["requested", "Pending confirmation"],
     ["assigned", "Assigned to you"],
     ["rescheduled", "Date or time updated"],
     ["removed", "No longer assigned to you"],
@@ -312,8 +318,13 @@ test("therapist schedule emails contain appointment details but no customer iden
       therapistName: "Waen <script>alert(1)</script>\u202E",
       businessName: "Siriranee Thai Massage",
       cmsUrl: "https://siriranee.com/cms",
+      confirmationUrl:
+        "https://siriranee.com/book/confirm?token=signed-therapist-capability",
     });
     const rendered = `${message.subject}\n${message.html}\n${message.text}`;
+    const expectedLink = event === "requested"
+      ? "https://siriranee.com/book/confirm?token=signed-therapist-capability"
+      : "https://siriranee.com/cms";
 
     for (const expected of [
       expectedStatus,
@@ -322,7 +333,7 @@ test("therapist schedule emails contain appointment details but no customer iden
       "60 minutes",
       "Thursday 10 September 2026",
       "10:00 (Dublin time)",
-      "https://siriranee.com/cms",
+      expectedLink,
     ]) {
       assert.match(
         rendered,
@@ -332,6 +343,10 @@ test("therapist schedule emails contain appointment details but no customer iden
     assert.match(message.html, /Waen &lt;script&gt;alert\(1\)&lt;\/script&gt;/);
     assert.doesNotMatch(message.html, /\u202E|<script>/);
     assert.doesNotMatch(message.text, /\u202E/);
+    if (event === "requested") {
+      assert.doesNotMatch(rendered, /https:\/\/siriranee\.com\/cms/);
+      assert.match(rendered, /No CMS login is required/);
+    }
 
     for (const forbidden of [
       "Nok Example",

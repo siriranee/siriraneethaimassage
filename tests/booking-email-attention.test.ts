@@ -96,11 +96,12 @@ test("successful manual retry removes stored attention, but a later bounce resto
   assert.equal((await repository.listBookingEmailAttention()).length, 1);
 });
 
-test("obsolete owner request errors are hidden without hiding previous-therapist removal errors", async () => {
+test("obsolete owner and therapist request errors are hidden without hiding later therapist errors", async () => {
   const { repository, booking } = await setup("pending");
   await repository.saveNotification({ ...failed, status: "sent" });
   await repository.saveNotification({ ...failed, id: "attention-owner", audience: "owner", kind: "booking-requested" });
-  assert.equal((await repository.listBookingEmailAttention())[0].count, 1);
+  await repository.saveNotification({ ...failed, id: "attention-therapist-request", audience: "therapist", targetTeamMemberId: booking.assignedStaffId, kind: "booking-requested" });
+  assert.equal((await repository.listBookingEmailAttention())[0].count, 2);
   await repository.saveBooking({ ...booking, version: booking.version + 1, status: "cancelled" }, booking.version);
   assert.deepEqual(await repository.listBookingEmailAttention(), []);
   await repository.saveNotification({ ...failed, id: "attention-removal", audience: "therapist", kind: "booking-cancelled", lastError: "therapist-booking-state-invalid" });

@@ -12,6 +12,10 @@ import {
 import { googleMapsDirectionsUrl } from "@/content/site";
 import type { CmsBooking, CmsSiteSettings } from "@/domain/cms/types";
 import {
+  createBookingConfirmationUrl,
+  createTherapistBookingConfirmationUrl,
+} from "@/server/booking/booking-confirmation-token";
+import {
   renderCustomerBookingCancelledEmail,
   renderCustomerBookingConfirmedEmail,
   renderCustomerBookingRescheduledEmail,
@@ -130,6 +134,7 @@ type SendDependencies = {
   readonly environment?: BookingEmailEnvironment;
   readonly timeoutMs?: number;
   readonly fingerprintSecret?: string;
+  readonly confirmationIssuedAt?: string;
 };
 
 class ResendRequestTimeoutError extends Error {
@@ -289,6 +294,43 @@ function cmsUrl(origin: string | undefined) {
   return new URL("/cms", origin).toString();
 }
 
+function ownerConfirmationUrl(
+  origin: string | undefined,
+  booking: CmsBooking,
+  secret: string | undefined,
+) {
+  if (!origin) return undefined;
+  try {
+    return createBookingConfirmationUrl(origin, booking, { secret });
+  } catch {
+    // The CMS booking link remains available if the capability secret is not
+    // configured. Live public booking already requires the encryption key.
+    return undefined;
+  }
+}
+
+function therapistConfirmationUrl(
+  origin: string | undefined,
+  booking: CmsBooking,
+  therapistId: string,
+  secret: string | undefined,
+  issuedAt: string | undefined,
+) {
+  if (!origin) return undefined;
+  try {
+    return createTherapistBookingConfirmationUrl(
+      origin,
+      booking,
+      therapistId,
+      { secret, issuedAt },
+    );
+  } catch {
+    // Pending delivery will fail before contacting Resend so the owner can fix
+    // configuration rather than sending a login-only workflow to a therapist.
+    return undefined;
+  }
+}
+
 function resolveConfiguration(
   dependencies: Pick<SendDependencies, "configuration" | "environment">,
 ) {
@@ -302,12 +344,31 @@ function resolveConfiguration(
     : inspectConfiguration(dependencies.environment);
 }
 
+export function isOwnerBookingEmailRecipient(
+  email: string,
+  dependencies: Pick<SendDependencies, "configuration" | "environment"> = {},
+) {
+  const configuration = resolveConfiguration(dependencies).configuration;
+  const recipient = clean(email).toLowerCase();
+  return Boolean(
+    configuration &&
+    isEmailAddress(recipient) &&
+    recipient === clean(configuration.to).toLowerCase(),
+  );
+}
+
 function createOwnerBookingEmailRequest(
   booking: CmsBooking,
   configuration: ResendBookingEmailConfiguration,
+  confirmationSecret?: string,
 ) {
   const message = renderOwnerBookingRequestedEmail(booking, {
     cmsBookingUrl: bookingUrl(configuration.siteOrigin, booking.id),
+    confirmationUrl: ownerConfirmationUrl(
+      configuration.siteOrigin,
+      booking,
+      confirmationSecret,
+    ),
   });
   const payload: CreateEmailOptions = {
     from: configuration.from,
@@ -432,6 +493,23 @@ function isTherapistBookingEmailStateValid(
   recipient: TherapistBookingEmailRecipient,
   event: TherapistBookingEmailEvent,
 ) {
+  if (event === "requested" || event === "request-updated") {
+    return (
+      booking.source === "website" &&
+      booking.status === "pending" &&
+      booking.assignedStaffId === recipient.id
+    );
+  }
+
+  if (event === "request-withdrawn") {
+    // The email renders the immutable original request snapshot while these
+    // live fields prove that request is no longer active for this therapist.
+    return (
+      booking.source === "website" &&
+      (booking.status !== "pending" || booking.assignedStaffId !== recipient.id)
+    );
+  }
+
   if (event === "removed") {
     // A historical removal remains true if a later booking update or
     // cancellation affects the other therapist. The outbox checks its snapshot.
@@ -458,6 +536,8 @@ function createTherapistBookingEmailRequest(
   bookingVersion: number,
   business: CustomerBookingEmailBusiness,
   configuration: ResendBookingEmailConfiguration,
+  confirmationSecret?: string,
+  confirmationIssuedAt?: string,
 ) {
   const therapistId = clean(recipient.id);
   const therapistEmail = clean(recipient.notificationEmail).toLowerCase();
@@ -473,12 +553,28 @@ function createTherapistBookingEmailRequest(
     return null;
   }
 
+  const pendingRequest = event === "requested" || event === "request-updated";
+  const confirmationUrl = pendingRequest
+    ? therapistConfirmationUrl(
+        configuration.siteOrigin,
+        booking,
+        therapistId,
+        confirmationSecret,
+        confirmationIssuedAt,
+      )
+    : undefined;
+  // A pending therapist message without its promised capability would direct
+  // the recipient into a login-only workflow. Fail before contacting Resend so
+  // the durable notification is surfaced to the owner for configuration review.
+  if (pendingRequest && !confirmationUrl) return null;
+
   const publicReplyTo = clean(business.email);
   const message = renderTherapistBookingEmail(booking, {
     event,
     therapistName,
     businessName: business.name,
     cmsUrl: cmsUrl(configuration.siteOrigin),
+    confirmationUrl,
   });
   const payload: CreateEmailOptions = {
     from: configuration.from,
@@ -512,7 +608,11 @@ export function getOwnerBookingEmailDeliveryFingerprint(
       (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
   );
   if (!configuration || !fingerprintSecret) return null;
-  const request = createOwnerBookingEmailRequest(booking, configuration);
+  const request = createOwnerBookingEmailRequest(
+    booking,
+    configuration,
+    fingerprintSecret,
+  );
   const domainKey = createHmac("sha256", fingerprintSecret)
     .update("siriranee/resend-booking-email/fingerprint/v2")
     .digest();
@@ -542,7 +642,11 @@ export function isOwnerBookingEmailDeliveryFingerprintCompatible(
       (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
   );
   if (!configuration || !fingerprintSecret) return false;
-  const request = createOwnerBookingEmailRequest(booking, configuration);
+  const request = createOwnerBookingEmailRequest(
+    booking,
+    configuration,
+    fingerprintSecret,
+  );
   const domainKey = createHmac("sha256", fingerprintSecret)
     .update("siriranee/resend-booking-email/fingerprint/v1")
     .digest();
@@ -624,7 +728,10 @@ export function getTherapistBookingEmailDeliveryFingerprint(
   business: CustomerBookingEmailBusiness,
   dependencies: Pick<
     SendDependencies,
-    "configuration" | "environment" | "fingerprintSecret"
+    | "configuration"
+    | "environment"
+    | "fingerprintSecret"
+    | "confirmationIssuedAt"
   > = {},
 ) {
   const configuration = resolveConfiguration(dependencies).configuration;
@@ -640,6 +747,8 @@ export function getTherapistBookingEmailDeliveryFingerprint(
     bookingVersion,
     business,
     configuration,
+    fingerprintSecret,
+    dependencies.confirmationIssuedAt,
   );
   if (!request) return null;
   const domainKey = createHmac("sha256", fingerprintSecret)
@@ -651,7 +760,9 @@ export function getTherapistBookingEmailDeliveryFingerprint(
         request,
         event,
         bookingVersion,
-        ...(event === "removed" ? {} : { bookingStatus: booking.status }),
+        ...(event === "removed" || event === "request-withdrawn"
+          ? {}
+          : { bookingStatus: booking.status }),
       }),
     )
     .digest("base64url");
@@ -755,7 +866,14 @@ export async function sendOwnerBookingRequestedEmail(
   }
 
   return sendResolvedBookingEmail(
-    createOwnerBookingEmailRequest(booking, configuration),
+    createOwnerBookingEmailRequest(
+      booking,
+      configuration,
+      clean(
+        dependencies.fingerprintSecret ??
+          (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
+      ) || undefined,
+    ),
     configuration,
     dependencies,
   );
@@ -919,6 +1037,11 @@ export async function sendTherapistBookingEmail(
     bookingVersion,
     business,
     configuration,
+    clean(
+      dependencies.fingerprintSecret ??
+        (dependencies.environment ?? process.env).CMS_PII_ENCRYPTION_KEY,
+    ) || undefined,
+    dependencies.confirmationIssuedAt,
   );
   if (!request) {
     const notificationEmail = clean(recipient.notificationEmail).toLowerCase();

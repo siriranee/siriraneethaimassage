@@ -374,6 +374,8 @@ export type CmsNotificationChannel = (typeof cmsNotificationChannels)[number];
 
 export const cmsNotificationKinds = [
   "booking-requested",
+  "booking-request-updated",
+  "booking-request-withdrawn",
   "booking-assigned",
   "booking-unassigned",
   "booking-confirmed",

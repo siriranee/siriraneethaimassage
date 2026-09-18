@@ -48,6 +48,7 @@ async function capturedRequest(current: CmsBooking, recipient = configuration.to
   let request: { payload: CreateEmailOptions; options?: CreateEmailRequestOptions } | undefined;
   await sendOwnerBookingRequestedEmail(current, {
     configuration: { ...configuration, to: recipient },
+    fingerprintSecret: dependencies.fingerprintSecret,
     client: { emails: { async send(payload, options) {
       request = { options, payload };
       return { data: { id: "simulated-owner-message" }, error: null, headers: null };

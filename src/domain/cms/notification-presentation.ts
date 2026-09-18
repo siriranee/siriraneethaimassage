@@ -13,13 +13,21 @@ export type CmsBookingEmailAttention = {
 };
 
 export function bookingEmailNeedsAttention(
-  notification: Pick<CmsBookingNotification, "channel" | "provider" | "status" | "deliveryStatus" | "audience" | "kind">,
-  booking: { readonly status: BookingStatus; readonly demo: boolean } | null,
+  notification: Pick<CmsBookingNotification, "channel" | "provider" | "status" | "deliveryStatus" | "audience" | "kind" | "targetTeamMemberId">,
+  booking: { readonly status: BookingStatus; readonly demo: boolean; readonly assignedStaffId?: string } | null,
 ) {
   if (!booking || booking.demo || notification.channel !== "email" || notification.provider !== "resend") return false;
   // An unsent initial request no longer requires review after staff have acted.
   // Other recipients, especially a previous therapist, can still need a correction.
-  if (notification.audience === "owner" && notification.kind === "booking-requested" && booking.status !== "pending") return false;
+  if (notification.audience === "owner" &&
+    notification.kind === "booking-requested" && booking.status !== "pending") return false;
+  if (
+    notification.audience === "therapist" &&
+    (notification.kind === "booking-requested" ||
+      notification.kind === "booking-request-updated") &&
+    (booking.status !== "pending" ||
+      notification.targetTeamMemberId !== booking.assignedStaffId)
+  ) return false;
   return bookingEmailAttentionStatuses.some((status) => status === notification.status) ||
     bookingEmailAttentionDeliveryStatuses.some((status) => status === notification.deliveryStatus);
 }
@@ -80,6 +88,9 @@ export function bookingEmailDeliveryFeedback(notification: DeliveryMetadata, ret
 } {
   if (notification.status === "failed" && notification.lastError === "therapist-removal-snapshot-unavailable") {
     return { tone: "warning", label: "Original appointment details unavailable", text: "No removal email was sent because the original appointment details are unavailable. Contact the previous therapist directly." };
+  }
+  if (notification.status === "failed" && notification.lastError === "therapist-request-withdrawal-snapshot-unavailable") {
+    return { tone: "warning", label: "Original request details unavailable", text: "No withdrawal email was sent because the original pending request details are unavailable. Contact the previous therapist directly." };
   }
   switch (notification.deliveryStatus) {
     case "delivered":

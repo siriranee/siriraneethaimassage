@@ -41,6 +41,7 @@ import {
   getOwnerBookingEmailDeliveryFingerprint,
   isOwnerBookingEmailDeliveryFingerprintCompatible,
   getTherapistBookingEmailDeliveryFingerprint,
+  isOwnerBookingEmailRecipient,
   sendCustomerBookingCancelledEmail,
   sendCustomerBookingConfirmedEmail,
   sendCustomerBookingRescheduledEmail,
@@ -123,6 +124,9 @@ export function therapistBookingEmailNotificationId(
 function therapistNotificationKind(
   event: TherapistBookingEmailEvent,
 ): CmsNotificationKind {
+  if (event === "requested") return "booking-requested";
+  if (event === "request-updated") return "booking-request-updated";
+  if (event === "request-withdrawn") return "booking-request-withdrawn";
   if (event === "assigned") return "booking-assigned";
   if (event === "removed") return "booking-unassigned";
   if (event === "rescheduled") return "booking-rescheduled";
@@ -151,9 +155,45 @@ export function getTherapistBookingEmailPlans(
   const nextTherapistId = next.assignedStaffId.trim();
 
   if (!current) {
-    return next.status === "confirmed" && nextTherapistId
+    if (!nextTherapistId) return [];
+    if (next.source === "website" && next.status === "pending") {
+      return [createPlan("requested", nextTherapistId)];
+    }
+    return next.status === "confirmed"
       ? [createPlan("assigned", nextTherapistId)]
       : [];
+  }
+
+  if (current.source === "website" && current.status === "pending") {
+    const reassigned = currentTherapistId !== nextTherapistId;
+    const withdrawCurrent = currentTherapistId
+      ? [createPlan("request-withdrawn", currentTherapistId)]
+      : [];
+
+    if (next.status === "cancelled") return withdrawCurrent;
+
+    if (next.status === "pending") {
+      if (reassigned) {
+        return [
+          ...withdrawCurrent,
+          ...(nextTherapistId
+            ? [createPlan("requested", nextTherapistId)]
+            : []),
+        ];
+      }
+      return bookingAppointmentDetailsChanged(current, next) && nextTherapistId
+        ? [createPlan("request-updated", nextTherapistId)]
+        : [];
+    }
+
+    if (next.status === "confirmed") {
+      return [
+        ...(reassigned ? withdrawCurrent : []),
+        ...(nextTherapistId
+          ? [createPlan("assigned", nextTherapistId)]
+          : []),
+      ];
+    }
   }
 
   if (current.status === "confirmed" && next.status === "cancelled") {
@@ -232,10 +272,11 @@ export async function recordTherapistBookingEmailPlans(
   const notifications: CmsBookingNotification[] = [];
 
   for (const plan of plans) {
-    const removedAppointment = plan.event === "removed" && current
+    const historicalAppointment =
+      (plan.event === "removed" || plan.event === "request-withdrawn") && current
       ? captureTherapistRemovedAppointment(current) : undefined;
-    const deliveryBooking = removedAppointment
-      ? withTherapistRemovedAppointment(next, removedAppointment) : next;
+    const deliveryBooking = historicalAppointment
+      ? withTherapistRemovedAppointment(next, historicalAppointment) : next;
     let recipient: TherapistBookingEmailRecipient | null = null;
     try {
       recipient = await getTherapistBookingEmailRecipient(
@@ -246,6 +287,16 @@ export async function recordTherapistBookingEmailPlans(
       // A missing or temporarily unavailable private contact must not erase
       // the booking transition. It will be checked again at delivery time.
     }
+    if (
+      plan.event === "requested" &&
+      !current &&
+      recipient &&
+      isOwnerBookingEmailRecipient(recipient.notificationEmail)
+    ) {
+      // The owner message contains the same request plus the secure confirmation
+      // action. When both roles share one inbox, keep that richer single email.
+      continue;
+    }
     const deliveryPayloadHash = recipient && business
       ? getTherapistBookingEmailDeliveryFingerprint(
           deliveryBooking,
@@ -253,6 +304,7 @@ export async function recordTherapistBookingEmailPlans(
           plan.event,
           plan.bookingVersion,
           business,
+          { confirmationIssuedAt: now },
         )
       : null;
     const notification: CmsBookingNotification = {
@@ -263,7 +315,9 @@ export async function recordTherapistBookingEmailPlans(
       audience: "therapist",
       targetTeamMemberId: plan.targetTeamMemberId,
       bookingVersion: plan.bookingVersion,
-      ...(removedAppointment ? { therapistRemovedAppointment: removedAppointment } : {}),
+      ...(historicalAppointment
+        ? { therapistRemovedAppointment: historicalAppointment }
+        : {}),
       kind: therapistNotificationKind(plan.event),
       status: "queued",
       provider: "resend",
@@ -928,7 +982,10 @@ function therapistEmailPlanFromNotification(
     return null;
   }
   const event: TherapistBookingEmailEvent | null =
-    notification.kind === "booking-assigned" ? "assigned"
+    notification.kind === "booking-requested" ? "requested"
+      : notification.kind === "booking-request-updated" ? "request-updated"
+      : notification.kind === "booking-request-withdrawn" ? "request-withdrawn"
+      : notification.kind === "booking-assigned" ? "assigned"
       : notification.kind === "booking-unassigned" ? "removed"
         : notification.kind === "booking-rescheduled" ? "rescheduled"
           : notification.kind === "booking-cancelled" ? "cancelled" : null;
@@ -970,17 +1027,46 @@ export async function deliverTherapistBookingEmail(
   const notification = await repository.getNotification(requestedPlan.notificationId);
   const plan = notification ? therapistEmailPlanFromNotification(notification) : null;
   if (!notification || !plan || notification.bookingId !== booking.id) return null;
-  const removedAppointment = plan.event === "removed"
+  const historicalAppointment =
+    plan.event === "removed" || plan.event === "request-withdrawn"
     ? readTherapistRemovedAppointment(notification.therapistRemovedAppointment, plan.targetTeamMemberId)
     : null;
-  const deliveryBooking = (latest: CmsBooking) => removedAppointment
-    ? withTherapistRemovedAppointment(latest, removedAppointment) : latest;
-  const sender = options.sender ?? sendTherapistBookingEmail;
-  const fingerprinter = options.fingerprinter ?? getTherapistBookingEmailDeliveryFingerprint;
+  const deliveryBooking = (latest: CmsBooking) => historicalAppointment
+    ? withTherapistRemovedAppointment(latest, historicalAppointment) : latest;
   return deliverBookingEmail(
     repository, booking, plan.notificationId,
-    (latest, context) => sender(deliveryBooking(latest), context.recipient, plan.event, plan.bookingVersion, context.business),
-    (latest, context) => fingerprinter(deliveryBooking(latest), context.recipient, plan.event, plan.bookingVersion, context.business),
+    (latest, context) => options.sender
+      ? options.sender(
+          deliveryBooking(latest),
+          context.recipient,
+          plan.event,
+          plan.bookingVersion,
+          context.business,
+        )
+      : sendTherapistBookingEmail(
+          deliveryBooking(latest),
+          context.recipient,
+          plan.event,
+          plan.bookingVersion,
+          context.business,
+          { confirmationIssuedAt: notification.createdAt },
+        ),
+    (latest, context) => options.fingerprinter
+      ? options.fingerprinter(
+          deliveryBooking(latest),
+          context.recipient,
+          plan.event,
+          plan.bookingVersion,
+          context.business,
+        )
+      : getTherapistBookingEmailDeliveryFingerprint(
+          deliveryBooking(latest),
+          context.recipient,
+          plan.event,
+          plan.bookingVersion,
+          context.business,
+          { confirmationIssuedAt: notification.createdAt },
+        ),
     "therapist booking email",
     {
       refreshBooking: () => repository.getBooking(booking.id),
@@ -994,18 +1080,39 @@ export async function deliverTherapistBookingEmail(
       },
       contextUnavailableError: "therapist-contact-unavailable",
       validateContext: (latest, context) => {
-        if (plan.event === "removed" && !removedAppointment) {
-          return "therapist-removal-snapshot-unavailable";
+        if (
+          (plan.event === "removed" || plan.event === "request-withdrawn") &&
+          !historicalAppointment
+        ) {
+          return plan.event === "request-withdrawn"
+            ? "therapist-request-withdrawal-snapshot-unavailable"
+            : "therapist-removal-snapshot-unavailable";
         }
         if (context.superseded || latest.version < plan.bookingVersion ||
-          (!removedAppointment && !notification.deliveryPayloadHash && latest.version !== plan.bookingVersion)) {
+          (!historicalAppointment && !notification.deliveryPayloadHash && latest.version !== plan.bookingVersion)) {
           return "booking-event-superseded";
         }
         if (plan.event === "removed") {
           return latest.assignedStaffId !== plan.targetTeamMemberId
             ? null : "therapist-booking-state-invalid";
         }
-        const status = plan.event === "cancelled" ? "cancelled" : "confirmed";
+        if (plan.event === "request-withdrawn") {
+          return latest.source === "website" &&
+            (latest.status !== "pending" || latest.assignedStaffId !== plan.targetTeamMemberId)
+            ? null
+            : "therapist-booking-state-invalid";
+        }
+        const status = plan.event === "requested" || plan.event === "request-updated"
+          ? "pending"
+          : plan.event === "cancelled"
+            ? "cancelled"
+            : "confirmed";
+        if (
+          (plan.event === "requested" || plan.event === "request-updated") &&
+          latest.source !== "website"
+        ) {
+          return "therapist-booking-state-invalid";
+        }
         return latest.status === status && latest.assignedStaffId === plan.targetTeamMemberId
           ? null : "therapist-booking-state-invalid";
       },

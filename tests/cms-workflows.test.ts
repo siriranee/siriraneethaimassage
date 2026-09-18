@@ -178,8 +178,9 @@ test("notification records keep Resend delivery metadata free of contact details
   assert.match(notifications, /provider: "resend"/);
   assert.match(
     publicBooking,
-    /const result = await create\(\);[\s\S]*?await attemptOwnerEmail\(result\.booking\)/,
+    /const result = await create\(\);[\s\S]*?await attemptRequestEmails\(result\.booking\)/,
   );
+  assert.match(publicBooking, /recordTherapistBookingEmailPlans\(transaction, null, booking\)/);
 });
 
 test("CMS navigation includes therapist management and omits retired publishing surfaces", async () => {
