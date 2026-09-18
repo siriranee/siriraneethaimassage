@@ -61,3 +61,37 @@ test("therapist form uses approved errors and preserves the no-cleanup ambiguity
   assert.match(source, /getTeamSaveErrorMessage\(error, requestState\)\}\$\{cleanupWarning\}/);
   assert.doesNotMatch(source, /safeMessage\(error\)/);
 });
+
+test("therapist form gives complete accessible validation feedback without losing the draft", async () => {
+  const [source, styles] = await Promise.all([
+    readFile("src/components/cms/TeamEditorForm.tsx", "utf8"),
+    readFile("src/components/cms/TeamEditorForm.module.css", "utf8"),
+  ]);
+
+  assert.match(
+    source,
+    /name === "serviceIds" \|\| name\.startsWith\("serviceIds\."\)[\s\S]*?"serviceIds"/,
+  );
+  assert.match(source, /const clientErrors = collectClientFieldErrors\(form\)/);
+  assert.match(source, /onBlur=\{handleFieldBlur\}/);
+  assert.match(source, /onChange=\{handleFieldChange\}/);
+  assert.match(source, /touchedFieldsRef\.current\.has\(field\) \|\| fieldErrors\[field\]/);
+  assert.match(source, /setFieldErrors\(\(current\) =>[\s\S]*?delete next\[field\]/);
+
+  assert.match(
+    source,
+    /aria-invalid=\{Boolean\(fieldError\("fullName"\)\)\}[\s\S]*?name="fullName"/,
+  );
+  assert.match(source, /id="fullName-error">\{fieldError\("fullName"\)\}/);
+  assert.match(source, /Object\.entries\(fieldErrors\)\.map/);
+  assert.match(source, /ref=\{errorSummaryRef\}/);
+  assert.match(source, /tabIndex=\{-1\}/);
+  assert.match(source, /onClick=\{\(\) => focusField\(field\)\}/);
+  assert.match(source, /requestAnimationFrame/);
+  assert.match(source, /noValidate/);
+
+  assert.doesNotMatch(source, /form\.reset\(/);
+  assert.match(styles, /\.serviceFieldset\[aria-invalid="true"\]/);
+  assert.match(styles, /input\[aria-invalid="true"\]/);
+  assert.match(styles, /\.errorSummary:focus/);
+});

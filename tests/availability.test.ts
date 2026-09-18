@@ -5,6 +5,7 @@ import { classifyAvailabilityCalendarDay } from "@/domain/booking/calendar";
 import {
   buildCalendarMonthCells,
   calendarMonthRange,
+  calendarWeekdayLabels,
   monthFromCalendarDate,
   normalizeCalendarDate,
   normalizeCalendarMonth,
@@ -28,7 +29,7 @@ const days: readonly CmsWeeklyHours["day"][] = [
   "Sunday",
 ];
 
-test("calendar month helpers reject invalid dates and build a Monday-first grid", () => {
+test("calendar month helpers reject invalid dates and build a Sunday-first grid", () => {
   assert.equal(normalizeCalendarMonth("2024-02"), "2024-02");
   assert.equal(normalizeCalendarMonth("2024-13"), null);
   assert.equal(normalizeCalendarMonth("2024-2"), null);
@@ -44,14 +45,23 @@ test("calendar month helpers reject invalid dates and build a Monday-first grid"
     from: "2024-02-01",
     to: "2024-02-29",
   });
+  assert.deepEqual(calendarWeekdayLabels, [
+    "Su",
+    "Mo",
+    "Tu",
+    "We",
+    "Th",
+    "Fr",
+    "Sa",
+  ]);
 
   const cells = buildCalendarMonthCells("2024-02");
   assert.equal(cells.length, 42);
   assert.equal(cells[0], null);
-  assert.equal(cells[2], null);
-  assert.equal(cells[3], "2024-02-01");
-  assert.equal(cells[31], "2024-02-29");
-  assert.equal(cells[32], null);
+  assert.equal(cells[3], null);
+  assert.equal(cells[4], "2024-02-01");
+  assert.equal(cells[32], "2024-02-29");
+  assert.equal(cells[33], null);
 });
 
 function settings(
@@ -192,6 +202,33 @@ test("different therapists can work concurrently while spa capacity remains", ()
   );
 });
 
+test("a submitted pending request stays unavailable for its therapist", () => {
+  const booking = {
+    startsAt: "2026-06-01T09:00:00Z",
+    endsAt: "2026-06-01T10:00:00Z",
+    assignedStaffId: "therapist-a",
+    status: "pending" as const,
+    // Legacy requests may still contain this old technical expiry value.
+    expiresAt: "2026-05-01T00:00:00Z",
+  };
+  const sameTherapist = slots({
+    therapistId: "therapist-a",
+    settings: settings({ maxConcurrentBookings: 2 }),
+    bookings: [booking],
+  });
+  const otherTherapist = slots({
+    therapistId: "therapist-b",
+    settings: settings({ maxConcurrentBookings: 2 }),
+    bookings: [booking],
+  });
+
+  assert.ok(!sameTherapist.some((slot) => slot.localTime === "10:00"));
+  assert.equal(
+    otherTherapist.find((slot) => slot.localTime === "10:00")?.remainingCapacity,
+    1,
+  );
+});
+
 test("global spa capacity still blocks a free therapist", () => {
   const result = slots({
     therapistId: "therapist-c",
@@ -241,8 +278,8 @@ test("partial and all-day closures remove intersecting slots", () => {
   );
 });
 
-test("expired pending capacity is ignored while an active hold blocks the slot", () => {
-  const expired = slots({
+test("submitted pending bookings keep the slot while only technical holds expire", () => {
+  const pendingBooking = slots({
     now: "2026-06-01T08:00:00Z",
     bookings: [
       {
@@ -253,20 +290,32 @@ test("expired pending capacity is ignored while an active hold blocks the slot",
       },
     ],
   });
-  const active = slots({
+  const expiredHold = slots({
     now: "2026-06-01T08:00:00Z",
-    bookings: [
+    holds: [
       {
         startsAt: "2026-06-01T09:00:00Z",
         endsAt: "2026-06-01T10:00:00Z",
-        status: "pending",
+        status: "active",
+        expiresAt: "2026-06-01T07:59:59Z",
+      },
+    ],
+  });
+  const activeHold = slots({
+    now: "2026-06-01T08:00:00Z",
+    holds: [
+      {
+        startsAt: "2026-06-01T09:00:00Z",
+        endsAt: "2026-06-01T10:00:00Z",
+        status: "active",
         expiresAt: "2026-06-01T08:10:00Z",
       },
     ],
   });
 
-  assert.ok(expired.some((slot) => slot.localTime === "10:00"));
-  assert.ok(!active.some((slot) => slot.localTime === "10:00"));
+  assert.ok(!pendingBooking.some((slot) => slot.localTime === "10:00"));
+  assert.ok(expiredHold.some((slot) => slot.localTime === "10:00"));
+  assert.ok(!activeHold.some((slot) => slot.localTime === "10:00"));
 });
 
 test("buffers, notice windows and booking horizon are enforced", () => {

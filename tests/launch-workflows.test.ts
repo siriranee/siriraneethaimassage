@@ -628,7 +628,7 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.equal(publicBooking.assignedStaffId, primaryTherapist.id);
   assert.equal(publicBooking.assignedStaffName, primaryTherapist.name);
   assert.ok(publicBooking.privacyAcceptedAt);
-  assert.ok(publicBooking.capacityExpiresAt > publicBooking.createdAt);
+  assert.equal(publicBooking.capacityExpiresAt, "");
 
   const idempotentRetry = await createPublicBooking(publicRequest, {
     idempotencyKey: "isolated-public-booking-request-0001",
@@ -886,7 +886,7 @@ test("isolated launch verification covers services, ten bookings and administrat
   const queryNow = Date.now();
   const futureStartsAt = new Date(queryNow + 86_400_000).toISOString();
   const futureEndsAt = new Date(queryNow + 90_000_000).toISOString();
-  const expiredAt = new Date(queryNow - 60_000).toISOString();
+  const legacyExpiry = new Date(queryNow - 60_000).toISOString();
   const unassignedFixture = {
     ...cancelledPublicBooking,
     id: "isolated-unassigned-active",
@@ -902,10 +902,10 @@ test("isolated launch verification covers services, ten bookings and administrat
   await repository.saveBooking(unassignedFixture);
   await repository.saveBooking({
     ...unassignedFixture,
-    id: "isolated-unassigned-expired",
-    reference: "SIR-UNASSIGNED-EXPIRED",
+    id: "isolated-unassigned-legacy-pending",
+    reference: "SIR-UNASSIGNED-LEGACY-PENDING",
     status: "pending",
-    capacityExpiresAt: expiredAt,
+    capacityExpiresAt: legacyExpiry,
   });
   await repository.saveBooking({
     ...unassignedFixture,
@@ -924,7 +924,10 @@ test("isolated launch verification covers services, ten bookings and administrat
   const attentionBookingIds = (
     await repository.listBookings({ attention: "unassigned" })
   ).map((booking) => booking.id);
-  assert.deepEqual(attentionBookingIds, [unassignedFixture.id]);
+  assert.deepEqual(attentionBookingIds, [
+    unassignedFixture.id,
+    "isolated-unassigned-legacy-pending",
+  ]);
   assert.ok(
     (
       await repository.listFutureActiveTherapistBookings(

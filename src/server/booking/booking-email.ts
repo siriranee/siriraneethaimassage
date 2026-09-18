@@ -17,7 +17,6 @@ type BookingEmailInput = Pick<
   | "localDate"
   | "localTime"
   | "timezone"
-  | "capacityExpiresAt"
   | "assignedStaffName"
   | "createdAt"
 >;
@@ -229,15 +228,6 @@ export function renderOwnerBookingRequestedEmail(
     "th-TH-u-ca-gregory-nu-latn",
   );
   const englishRequestedAt = formatDublinTimestamp(booking.createdAt, "en-IE");
-  const thaiHoldUntil = formatDublinTimestamp(
-    booking.capacityExpiresAt,
-    "th-TH-u-ca-gregory-nu-latn",
-  );
-  const englishHoldUntil = formatDublinTimestamp(
-    booking.capacityExpiresAt,
-    "en-IE",
-  );
-
   const thai = section({
     language: "th",
     eyebrow: "การจองผ่านเว็บไซต์",
@@ -266,7 +256,6 @@ export function renderOwnerBookingRequestedEmail(
     requestRows: [
       ["รหัสภายใน", bookingId],
       ["ส่งคำขอเมื่อ", `${thaiRequestedAt} (เวลาดับลิน)`],
-      ["กันคิวชั่วคราวถึง", `${thaiHoldUntil} (เวลาดับลิน)`],
     ],
     warning: "อีเมลนี้บันทึกข้อมูลตอนลูกค้าส่งคำขอ กรุณาเปิด CMS เพื่อดูสถานะล่าสุด หากยืนยันแล้ว ไม่ต้องยืนยันซ้ำ",
     buttonLabel: "เปิดรายการจองใน CMS",
@@ -301,7 +290,6 @@ export function renderOwnerBookingRequestedEmail(
     requestRows: [
       ["Internal booking ID", bookingId],
       ["Submitted", `${englishRequestedAt} (Dublin time)`],
-      ["Temporary capacity held until", `${englishHoldUntil} (Dublin time)`],
     ],
     warning: "This email records the original request. Open the CMS for the latest status. If it is already confirmed, no further confirmation is needed.",
     buttonLabel: "Open booking in CMS",
@@ -356,7 +344,6 @@ export function renderOwnerBookingRequestedEmail(
 ข้อมูลคำขอ
 รหัสภายใน: ${bookingId}
 ส่งคำขอเมื่อ: ${thaiRequestedAt} (เวลาดับลิน)
-กันคิวชั่วคราวถึง: ${thaiHoldUntil} (เวลาดับลิน)
 ${cmsBookingUrl ? `เปิดรายการจองใน CMS: ${cmsBookingUrl}\n` : ""}
 อีเมลนี้บันทึกข้อมูลตอนลูกค้าส่งคำขอ กรุณาเปิด CMS เพื่อดูสถานะล่าสุด หากยืนยันแล้ว ไม่ต้องยืนยันซ้ำ
 
@@ -385,7 +372,6 @@ Notes: ${customerNotes || "Not provided"}
 Request information
 Internal booking ID: ${bookingId}
 Submitted: ${englishRequestedAt} (Dublin time)
-Temporary capacity held until: ${englishHoldUntil} (Dublin time)
 ${cmsBookingUrl ? `Open booking in CMS: ${cmsBookingUrl}\n` : ""}
 This email records the original request. Open the CMS for the latest status. If it is already confirmed, no further confirmation is needed.`;
 

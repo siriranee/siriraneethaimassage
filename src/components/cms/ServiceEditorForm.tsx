@@ -18,6 +18,7 @@ import {
 } from "react";
 
 import { CmsImageUploadField } from "@/components/cms/CmsImageUploadField";
+import { CmsValidatedForm } from "@/components/cms/CmsValidatedForm";
 import type { CmsServicePrice, CmsServiceRecord } from "@/domain/cms/types";
 import type { PreparedClientImage } from "@/lib/media/client-image";
 import {
@@ -615,7 +616,7 @@ export function ServiceEditorForm({
   }
 
   return (
-    <form
+    <CmsValidatedForm
       aria-busy={locked}
       className={`${styles.form} ${locked ? styles.formBusy : ""}`}
       onChange={handleFormChange}
@@ -793,7 +794,7 @@ export function ServiceEditorForm({
                   <div className={styles.priceFields}>
                     <label className={styles.field}>
                       Duration, minutes
-                      <input aria-invalid={Boolean(errorFor(`prices.${index}.durationMinutes`))} defaultValue={price.durationMinutes} max={240} min={15} name={`prices.${index}.durationMinutes`} required step={5} type="number" />
+                      <input aria-invalid={Boolean(errorFor(`prices.${index}.durationMinutes`))} data-cms-clear-custom-when-prefix="prices." defaultValue={price.durationMinutes} max={240} min={15} name={`prices.${index}.durationMinutes`} required step={5} type="number" />
                       {errorFor(`prices.${index}.durationMinutes`) ? <small className={styles.fieldError}>{errorFor(`prices.${index}.durationMinutes`)}</small> : null}
                     </label>
                     <label className={styles.field}>
@@ -932,6 +933,6 @@ export function ServiceEditorForm({
           {saving ? "Saving…" : isNew ? "Create and publish" : "Save and publish"}
         </button>
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }

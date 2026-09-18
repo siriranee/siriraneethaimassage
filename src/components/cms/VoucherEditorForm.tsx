@@ -17,6 +17,7 @@ import {
 } from "@/lib/media/cms-media-client";
 import type { PreparedClientImage } from "@/lib/media/client-image";
 import { CmsImageUploadField } from "./CmsImageUploadField";
+import { CmsValidatedForm, safeCmsFieldErrors } from "./CmsValidatedForm";
 import { useUnsavedChanges } from "./useUnsavedChanges";
 import styles from "./CmsEditorForm.module.css";
 import voucherStyles from "./VoucherEditorForm.module.css";
@@ -28,6 +29,7 @@ type SaveRequestState = "not-started" | "ambiguous" | "definite-failure" | "succ
 
 type VoucherSaveResponse = {
   readonly error?: string;
+  readonly fields?: unknown;
   readonly voucher?: CmsVoucherRecord;
   readonly mediaCommitState?: "indeterminate";
   readonly mediaRollback?: unknown;
@@ -65,6 +67,7 @@ export function VoucherEditorForm({
   const [preparedImage, setPreparedImage] = useState<PreparedClientImage | null>(null);
   const [preparationBusy, setPreparationBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error" | "progress";
     text: string;
@@ -75,6 +78,8 @@ export function VoucherEditorForm({
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saveLockRef.current || preparationBusy) return;
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     if (!imageUrl && !preparedImage) {
       setFeedback({ tone: "error", text: "Choose and prepare a voucher image before saving." });
       return;
@@ -83,7 +88,8 @@ export function VoucherEditorForm({
     saveLockRef.current = true;
     setSaving(true);
     setFeedback(null);
-    const data = new FormData(event.currentTarget);
+    setFieldErrors({});
+    const data = new FormData(form);
     let submissionId: string | null = null;
     let stagedAssets: readonly CmsStagedMediaAsset[] = [];
     let requestState: SaveRequestState = "not-started";
@@ -149,6 +155,7 @@ export function VoucherEditorForm({
         serverRollback = submissionId
           ? parseCmsMediaServerRollbackSummary(result.mediaRollback, submissionId, stagedAssets)
           : null;
+        setFieldErrors(safeCmsFieldErrors(result.fields));
         throw new Error(result.error ?? "The voucher could not be saved.");
       }
       if (!isVoucherRecord(result.voucher)) throw new Error(ambiguousSaveMessage);
@@ -193,7 +200,7 @@ export function VoucherEditorForm({
   }
 
   return (
-    <form aria-busy={locked} className={styles.form} onChange={markDirty} onSubmit={save}>
+    <CmsValidatedForm aria-busy={locked} className={styles.form} onChange={markDirty} onSubmit={save} serverErrors={fieldErrors}>
       <fieldset className={styles.formFields} disabled={locked}>
         <section className={styles.section}>
           <header className={styles.sectionHeader}>
@@ -269,6 +276,6 @@ export function VoucherEditorForm({
           {saving ? "Saving and publishing…" : isNew ? "Create and publish voucher" : "Save and publish voucher"}
         </button>
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }

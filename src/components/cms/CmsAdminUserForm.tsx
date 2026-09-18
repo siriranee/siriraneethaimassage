@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
+  type Dispatch,
+  type SetStateAction,
   useState,
   type FormEvent,
 } from "react";
@@ -26,6 +28,7 @@ import {
 } from "@/domain/cms/account-policy";
 import { getCmsRoleDescription } from "@/domain/cms/permissions";
 import type { CmsRole, CmsUserSummary } from "@/domain/cms/types";
+import { CmsValidatedForm, safeCmsFieldErrors } from "./CmsValidatedForm";
 
 import formStyles from "./CmsEditorForm.module.css";
 import styles from "./CmsAdminUserForm.module.css";
@@ -42,6 +45,34 @@ type Feedback = {
   readonly tone: "success" | "error";
   readonly text: string;
 };
+
+type FieldErrors = Readonly<Record<string, string>>;
+
+function clearEditedFieldError(
+  setErrors: Dispatch<SetStateAction<FieldErrors>>,
+  event: FormEvent<HTMLFormElement>,
+) {
+  const target = event.target;
+  if (
+    !(target instanceof HTMLInputElement) &&
+    !(target instanceof HTMLSelectElement) &&
+    !(target instanceof HTMLTextAreaElement)
+  ) {
+    return;
+  }
+  const field = target.name;
+  if (!field) return;
+  const relatedFields =
+    field === "newPassword" || field === "confirmPassword"
+      ? ["newPassword", "confirmPassword"]
+      : [field];
+  setErrors((current) => {
+    if (!relatedFields.some((name) => current[name])) return current;
+    const next = { ...current };
+    relatedFields.forEach((name) => delete next[name]);
+    return next;
+  });
+}
 
 async function readApiResult(response: Response): Promise<ApiResult> {
   try {
@@ -83,6 +114,7 @@ function PasswordField({
           autoCapitalize="none"
           autoComplete={autoComplete}
           id={id}
+          data-cms-match-field={name === "confirmPassword" ? "newPassword" : undefined}
           maxLength={CMS_PASSWORD_MAX_LENGTH}
           minLength={newPassword ? CMS_PASSWORD_MIN_LENGTH : undefined}
           name={name}
@@ -179,7 +211,7 @@ export function CmsAdminUserCreateForm({
           router.refresh();
           return;
         }
-        setFieldErrors(result.fields ?? {});
+        setFieldErrors(safeCmsFieldErrors(result.fields));
         setFeedback({
           tone: "error",
           text: result.error ?? "The account could not be created.",
@@ -201,7 +233,7 @@ export function CmsAdminUserCreateForm({
   }
 
   return (
-    <form aria-busy={busy} className={styles.form} onSubmit={createAccount}>
+    <CmsValidatedForm aria-busy={busy} className={styles.form} onInputCapture={(event) => clearEditedFieldError(setFieldErrors, event)} onSubmit={createAccount} serverErrors={fieldErrors}>
       <fieldset className={formStyles.formFields} disabled={busy}>
         <section className={formStyles.section}>
           <header className={formStyles.sectionHeader}>
@@ -317,7 +349,7 @@ export function CmsAdminUserCreateForm({
           <UserPlus aria-hidden="true" /> {busy ? "Creating…" : "Create account"}
         </button>
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }
 
@@ -379,7 +411,7 @@ export function CmsAdminUserEditor({
           router.refresh();
           return;
         }
-        setAccountErrors(result.fields ?? {});
+        setAccountErrors(safeCmsFieldErrors(result.fields));
         setAccountFeedback({ tone: "error", text: result.error ?? "The account could not be saved." });
         return;
       }
@@ -433,7 +465,7 @@ export function CmsAdminUserEditor({
           router.refresh();
           return;
         }
-        setPasswordErrors(result.fields ?? {});
+        setPasswordErrors(safeCmsFieldErrors(result.fields));
         setPasswordFeedback({ tone: "error", text: result.error ?? "The password could not be reset." });
         return;
       }
@@ -477,7 +509,7 @@ export function CmsAdminUserEditor({
           router.refresh();
           return;
         }
-        setSessionErrors(result.fields ?? {});
+        setSessionErrors(safeCmsFieldErrors(result.fields));
         setSessionFeedback({ tone: "error", text: result.error ?? "Sessions could not be revoked." });
         return;
       }
@@ -496,7 +528,7 @@ export function CmsAdminUserEditor({
 
   return (
     <div className={styles.editorStack}>
-      <form aria-busy={busySection === "account"} className={styles.form} onSubmit={saveAccount}>
+      <CmsValidatedForm aria-busy={busySection === "account"} className={styles.form} onInputCapture={(event) => clearEditedFieldError(setAccountErrors, event)} onSubmit={saveAccount} serverErrors={accountErrors}>
         <fieldset className={formStyles.formFields} disabled={busy}>
           <section className={formStyles.section}>
             <header className={formStyles.sectionHeader}>
@@ -510,6 +542,7 @@ export function CmsAdminUserEditor({
                   aria-describedby="edit-display-name-hint"
                   aria-invalid={Boolean(accountErrors.displayName)}
                   id="edit-display-name"
+                  name="displayName"
                   maxLength={CMS_DISPLAY_NAME_MAX_LENGTH}
                   minLength={CMS_DISPLAY_NAME_MIN_LENGTH}
                   onChange={(event) => setDisplayName(event.target.value)}
@@ -530,8 +563,9 @@ export function CmsAdminUserEditor({
                 Role
                 <select
                   aria-describedby="edit-role-hint"
-                  disabled={current}
-                  id="edit-role"
+                      disabled={current}
+                      id="edit-role"
+                      name="role"
                   onChange={(event) => {
                     setRole(event.target.value as CmsRole);
                     setConfirmAccessChange(false);
@@ -548,8 +582,9 @@ export function CmsAdminUserEditor({
 
               <label className={formStyles.checkbox}>
                 <input
-                  checked={active}
-                  disabled={current}
+                      checked={active}
+                      disabled={current}
+                      name="active"
                   onChange={(event) => {
                     setActive(event.target.checked);
                     setConfirmAccessChange(false);
@@ -598,9 +633,9 @@ export function CmsAdminUserEditor({
             <Save aria-hidden="true" /> {busySection === "account" ? "Saving…" : "Save account"}
           </button>
         </div>
-      </form>
+      </CmsValidatedForm>
 
-      <form aria-busy={busySection === "password"} className={styles.form} onSubmit={resetPassword}>
+      <CmsValidatedForm aria-busy={busySection === "password"} className={styles.form} onInputCapture={(event) => clearEditedFieldError(setPasswordErrors, event)} onSubmit={resetPassword} serverErrors={passwordErrors}>
         <fieldset className={formStyles.formFields} disabled={busy}>
           <section className={formStyles.section}>
             <header className={formStyles.sectionHeader}>
@@ -646,9 +681,9 @@ export function CmsAdminUserEditor({
             <KeyRound aria-hidden="true" /> {busySection === "password" ? "Resetting…" : "Reset password"}
           </button>
         </div>
-      </form>
+      </CmsValidatedForm>
 
-      <form aria-busy={busySection === "sessions"} className={styles.form} onSubmit={revokeSessions}>
+      <CmsValidatedForm aria-busy={busySection === "sessions"} className={styles.form} onInputCapture={(event) => clearEditedFieldError(setSessionErrors, event)} onSubmit={revokeSessions} serverErrors={sessionErrors}>
         <fieldset className={formStyles.formFields} disabled={busy}>
           <section className={`${formStyles.section} ${styles.dangerSection}`}>
             <header className={formStyles.sectionHeader}>
@@ -682,7 +717,7 @@ export function CmsAdminUserEditor({
             <LogOut aria-hidden="true" /> {busySection === "sessions" ? "Revoking…" : "Revoke all sessions"}
           </button>
         </div>
-      </form>
+      </CmsValidatedForm>
     </div>
   );
 }

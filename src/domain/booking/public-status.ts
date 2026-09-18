@@ -6,7 +6,7 @@ export type PublicBookingIdentifier =
 
 export type PublicBookingStatusSource = Pick<
   CmsBooking,
-  "status" | "capacityExpiresAt"
+  "status"
 >;
 
 export const publicBookingStatusCodes = [
@@ -14,7 +14,6 @@ export const publicBookingStatusCodes = [
   "confirmed",
   "completed",
   "closed",
-  "expired",
 ] as const;
 
 export type PublicBookingStatusCode =
@@ -46,21 +45,7 @@ export function parsePublicBookingIdentifier(
   return null;
 }
 
-function pendingCapacityExpired(
-  booking: PublicBookingStatusSource,
-  now: number,
-) {
-  if (booking.status !== "pending" || !booking.capacityExpiresAt) return false;
-
-  const expiresAt = Date.parse(booking.capacityExpiresAt);
-  return Number.isFinite(expiresAt) && expiresAt <= now;
-}
-
-function publicCode(
-  booking: PublicBookingStatusSource,
-  now: number,
-): PublicBookingStatusCode {
-  if (pendingCapacityExpired(booking, now)) return "expired";
+function publicCode(booking: PublicBookingStatusSource): PublicBookingStatusCode {
   if (booking.status === "cancelled" || booking.status === "no-show") {
     return "closed";
   }
@@ -87,19 +72,12 @@ const statusCopy: Readonly<
     label: "Closed",
     message: "This booking is no longer active. Contact Siriranee if you need help.",
   },
-  expired: {
-    label: "Request expired",
-    message:
-      "This request is no longer holding appointment capacity. Please make a new request or contact Siriranee.",
-  },
 };
 
 export function createPublicBookingStatusSnapshot(
   booking: PublicBookingStatusSource,
-  now: number | Date = Date.now(),
 ): PublicBookingStatusSnapshot {
-  const currentTime = now instanceof Date ? now.getTime() : now;
-  const code = publicCode(booking, currentTime);
+  const code = publicCode(booking);
 
   return { code, ...statusCopy[code] };
 }

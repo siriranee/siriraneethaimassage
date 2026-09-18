@@ -429,3 +429,34 @@ test("image-only vouchers publish on save and render in a navigation-free drag s
   assert.match(itemRoute, /Number\(parsed\.body\.expectedVersion\)/);
   assert.match(itemRoute, /rollbackCmsMediaSubmission/);
 });
+
+test("settings forms share accessible native and server field validation", async () => {
+  const [business, hours, booking] = await Promise.all([
+    source("src/components/cms/SiteBusinessForm.tsx"),
+    source("src/components/cms/OpeningHoursForm.tsx"),
+    source("src/components/cms/BookingSettingsForm.tsx"),
+  ]);
+
+  for (const form of [business, hours, booking]) {
+    assert.match(form, /CmsValidatedForm/);
+    assert.match(form, /safeCmsFieldErrors/);
+    assert.match(form, /serverErrors=\{fieldErrors\}/);
+    assert.match(form, /fields\?: unknown/);
+    assert.match(form, /setFieldErrors\(safeCmsFieldErrors\(result\.fields\)\)/);
+
+    const requestIndex = form.indexOf("await fetch(");
+    const clearIndex = form.lastIndexOf("setFieldErrors({});", requestIndex);
+    const clearCount = form.match(/setFieldErrors\(\{\}\);/g)?.length ?? 0;
+    assert.ok(requestIndex > 0);
+    assert.ok(clearIndex >= 0 && clearIndex < requestIndex,
+      "field errors must be cleared before sending a settings request");
+    assert.ok(clearCount >= 2, "field errors must also be cleared after a successful save");
+  }
+
+  for (const field of ["open", "opens", "closes"]) {
+    assert.match(
+      hours,
+      new RegExp(`data-cms-field=\\{[^}\\n]*weeklyHours\\.\\$\\{index\\}\\.${field}`),
+    );
+  }
+});

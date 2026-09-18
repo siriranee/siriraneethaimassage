@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import type { CmsPromotionRecord } from "@/domain/cms/types";
+import { CmsValidatedForm, safeCmsFieldErrors } from "./CmsValidatedForm";
 import { useUnsavedChanges } from "./useUnsavedChanges";
 import styles from "./CmsEditorForm.module.css";
 
@@ -11,14 +12,27 @@ export function PromotionEditorForm({ promotion, isNew = false }: Readonly<{ pro
   const router = useRouter();
   const [version, setVersion] = useState(promotion.version);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const { dirty, markDirty, markSaved } = useUnsavedChanges();
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
+    const start = form.elements.namedItem("startsOn");
+    const end = form.elements.namedItem("endsOn");
+    if (end instanceof HTMLInputElement) {
+      end.setCustomValidity(
+        start instanceof HTMLInputElement && start.value && end.value && end.value < start.value
+          ? "End date must be on or after start date."
+          : "",
+      );
+    }
+    if (!form.reportValidity()) return;
     setSaving(true);
     setFeedback(null);
-    const data = new FormData(event.currentTarget);
+    setFieldErrors({});
+    const data = new FormData(form);
     try {
       const response = await fetch(isNew ? "/api/cms/promotions" : `/api/cms/promotions/${promotion.id}`, {
         method: isNew ? "POST" : "PATCH",
@@ -32,8 +46,9 @@ export function PromotionEditorForm({ promotion, isNew = false }: Readonly<{ pro
           endsOn: data.get("endsOn"),
         }),
       });
-      const result = (await response.json()) as { error?: string; promotion?: CmsPromotionRecord };
+      const result = (await response.json()) as { error?: string; fields?: unknown; promotion?: CmsPromotionRecord };
       if (!response.ok || !result.promotion) {
+        setFieldErrors(safeCmsFieldErrors(result.fields));
         setFeedback({ tone: "error", text: result.error ?? "The promotion could not be saved." });
         return;
       }
@@ -50,7 +65,7 @@ export function PromotionEditorForm({ promotion, isNew = false }: Readonly<{ pro
   }
 
   return (
-    <form className={styles.form} onChange={markDirty} onSubmit={save}>
+    <CmsValidatedForm className={styles.form} onChange={markDirty} onSubmit={save} serverErrors={fieldErrors}>
       <section className={styles.section}>
         <header className={styles.sectionHeader}><h2>Offer details</h2><p>Publish only genuine owner-approved offers with clear dates and wording.</p></header>
         <div className={styles.grid}>
@@ -59,13 +74,13 @@ export function PromotionEditorForm({ promotion, isNew = false }: Readonly<{ pro
           <label className={styles.field}>Status<select defaultValue={promotion.status} name="status"><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select><small>Changes save immediately; only Published offers appear on the website.</small></label>
           <span />
           <label className={styles.field}>Start date, optional<input defaultValue={promotion.startsOn} name="startsOn" type="date" /></label>
-          <label className={styles.field}>End date, optional<input defaultValue={promotion.endsOn} name="endsOn" type="date" /></label>
+          <label className={styles.field}>End date, optional<input data-cms-not-before-field="startsOn" defaultValue={promotion.endsOn} name="endsOn" type="date" /></label>
         </div>
       </section>
       <div className={styles.saveBar}>
         <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Current version ${version}${dirty ? " · unsaved changes" : ""}`}</span>
         <button disabled={saving} type="submit">{saving ? "Saving and publishing..." : isNew ? "Create promotion" : "Save website changes"}</button>
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }

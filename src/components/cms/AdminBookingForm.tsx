@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import type { AvailabilitySlot } from "@/domain/booking/availability";
+import { CmsValidatedForm, safeCmsFieldErrors } from "./CmsValidatedForm";
 
 import styles from "./CmsEditorForm.module.css";
 
@@ -54,6 +55,7 @@ export function AdminBookingForm({
   const [availabilityMessage, setAvailabilityMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
   const idempotencyKeyRef = useRef("");
   const [bookingStatus, setBookingStatus] = useState<"pending" | "confirmed">(
     "pending",
@@ -132,12 +134,14 @@ export function AdminBookingForm({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     if (!selectedVariant || !localTime) {
       setFeedback("Choose an available time.");
       return;
     }
 
-    const data = new FormData(event.currentTarget);
+    const data = new FormData(form);
     const customerEmail = String(data.get("email") ?? "").trim();
     if (
       bookingStatus === "confirmed" &&
@@ -154,6 +158,7 @@ export function AdminBookingForm({
 
     setSaving(true);
     setFeedback("");
+    setFieldErrors({});
     idempotencyKeyRef.current ||= createIdempotencyKey();
 
     try {
@@ -180,11 +185,13 @@ export function AdminBookingForm({
       });
       const result = (await response.json()) as {
         error?: string;
+        fields?: unknown;
         booking?: { id: string };
       };
 
       if (!response.ok || !result.booking) {
         idempotencyKeyRef.current = "";
+        setFieldErrors(safeCmsFieldErrors(result.fields));
         setFeedback(result.error ?? "The booking could not be saved.");
         return;
       }
@@ -202,12 +209,12 @@ export function AdminBookingForm({
   }
 
   return (
-    <form className={styles.form} onSubmit={save}>
+    <CmsValidatedForm className={styles.form} onSubmit={save} serverErrors={fieldErrors}>
       <section className={styles.section}>
         <header className={styles.sectionHeader}><h2>Appointment</h2><p>Fully booked and blocked times are removed from the time list.</p></header>
         <div className={styles.grid}>
           <label className={styles.fullField}>Treatment and duration
-            <select onChange={(event) => changeVariant(event.target.value)} value={variantKey}>
+            <select data-cms-field="serviceId" data-cms-field-aliases="durationMinutes" name="serviceVariant" onChange={(event) => changeVariant(event.target.value)} required value={variantKey}>
               {variants.map((variant) => (
                 <option key={`${variant.serviceId}-${variant.durationMinutes}`} value={`${variant.serviceId}|${variant.durationMinutes}`}>
                   {variant.serviceName} · {variant.durationMinutes} min · €{(variant.priceCents / 100).toFixed(0)}
@@ -234,9 +241,9 @@ export function AdminBookingForm({
             </select>
             <small>Availability is checked for the selected therapist. Confirmed bookings require an assignment. {isMock ? "Demo mode does not send emails." : "The assigned therapist receives a separate appointment email."}</small>
           </label>
-          <label className={styles.field}>Date<input min={defaultDate} onChange={(event) => changeDate(event.target.value)} required type="date" value={localDate} /></label>
+          <label className={styles.field}>Date<input min={defaultDate} name="localDate" onChange={(event) => changeDate(event.target.value)} required type="date" value={localDate} /></label>
           <label className={styles.field}>Available time
-            <select disabled={availabilityState === "loading" || !slots.length} onChange={(event) => setLocalTime(event.target.value)} required value={localTime}>
+            <select data-cms-field="localTime" disabled={availabilityState === "loading" || !slots.length} name="localTime" onChange={(event) => setLocalTime(event.target.value)} required value={localTime}>
               <option value="">{availabilityState === "loading" ? "Checking times..." : slots.length ? "Choose a time" : "No available times"}</option>
               {slots.map((slot) => <option key={slot.slotId} value={slot.localTime}>{slot.localTimeLabel}</option>)}
             </select>
@@ -249,7 +256,7 @@ export function AdminBookingForm({
         <header className={styles.sectionHeader}><h2>Customer</h2><p>{isMock ? 'Use a fictional name beginning with "Demo".' : "Collect only information needed to manage the appointment."}</p></header>
         <div className={styles.grid}>
           <label className={styles.field}>Customer name<input defaultValue={isMock ? "Demo guest" : ""} maxLength={100} minLength={2} name="customerName" required /></label>
-          <label className={styles.field}>Phone<input defaultValue={isMock ? "+353 00 000 0000" : ""} maxLength={30} minLength={7} name="phone" required /></label>
+          <label className={styles.field}>Phone<input defaultValue={isMock ? "+353 00 000 0000" : ""} inputMode="tel" maxLength={30} minLength={7} name="phone" pattern="(?=(?:\\D*\\d){7,})\\+?[\\d\\s().-]{7,30}" required title="Use 7–30 characters and include at least seven digits." type="tel" /></label>
           <label className={styles.fullField}>Email, optional<input maxLength={254} name="email" type="email" /><small>{isMock ? "Demo mode does not contact Resend." : "A confirmation email is sent only when this booking is created or later moved to Confirmed."}</small></label>
           <label className={styles.fullField}>Customer note, optional<textarea maxLength={1000} name="customerNotes" /><small>Do not record unnecessary medical or sensitive information.</small></label>
         </div>
@@ -266,8 +273,8 @@ export function AdminBookingForm({
 
       <div className={styles.saveBar}>
         <span aria-live="polite">{feedback ? <span className={styles.error} role="alert">{feedback}</span> : selectedVariant ? `€${(selectedVariant.priceCents / 100).toFixed(0)} · ${selectedVariant.durationMinutes} minutes` : "Choose a treatment"}</span>
-        <button disabled={saving || !localTime} type="submit">{saving ? "Saving..." : bookingStatus === "confirmed" ? isMock ? "Create & confirm demo booking" : "Create & confirm booking" : "Create pending booking"}</button>
+        <button disabled={saving} type="submit">{saving ? "Saving..." : bookingStatus === "confirmed" ? isMock ? "Create & confirm demo booking" : "Create & confirm booking" : "Create pending booking"}</button>
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }

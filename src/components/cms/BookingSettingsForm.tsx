@@ -5,6 +5,10 @@ import { useState, type FormEvent } from "react";
 
 import type { CmsBookingSettings } from "@/domain/cms/types";
 
+import {
+  CmsValidatedForm,
+  safeCmsFieldErrors,
+} from "./CmsValidatedForm";
 import styles from "./CmsEditorForm.module.css";
 
 export function BookingSettingsForm({
@@ -24,6 +28,7 @@ export function BookingSettingsForm({
   );
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
   const canEnablePublicBooking =
     openingHoursConfirmed && rulesConfirmed && hasBookableTherapist;
 
@@ -36,6 +41,7 @@ export function BookingSettingsForm({
     event.preventDefault();
     setSaving(true);
     setFeedback(null);
+    setFieldErrors({});
     const data = new FormData(event.currentTarget);
     const payload = {
       expectedVersion: version,
@@ -59,13 +65,19 @@ export function BookingSettingsForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const result = (await response.json()) as { error?: string; bookingSettings?: CmsBookingSettings };
+      const result = (await response.json()) as {
+        error?: string;
+        fields?: unknown;
+        bookingSettings?: CmsBookingSettings;
+      };
 
       if (!response.ok || !result.bookingSettings) {
+        setFieldErrors(safeCmsFieldErrors(result.fields));
         setFeedback({ tone: "error", text: result.error ?? "Booking rules could not be saved." });
         return;
       }
 
+      setFieldErrors({});
       setVersion(result.bookingSettings.version);
       setRulesConfirmed(result.bookingSettings.rulesConfirmed);
       setPublicBookingEnabled(result.bookingSettings.publicBookingEnabled);
@@ -79,7 +91,11 @@ export function BookingSettingsForm({
   }
 
   return (
-    <form className={styles.form} onSubmit={save}>
+    <CmsValidatedForm
+      className={styles.form}
+      onSubmit={save}
+      serverErrors={fieldErrors}
+    >
       <section className={styles.section}>
         <header className={styles.sectionHeader}><h2>Calendar basis</h2><p>All public and administrative times use one source of truth.</p></header>
         <div className={styles.grid}>
@@ -139,6 +155,6 @@ export function BookingSettingsForm({
         <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Published version ${version}`}</span>
         <button disabled={saving} type="submit">{saving ? "Saving and publishing..." : "Save and publish booking rules"}</button>
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }

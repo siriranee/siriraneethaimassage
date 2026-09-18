@@ -40,6 +40,11 @@
   background: var(--color-purple-50);
 }
 
+.serviceFieldset[aria-invalid="true"] {
+  border-color: var(--color-danger);
+  background: var(--color-danger-surface);
+}
+
 .serviceFieldset legend {
   padding-inline: 0.35rem;
   color: var(--color-purple-950);
@@ -110,6 +115,11 @@
   font-weight: 750 !important;
 }
 
+.errorSummary:focus {
+  outline: 0.2rem solid rgb(var(--color-danger-rgb) / 0.32);
+  outline-offset: 0.15rem;
+}
+
 .errorSummary {
   display: grid;
   gap: 0.2rem;
@@ -120,8 +130,41 @@
   color: var(--color-danger);
 }
 
-.errorSummary span {
+.errorSummary ul {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.errorSummary button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
   font-size: var(--fs-sm);
+  font-weight: 650;
+  line-height: 1.45;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.errorSummary button:hover,
+.errorSummary button:focus-visible {
+  text-decoration-thickness: 0.13em;
+}
+
+.errorSummary button span {
+  font-weight: 850;
+}
+
+.errorSummary ~ section input[aria-invalid="true"],
+.errorSummary ~ section textarea[aria-invalid="true"] {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 0.12rem rgb(var(--color-danger-rgb) / 0.12);
 }
 
 .deletionImpact {

@@ -1,6 +1,5 @@
 import "server-only";
 
-import { isPendingCapacityExpired } from "@/domain/booking/status";
 import type {
   CmsBookingQuery,
   CmsNotificationBellItem,
@@ -26,17 +25,12 @@ export async function getCmsDashboardData() {
     repository.listBookings(),
   ]);
   const today = dublinDate();
-  const now = Date.now();
-  const expiredPending = bookings.filter((booking) =>
-    isPendingCapacityExpired(booking, now),
-  );
   const upcoming = bookings.filter(
     (booking) =>
       booking.localDate >= today &&
       booking.status !== "cancelled" &&
       booking.status !== "completed" &&
-      booking.status !== "no-show" &&
-      !isPendingCapacityExpired(booking, now),
+      booking.status !== "no-show",
   );
   const [emailAttention, upcomingEmailAttention] = await Promise.all([
     repository.listBookingEmailAttention(undefined, 8),
@@ -48,12 +42,7 @@ export async function getCmsDashboardData() {
     today,
     summary: {
       todayCount: upcoming.filter((booking) => booking.localDate === today).length,
-      pendingCount: bookings.filter(
-        (booking) =>
-          booking.status === "pending" &&
-          !isPendingCapacityExpired(booking, now),
-      ).length,
-      expiredPendingCount: expiredPending.length,
+      pendingCount: bookings.filter((booking) => booking.status === "pending").length,
       upcomingCount: upcoming.length,
       unassignedCount: upcoming.filter((booking) => !booking.assignedStaffId).length,
       activeServiceCount: content.services.filter(

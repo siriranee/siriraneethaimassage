@@ -97,10 +97,13 @@ function requiredText(value: unknown, field: string, minimum: number, maximum: n
   return parsed;
 }
 
-function optionalText(value: unknown, maximum: number) {
+function optionalText(value: unknown, maximum: number, field?: string) {
   const parsed = typeof value === "string" ? value.trim() : "";
   if (parsed.length > maximum) {
-    throw new CmsValidationError(`Text cannot exceed ${maximum} characters.`);
+    throw new CmsValidationError(
+      field ? "Please check the booking details." : `Text cannot exceed ${maximum} characters.`,
+      field ? { [field]: `Use no more than ${maximum} characters.` } : {},
+    );
   }
   return parsed;
 }
@@ -118,44 +121,61 @@ function parseBookingInput(value: unknown): BookingInput {
   const phone = requiredText(source.phone, "phone", 7, 30);
 
   if (!bookingStatuses.some((item) => item === status)) {
-    throw new CmsValidationError("Choose a valid booking status.");
+    throw new CmsValidationError("Choose a valid booking status.", {
+      status: "Choose a valid booking status.",
+    });
   }
   if (status !== "pending" && status !== "confirmed") {
     throw new CmsValidationError(
       "New bookings must start as pending or confirmed.",
+      { status: "Choose Pending or Confirmed for a new booking." },
     );
   }
   if (!bookingSources.some((item) => item === bookingSource) || bookingSource === "website" || bookingSource === "provider") {
-    throw new CmsValidationError("Choose phone, WhatsApp, walk-in or administrator as the source.");
+    throw new CmsValidationError("Choose phone, WhatsApp, walk-in or administrator as the source.", {
+      source: "Choose Phone, WhatsApp, Walk-in or Administrator.",
+    });
   }
   if (!Number.isInteger(durationMinutes) || durationMinutes < 15 || durationMinutes > 240) {
-    throw new CmsValidationError("Choose a valid treatment duration.");
+    throw new CmsValidationError("Choose a valid treatment duration.", {
+      durationMinutes: "Choose a current treatment duration.",
+    });
   }
   if (!datePattern.test(localDate) || !timePattern.test(localTime)) {
-    throw new CmsValidationError("Choose a valid date and time.");
+    throw new CmsValidationError("Choose a valid date and time.", {
+      ...(!datePattern.test(localDate) ? { localDate: "Choose a valid date." } : {}),
+      ...(!timePattern.test(localTime) ? { localTime: "Choose an available time." } : {}),
+    });
   }
-  if (!/^\+?[\d\s().-]{7,30}$/.test(phone)) {
-    throw new CmsValidationError("Enter a valid phone number.");
+  if (
+    !/^\+?[\d\s().-]{7,30}$/.test(phone) ||
+    phone.replace(/\D/g, "").length < 7
+  ) {
+    throw new CmsValidationError("Enter a valid phone number.", {
+      phone: "Use 7–30 characters and include at least seven digits.",
+    });
   }
 
-  const email = optionalText(source.email, 254).toLowerCase();
+  const email = optionalText(source.email, 254, "email").toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new CmsValidationError("Enter a valid email address.");
+    throw new CmsValidationError("Enter a valid email address.", {
+      email: "Enter a valid email address.",
+    });
   }
 
   return {
     customerName: requiredText(source.customerName, "customerName", 2, 100),
     phone,
     email,
-    customerNotes: optionalText(source.customerNotes, 1000),
+    customerNotes: optionalText(source.customerNotes, 1000, "customerNotes"),
     serviceId: requiredText(source.serviceId, "serviceId", 2, 120),
-    therapistId: optionalText(source.therapistId, 120),
+    therapistId: optionalText(source.therapistId, 120, "therapistId"),
     durationMinutes,
     localDate,
     localTime,
     status: status as BookingStatus,
     source: bookingSource as BookingSource,
-    internalNotes: optionalText(source.internalNotes, 1000),
+    internalNotes: optionalText(source.internalNotes, 1000, "internalNotes"),
   };
 }
 
@@ -450,11 +470,13 @@ export async function updateAdminBooking(
     const nextTime = typeof source.localTime === "string" ? source.localTime : current.localTime;
     const nextTherapistId =
       typeof source.therapistId === "string"
-        ? optionalText(source.therapistId, 120)
+        ? optionalText(source.therapistId, 120, "therapistId")
         : current.assignedStaffId;
     const statusValue = typeof source.status === "string" ? source.status : current.status;
     if (!bookingStatuses.some((item) => item === statusValue)) {
-      throw new CmsValidationError("Choose a valid booking status.");
+      throw new CmsValidationError("Choose a valid booking status.", {
+        status: "Choose a valid booking status.",
+      });
     }
     const status = statusValue as BookingStatus;
     if (!canTransitionBookingStatus(current.status, status)) {
@@ -464,7 +486,7 @@ export async function updateAdminBooking(
     }
     const internalNotes = source.internalNotes === undefined
       ? current.internalNotes
-      : optionalText(source.internalNotes, 1000);
+      : optionalText(source.internalNotes, 1000, "internalNotes");
     const reasonValue = typeof source.changeReason === "string" ? source.changeReason : "";
     const changeReason = bookingChangeReasons.some((reason) => reason === reasonValue)
       ? (reasonValue as BookingChangeReason)
@@ -478,6 +500,10 @@ export async function updateAdminBooking(
     ) {
       throw new CmsValidationError(
         "Complete the reschedule before moving a booking to a final status.",
+        {
+          status:
+            "Save the new appointment time before moving this booking to a final status.",
+        },
       );
     }
     if (
@@ -486,6 +512,10 @@ export async function updateAdminBooking(
     ) {
       throw new CmsValidationError(
         "Reassign the therapist before moving a booking to a final status.",
+        {
+          therapistId:
+            "Save the therapist reassignment before moving this booking to a final status.",
+        },
       );
     }
     const appointmentChanged =
@@ -501,6 +531,7 @@ export async function updateAdminBooking(
     if (appointmentChanged && !changeReason) {
       throw new CmsValidationError(
         "Choose an operational reason when changing appointment status, date, time or therapist.",
+        { changeReason: "Choose a reason for changing the appointment." },
       );
     }
     if (appointmentChanged) {
@@ -543,8 +574,7 @@ export async function updateAdminBooking(
       localDate: nextDate,
       localTime: nextTime,
       status,
-      capacityExpiresAt:
-        status === "pending" ? current.capacityExpiresAt || "" : "",
+      capacityExpiresAt: "",
       assignedStaffId: nextTherapistId,
       assignedStaffName,
       internalNotes,
@@ -629,7 +659,9 @@ function parseClosureInput(value: unknown, allowRepeat: boolean): ClosureInput {
   const endsAtLocal = String(source.endsAtLocal ?? "").trim();
 
   if (!datePattern.test(localDate)) {
-    throw new CmsValidationError("Choose a valid closure date.");
+    throw new CmsValidationError("Choose a valid closure date.", {
+      localDate: "Choose a valid closure date.",
+    });
   }
   if (
     !closedAllDay &&
@@ -637,14 +669,19 @@ function parseClosureInput(value: unknown, allowRepeat: boolean): ClosureInput {
       !timePattern.test(endsAtLocal) ||
       startsAtLocal >= endsAtLocal)
   ) {
-    throw new CmsValidationError("Choose a valid closure start and end time.");
+    throw new CmsValidationError("Choose a valid closure start and end time.", {
+      startsAtLocal: "Choose a valid start time.",
+      endsAtLocal: "End time must be later than start time.",
+    });
   }
 
   const repeatWeeklyCount = allowRepeat
     ? Number(source.repeatWeeklyCount ?? 1)
     : 1;
   if (!Number.isInteger(repeatWeeklyCount) || repeatWeeklyCount < 1 || repeatWeeklyCount > 12) {
-    throw new CmsValidationError("Repeat a closure between one and twelve weeks.");
+    throw new CmsValidationError("Repeat a closure between one and twelve weeks.", {
+      repeatWeeklyCount: "Use a whole number from 1 to 12.",
+    });
   }
 
   return {
@@ -653,7 +690,7 @@ function parseClosureInput(value: unknown, allowRepeat: boolean): ClosureInput {
     startsAtLocal: closedAllDay ? "" : startsAtLocal,
     endsAtLocal: closedAllDay ? "" : endsAtLocal,
     reason: requiredText(source.reason, "reason", 2, 200),
-    publicLabel: optionalText(source.publicLabel, 120),
+    publicLabel: optionalText(source.publicLabel, 120, "publicLabel"),
     active: source.active !== false,
     repeatWeeklyCount,
   };

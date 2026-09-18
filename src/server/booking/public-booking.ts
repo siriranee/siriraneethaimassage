@@ -237,12 +237,7 @@ export async function createPublicBooking(
         );
       }
 
-      const nowDate = new Date();
-      const now = nowDate.toISOString();
-      const capacityExpiresAt = new Date(
-        nowDate.getTime() +
-          Math.max(1, content.bookingSettings.holdMinutes) * 60_000,
-      ).toISOString();
+      const now = new Date().toISOString();
       const booking: CmsBooking = {
         id: randomUUID(),
         reference: reference(localDate),
@@ -265,11 +260,10 @@ export async function createPublicBooking(
         timezone: "Europe/Dublin",
         status: "pending",
         source: "website",
-        capacityExpiresAt,
+        capacityExpiresAt: "",
         assignedStaffId: therapist.id,
         assignedStaffName: therapist.name,
-        internalNotes:
-          "Website request awaiting internal confirmation. Temporary capacity expires automatically if it is not confirmed.",
+        internalNotes: "Website request awaiting internal confirmation.",
         privacyAcceptedAt: now,
         privacyNoticeVersion: bookingPrivacyNotice.version,
         holdTokenHash: "",

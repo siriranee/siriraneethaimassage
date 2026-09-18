@@ -470,7 +470,7 @@ export type CmsBookingQuery = {
   readonly source?: BookingSource;
   readonly serviceId?: string;
   readonly therapistId?: string;
-  readonly attention?: "expired" | "unassigned";
+  readonly attention?: "unassigned";
   readonly search?: string;
   readonly order?: "startsAt-asc" | "startsAt-desc";
 };

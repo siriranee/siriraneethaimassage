@@ -58,28 +58,37 @@ function setup(initial = [candidate("one")]) {
   };
 }
 
-test("assignment dry run is read-only, PII-free and limited to active future unassigned bookings", async () => {
+test("assignment dry run is read-only, PII-free and includes submitted pending bookings", async () => {
   const fixture = setup([
     candidate("one"), candidate("cancelled", { status: "cancelled" }),
     candidate("past", { endsAt: "2098-01-01T10:00:00.000Z" }),
     candidate("assigned", { assignedStaffId: "another-therapist" }),
-    candidate("expired", { status: "pending", capacityExpiresAt: "2098-01-01T10:00:00.000Z" }),
+    candidate("legacy-pending", {
+      status: "pending",
+      capacityExpiresAt: "2098-01-01T10:00:00.000Z",
+      localTime: "13:00",
+      startsAt: "2099-01-10T13:00:00.000Z",
+      endsAt: "2099-01-10T14:00:00.000Z",
+    }),
   ]);
-  // Irrelevant fixture rows deliberately overlap; only the active assigned row
-  // should occupy capacity, which remains available for the one candidate.
+  // Irrelevant fixture rows deliberately overlap. Submitted pending bookings
+  // remain active candidates even if an old record still has an expiry value.
   const result = await fixture.run({ therapistId });
-  assert.equal(result.count, 1);
-  assert.deepEqual(result.bookings.map((booking) => booking.reference), ["SRN-TEST-one"]);
+  assert.equal(result.count, 2);
+  assert.deepEqual(result.bookings.map((booking) => booking.reference), [
+    "SRN-TEST-legacy-pending",
+    "SRN-TEST-one",
+  ]);
   assert.deepEqual(fixture.operations, []);
   assert.deepEqual(fixture.audits(), []);
   assert.doesNotMatch(JSON.stringify(result), /ciphertext|internalNotes|emailMetadata/);
   assert.equal(result.emailsSent, 0);
 });
 
-test("missing and null assignment qualify, while expired pending and terminal bookings do not", () => {
+test("missing and null assignment qualify, including pending bookings with legacy expiry data", () => {
   assert.equal(isAssignmentCandidate(candidate("a", { assignedStaffId: null }), now), true);
   assert.equal(isAssignmentCandidate(candidate("a", { assignedStaffId: undefined }), now), true);
-  assert.equal(isAssignmentCandidate(candidate("a", { status: "pending", capacityExpiresAt: now }), now), false);
+  assert.equal(isAssignmentCandidate(candidate("a", { status: "pending", capacityExpiresAt: now }), now), true);
   assert.equal(isAssignmentCandidate(candidate("a", { status: "completed" }), now), false);
 });
 

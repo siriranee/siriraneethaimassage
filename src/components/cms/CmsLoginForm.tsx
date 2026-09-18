@@ -29,6 +29,7 @@ import {
   normalizeCmsUsername,
 } from "@/domain/cms/account-policy";
 import type { CmsMode } from "@/server/cms/config";
+import { CmsValidatedForm } from "./CmsValidatedForm";
 
 import styles from "./CmsLoginForm.module.css";
 
@@ -176,7 +177,7 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
   }
 
   return (
-    <form
+    <CmsValidatedForm
       aria-busy={status === "working"}
       className={styles.form}
       onChange={clearError}
@@ -260,6 +261,6 @@ export function CmsLoginForm({ mode }: Readonly<{ mode: CmsMode }>) {
       <div className={styles.messageArea}>
         {message ? <p className={styles.error} id={errorId} role="alert">{message}</p> : null}
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }

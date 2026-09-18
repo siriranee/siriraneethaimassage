@@ -546,7 +546,11 @@ test("booking page uses static copy and keeps customer instructions concise", as
   assert.match(planner, />Treatment</);
   assert.match(planner, />Duration</);
   assert.match(planner, />Date &amp; time</);
-  assert.match(planner, />Available times · Dublin time</);
+  assert.match(planner, /Available times for \{selectedTherapist\?\.name/);
+  assert.match(planner, /· Dublin time/);
+  assert.match(planner, /window\.setInterval\(refreshAvailability, 30_000\)/);
+  assert.match(planner, /window\.addEventListener\("focus", refreshAvailability\)/);
+  assert.match(planner, /document\.addEventListener\("visibilitychange", refreshWhenVisible\)/);
   assert.doesNotMatch(planner, /<small>Dublin time<\/small>/);
   assert.doesNotMatch(planner, /styles\.journey/);
   assert.doesNotMatch(planner, /stepNumber/);

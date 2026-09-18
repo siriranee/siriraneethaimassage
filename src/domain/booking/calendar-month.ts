@@ -1,13 +1,13 @@
 import { Temporal } from "@js-temporal/polyfill";
 
 export const calendarWeekdayLabels = [
+  "Su",
   "Mo",
   "Tu",
   "We",
   "Th",
   "Fr",
   "Sa",
-  "Su",
 ] as const;
 
 const monthFormatter = new Intl.DateTimeFormat("en-IE", {
@@ -87,7 +87,7 @@ export function buildCalendarMonthCells(value: string) {
   const firstDate = firstDateOfMonth(value);
   if (!firstDate) return [] as readonly (string | null)[];
 
-  const leadingDays = firstDate.dayOfWeek - 1;
+  const leadingDays = firstDate.dayOfWeek % 7;
   return Array.from({ length: 42 }, (_, index) => {
     const day = index - leadingDays + 1;
     if (day < 1 || day > firstDate.daysInMonth) return null;

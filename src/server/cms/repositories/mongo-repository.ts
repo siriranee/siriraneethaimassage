@@ -816,15 +816,7 @@ export class MongoCmsRepository implements CmsRepository {
         {
           $or: [
             { status: "confirmed" },
-            {
-              status: "pending",
-              $or: [
-                { capacityExpiresAt: "" },
-                { capacityExpiresAt: null },
-                { capacityExpiresAt: { $exists: false } },
-                { capacityExpiresAt: { $gt: nowIso } },
-              ],
-            },
+            { status: "pending" },
           ],
         },
       ];
@@ -839,14 +831,6 @@ export class MongoCmsRepository implements CmsRepository {
     const bookings = rows.map((row) => decodeBooking(row)!);
     return bookings.filter((booking) => {
       if (query.search && !bookingIncludesSearch(booking, query.search.slice(0, 100))) return false;
-      if (
-        query.attention === "expired" &&
-        !(
-          booking.status === "pending" &&
-          booking.capacityExpiresAt &&
-          booking.capacityExpiresAt <= nowIso
-        )
-      ) return false;
       return true;
     });
   }
@@ -864,15 +848,7 @@ export class MongoCmsRepository implements CmsRepository {
           endsAt: { $gt: afterIso },
           $or: [
             { status: "confirmed" },
-            {
-              status: "pending",
-              $or: [
-                { capacityExpiresAt: "" },
-                { capacityExpiresAt: null },
-                { capacityExpiresAt: { $exists: false } },
-                { capacityExpiresAt: { $gt: afterIso } },
-              ],
-            },
+            { status: "pending" },
           ],
         },
         {
@@ -909,19 +885,13 @@ export class MongoCmsRepository implements CmsRepository {
           : { reference: identifier.value },
         {
           ...this.options(),
-          projection: { _id: 0, status: 1, capacityExpiresAt: 1 },
+          projection: { _id: 0, status: 1 },
         },
       );
 
     if (!row || !isInternalBookingStatus(row.status)) return null;
 
-    return {
-      status: row.status,
-      capacityExpiresAt:
-        typeof row.capacityExpiresAt === "string"
-          ? row.capacityExpiresAt
-          : "",
-    };
+    return { status: row.status };
   }
 
   async findBookingByIdempotencyHash(hash: string) {

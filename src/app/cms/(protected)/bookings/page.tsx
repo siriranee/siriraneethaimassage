@@ -6,7 +6,7 @@ import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions"
 import { CmsBookingEmailAttentionNotice } from "@/components/cms/CmsBookingEmailAttentionNotice";
 import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import { CmsEmptyState, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
-import { isPendingCapacityExpired } from "@/domain/booking/status";
+import { CmsValidatedForm } from "@/components/cms/CmsValidatedForm";
 import { canCmsRole } from "@/domain/cms/permissions";
 import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import { bookingSources, bookingStatuses, type BookingSource, type BookingStatus, type CmsBooking } from "@/domain/cms/types";
@@ -46,12 +46,9 @@ function formatDate(value: string) {
 }
 
 function BookingStatusCell({ booking }: Readonly<{ booking: CmsBooking }>) {
-  const expired = isPendingCapacityExpired(booking);
-
   return (
     <div className={styles.bookingStatusCell}>
       <CmsBookingStatus status={booking.status} />
-      {expired ? <small className={styles.expiredHold}>Temporary hold expired</small> : null}
     </div>
   );
 }
@@ -68,10 +65,7 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
   const serviceId = single(params.serviceId).trim() || undefined;
   const therapistId = single(params.therapistId).trim() || undefined;
   const attentionValue = single(params.attention);
-  const attention =
-    attentionValue === "expired" || attentionValue === "unassigned"
-      ? attentionValue
-      : undefined;
+  const attention = attentionValue === "unassigned" ? attentionValue : undefined;
   const from = safeDate(single(params.from));
   const to = safeDate(single(params.to));
   const [bookings, content, emailAttention] = await Promise.all([
@@ -125,10 +119,10 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
             </span>
             <small>{hasActiveFilters ? "Filters applied" : "Show filters"}</small>
           </summary>
-          <form className={styles.searchForm}>
+          <CmsValidatedForm className={styles.searchForm}>
             <label>
               Search bookings
-              <input defaultValue={search} name="search" placeholder="Reference, guest, phone or treatment" type="search" />
+              <input defaultValue={search} maxLength={120} name="search" placeholder="Reference, guest, phone or treatment" type="search" />
             </label>
             <label>
               Status
@@ -142,11 +136,11 @@ export default async function CmsBookingsPage({ searchParams }: PageProps) {
             <label>Treatment<select defaultValue={serviceId ?? ""} name="serviceId"><option value="">All treatments</option>{content.services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
             <label>Massage therapist<select defaultValue={therapistId ?? ""} name="therapistId"><option value="">All therapists</option>{content.team.filter((member) => !member.archived).sort(compareCmsTeamMembersByName).map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
             <label>Source<select defaultValue={source ?? ""} name="source"><option value="">All sources</option>{bookingSources.map((item) => <option key={item} value={item}>{item.charAt(0).toUpperCase() + item.slice(1)}</option>)}</select></label>
-            <label>Needs attention<select defaultValue={attention ?? ""} name="attention"><option value="">All bookings</option><option value="expired">Expired pending holds</option><option value="unassigned">Unassigned active bookings</option></select></label>
+            <label>Needs attention<select defaultValue={attention ?? ""} name="attention"><option value="">All bookings</option><option value="unassigned">Unassigned active bookings</option></select></label>
             <label>From date<input defaultValue={from ?? ""} name="from" type="date" /></label>
-            <label>To date<input defaultValue={to ?? ""} name="to" type="date" /></label>
+            <label>To date<input data-cms-not-before-field="from" defaultValue={to ?? ""} name="to" type="date" /></label>
             <div className={styles.filterActions}><button type="submit">Apply filters</button><Link href="/cms/bookings">Clear</Link></div>
-          </form>
+          </CmsValidatedForm>
         </details>
 
         {bookings.length ? (

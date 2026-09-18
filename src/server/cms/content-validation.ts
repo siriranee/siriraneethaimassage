@@ -64,10 +64,13 @@ function text(
   return result;
 }
 
-function optionalText(value: unknown, maximum: number) {
+function optionalText(value: unknown, maximum: number, field?: string) {
   const result = typeof value === "string" ? value.trim() : "";
   if (result.length > maximum) {
-    throw new CmsValidationError(`Text cannot exceed ${maximum} characters.`);
+    throw new CmsValidationError(
+      field ? "Please check the highlighted fields." : `Text cannot exceed ${maximum} characters.`,
+      field ? { [field]: `Use no more than ${maximum} characters.` } : {},
+    );
   }
   return result;
 }
@@ -217,7 +220,7 @@ function teamServiceIds(
     const serviceId = typeof item === "string" ? item.trim() : "";
     if (!serviceId || serviceId.length > 120 || !allowed.has(serviceId)) {
       throw new CmsValidationError("Please check the highlighted fields.", {
-        [`serviceIds.${index}`]: "Choose a current Siriranee treatment.",
+        serviceIds: `Treatment choice ${index + 1} is no longer available. Choose from the current Siriranee treatments.`,
       });
     }
     if (!selected.includes(serviceId)) selected.push(serviceId);
@@ -231,7 +234,7 @@ export function parseTherapistNotificationEmail(
   current = "",
 ) {
   if (value === undefined) return current.trim().toLowerCase();
-  const email = optionalText(value, 254).toLowerCase();
+  const email = optionalText(value, 254, "notificationEmail").toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new CmsValidationError("Please check the highlighted fields.", {
       notificationEmail: "Enter a valid therapist notification email.",
@@ -242,8 +245,12 @@ export function parseTherapistNotificationEmail(
 
 export function parseTherapistContactPhone(value: unknown, current = "") {
   if (value === undefined) return current.trim();
-  const phone = optionalText(value, 30);
-  if (phone && !/^\+?[\d\s().-]{7,30}$/.test(phone)) {
+  const phone = optionalText(value, 30, "contactPhone");
+  if (
+    phone &&
+    (!/^\+?[\d\s().-]{7,30}$/.test(phone) ||
+      phone.replace(/\D/g, "").length < 7)
+  ) {
     throw new CmsValidationError("Please check the highlighted fields.", {
       contactPhone: "Enter a valid private therapist phone number.",
     });
@@ -382,7 +389,7 @@ export function parseServiceUpdate(
     prices: prices(source.prices, current.id),
     idealFor: stringList(source.idealFor, "idealFor", 8, 160),
     highlights: stringList(source.highlights, "highlights", 8, 160),
-    priceNote: optionalText(source.priceNote, 300),
+    priceNote: optionalText(source.priceNote, 300, "priceNote"),
     seoTitle: text(source.seoTitle, "seoTitle", 10, 70),
     seoDescription: text(source.seoDescription, "seoDescription", 40, 170),
     version: current.version + 1,
@@ -451,7 +458,10 @@ export function parseSiteSettingsUpdate(
         const closes = validTime(row.closes, `weeklyHours.${index}.closes`);
 
         if (open && opens >= closes) {
-          throw new CmsValidationError("Opening time must be before closing time.");
+          throw new CmsValidationError("Please check the highlighted fields.", {
+            [`weeklyHours.${index}.closes`]:
+              "Closing time must be later than opening time.",
+          });
         }
 
         return { ...previous, open, opens, closes };
@@ -462,8 +472,8 @@ export function parseSiteSettingsUpdate(
     throw new CmsValidationError("All seven opening-hours rows are required.");
   }
 
-  const phoneDisplay = optionalText(source.phoneDisplay, 40);
-  const phoneE164Input = optionalText(source.phoneE164, 25);
+  const phoneDisplay = optionalText(source.phoneDisplay, 40, "phoneDisplay");
+  const phoneE164Input = optionalText(source.phoneE164, 25, "phoneE164");
   const phoneE164 = phoneE164Input.replace(/[\s().-]/g, "");
   const phoneConfirmed =
     source.phoneConfirmed === undefined
@@ -471,8 +481,9 @@ export function parseSiteSettingsUpdate(
       : source.phoneConfirmed === true;
 
   if (
-    phoneConfirmed &&
-    (phoneDisplay.length < 5 || !/^\+[1-9]\d{7,14}$/.test(phoneE164))
+    (phoneE164Input && !/^\+[1-9]\d{7,14}$/.test(phoneE164)) ||
+    (phoneConfirmed &&
+      (phoneDisplay.length < 5 || !/^\+[1-9]\d{7,14}$/.test(phoneE164)))
   ) {
     throw new CmsValidationError(
       "Enter and verify the public phone number before confirming it.",
@@ -487,6 +498,25 @@ export function parseSiteSettingsUpdate(
     );
   }
 
+  const email = optionalText(source.email, 254, "email").toLowerCase();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      email: "Enter a valid public email address.",
+    });
+  }
+  const whatsappInput = optionalText(
+    source.whatsappNumber,
+    25,
+    "whatsappNumber",
+  );
+  const whatsappNumber = whatsappInput.replace(/\D/g, "");
+  if (whatsappInput && !/^[1-9]\d{7,14}$/.test(whatsappNumber)) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      whatsappNumber:
+        "Enter a valid international WhatsApp number, for example 353899484585.",
+    });
+  }
+
   return {
     ...current,
     name: text(source.name, "name", 2, 100),
@@ -494,13 +524,13 @@ export function parseSiteSettingsUpdate(
     streetAddress: text(source.streetAddress, "streetAddress", 5, 180),
     locality: text(source.locality, "locality", 2, 80),
     region: text(source.region, "region", 2, 80),
-    postalCode: optionalText(source.postalCode, 20),
+    postalCode: optionalText(source.postalCode, 20, "postalCode"),
     country: text(source.country, "country", 2, 80),
     phoneDisplay,
     phoneE164,
     phoneConfirmed,
-    email: optionalText(source.email, 254),
-    whatsappNumber: optionalText(source.whatsappNumber, 25).replace(/\D/g, ""),
+    email,
+    whatsappNumber,
     instagramUrl: validUrl(source.instagramUrl, "instagramUrl"),
     booksyUrl: validUrl(source.booksyUrl, "booksyUrl"),
     googleReviewUrl: validUrl(source.googleReviewUrl, "googleReviewUrl"),
@@ -534,6 +564,10 @@ export function parseBookingSettingsUpdate(
   ) {
     throw new CmsValidationError(
       "Confirm the booking rules and opening hours before enabling public date and time booking.",
+      {
+        publicBookingEnabled:
+          "Confirm the booking rules and opening hours before enabling public booking.",
+      },
     );
   }
 
@@ -584,7 +618,11 @@ export function parseBookingSettingsUpdate(
       0,
       10080,
     ),
-    provisionalNotice: optionalText(source.provisionalNotice, 500),
+    provisionalNotice: optionalText(
+      source.provisionalNotice,
+      500,
+      "provisionalNotice",
+    ),
     version: current.version + 1,
     updatedAt: new Date().toISOString(),
   } satisfies CmsBookingSettings;
@@ -636,7 +674,7 @@ export function parseTeamUpdate(
   const imageUrlInput =
     source.imageUrl === undefined
       ? current.imageUrl
-      : optionalText(source.imageUrl, 2048);
+      : optionalText(source.imageUrl, 2048, "imageUrl");
   const imageUrl =
     !imageUrlInput || imageUrlInput.startsWith("/")
       ? imageUrlInput
@@ -644,10 +682,10 @@ export function parseTeamUpdate(
   const imageAlt =
     source.imageAlt === undefined
       ? current.imageAlt
-      : optionalText(source.imageAlt, 180);
-  if (imageUrl && imageAlt.length < 4) {
+      : optionalText(source.imageAlt, 180, "imageAlt");
+  if (imageUrl && imageAlt.length < 8) {
     throw new CmsValidationError("Please check the highlighted fields.", {
-      imageAlt: "Describe the therapist image in at least 4 characters.",
+      imageAlt: "Describe the therapist image in at least 8 characters.",
     });
   }
 
@@ -661,7 +699,7 @@ export function parseTeamUpdate(
     shortBio:
       source.shortBio === undefined
         ? current.shortBio
-        : optionalText(source.shortBio, 300),
+        : text(source.shortBio, "shortBio", 20, 300),
     imageUrl,
     imageAlt: imageUrl ? imageAlt : "",
     serviceIds,
@@ -720,11 +758,18 @@ export function parsePromotionUpdate(
   const startsOn = optionalDate(source.startsOn, "startsOn");
   const endsOn = optionalDate(source.endsOn, "endsOn");
   if (startsOn && endsOn && endsOn < startsOn) {
-    throw new CmsValidationError("The promotion end date must be on or after its start date.");
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      endsOn: "End date must be on or after start date.",
+    });
   }
-  const status = ["draft", "published", "archived"].includes(String(source.status))
-    ? (String(source.status) as CmsPromotionRecord["status"])
-    : current.status;
+  const statusValue =
+    source.status === undefined ? current.status : String(source.status);
+  if (!["draft", "published", "archived"].includes(statusValue)) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      status: "Choose Draft, Published or Archived.",
+    });
+  }
+  const status = statusValue as CmsPromotionRecord["status"];
 
   return {
     ...current,
@@ -763,9 +808,14 @@ export function parseVoucherUpdate(
     value && typeof value === "object"
       ? (value as Record<string, unknown>)
       : {};
-  const status = ["draft", "published", "archived"].includes(String(source.status))
-    ? (String(source.status) as CmsVoucherRecord["status"])
-    : current.status;
+  const statusValue =
+    source.status === undefined ? current.status : String(source.status);
+  if (!["draft", "published", "archived"].includes(statusValue)) {
+    throw new CmsValidationError("Please check the highlighted fields.", {
+      status: "Choose Draft, Published or Archived.",
+    });
+  }
+  const status = statusValue as CmsVoucherRecord["status"];
 
   return {
     ...current,

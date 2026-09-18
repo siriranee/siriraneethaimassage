@@ -106,7 +106,11 @@ function maximumConcurrent(
     ) {
       continue;
     }
-    if (item.expiresAt && Temporal.Instant.compare(Temporal.Instant.from(item.expiresAt), now) <= 0) {
+    if (
+      item.status === "active" &&
+      item.expiresAt &&
+      Temporal.Instant.compare(Temporal.Instant.from(item.expiresAt), now) <= 0
+    ) {
       continue;
     }
 
@@ -152,6 +156,7 @@ function hasTherapistConflict(
       return false;
     }
     if (
+      item.status === "active" &&
       item.expiresAt &&
       Temporal.Instant.compare(Temporal.Instant.from(item.expiresAt), now) <= 0
     ) {

@@ -37,7 +37,6 @@ test("public booking identifiers accept canonical IDs and references only", () =
 test("public booking snapshots expose status copy only", () => {
   const sourceWithSensitiveFields = {
     status: "confirmed",
-    capacityExpiresAt: "",
     customer: { name: "Private name", phone: "+3530000000" },
     localDate: "2026-09-03",
     localTime: "10:00",
@@ -45,10 +44,7 @@ test("public booking snapshots expose status copy only", () => {
     priceCents: 5000,
   } as unknown as PublicBookingStatusSource;
 
-  const snapshot = createPublicBookingStatusSnapshot(
-    sourceWithSensitiveFields,
-    Date.parse("2026-09-03T08:00:00Z"),
-  );
+  const snapshot = createPublicBookingStatusSnapshot(sourceWithSensitiveFields);
 
   assert.deepEqual(Object.keys(snapshot).sort(), ["code", "label", "message"]);
   assert.equal(snapshot.code, "confirmed");
@@ -58,10 +54,10 @@ test("public booking snapshots expose status copy only", () => {
   );
 });
 
-test("public status hides internal no-show detail and identifies expired requests", () => {
+test("public status hides internal no-show detail and keeps submitted requests pending", () => {
   for (const status of ["cancelled", "no-show"] as const) {
     assert.equal(
-      createPublicBookingStatusSnapshot({ status, capacityExpiresAt: "" }).code,
+      createPublicBookingStatusSnapshot({ status }).code,
       "closed",
     );
   }
@@ -71,18 +67,7 @@ test("public status hides internal no-show detail and identifies expired request
       {
         status: "pending",
         capacityExpiresAt: "2026-09-03T07:59:59Z",
-      },
-      Date.parse("2026-09-03T08:00:00Z"),
-    ).code,
-    "expired",
-  );
-  assert.equal(
-    createPublicBookingStatusSnapshot(
-      {
-        status: "pending",
-        capacityExpiresAt: "2026-09-03T08:00:01Z",
-      },
-      Date.parse("2026-09-03T08:00:00Z"),
+      } as unknown as PublicBookingStatusSource,
     ).code,
     "pending",
   );
@@ -97,7 +82,7 @@ test("Mongo status lookup projects no encrypted customer or appointment data", a
   assert.ok(start >= 0 && end > start);
   assert.match(
     lookup,
-    /projection:\s*\{ _id: 0, status: 1, capacityExpiresAt: 1 \}/,
+    /projection:\s*\{ _id: 0, status: 1 \}/,
   );
   assert.doesNotMatch(
     lookup,

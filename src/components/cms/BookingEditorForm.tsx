@@ -17,6 +17,7 @@ import {
 } from "@/domain/booking/status";
 import { bookingChangeReasons, type CmsBooking } from "@/domain/cms/types";
 import { withTherapistEmailFeedback, type TherapistEmailAttempt } from "@/domain/cms/notification-presentation";
+import { CmsValidatedForm, safeCmsFieldErrors } from "./CmsValidatedForm";
 import { useUnsavedChanges } from "./useUnsavedChanges";
 
 import styles from "./CmsEditorForm.module.css";
@@ -31,6 +32,7 @@ export function BookingEditorForm({
   const router = useRouter();
   const [version, setVersion] = useState(booking.version);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
   const [feedback, setFeedback] = useState<{
     tone: "success" | "warning" | "error";
     text: string;
@@ -45,8 +47,34 @@ export function BookingEditorForm({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     const nextStatus = data.get("status");
+    const nextDate = String(data.get("localDate") ?? booking.localDate);
+    const nextTime = String(data.get("localTime") ?? booking.localTime);
+    const nextReason = String(data.get("changeReason") ?? "");
+    const appointmentChanged =
+      nextStatus !== booking.status ||
+      nextDate !== booking.localDate ||
+      nextTime !== booking.localTime ||
+      therapistId !== booking.assignedStaffId;
+    const therapistControl = form.elements.namedItem("therapistId");
+    const reasonControl = form.elements.namedItem("changeReason");
+    if (therapistControl instanceof HTMLSelectElement) {
+      therapistControl.setCustomValidity(
+        appointmentChanged && nextStatus === "confirmed" && !therapistId
+          ? "Choose an active massage therapist before confirming this booking."
+          : "",
+      );
+    }
+    if (reasonControl instanceof HTMLSelectElement) {
+      reasonControl.setCustomValidity(
+        appointmentChanged && !nextReason
+          ? "Choose a reason for changing the appointment."
+          : "",
+      );
+    }
+    if (!form.reportValidity()) return;
     if (
       booking.status !== "confirmed" &&
       nextStatus === "confirmed" &&
@@ -76,6 +104,7 @@ export function BookingEditorForm({
 
     setSaving(true);
     setFeedback(null);
+    setFieldErrors({});
 
     try {
       const response = await fetch(`/api/cms/bookings/${booking.id}`, {
@@ -93,6 +122,7 @@ export function BookingEditorForm({
       });
       const result = (await response.json()) as {
         error?: string;
+        fields?: unknown;
         booking?: CmsBooking;
         confirmationEmail?: CustomerBookingConfirmationEmailOutcome;
         cancellationEmail?: CustomerBookingCancellationEmailOutcome;
@@ -101,6 +131,7 @@ export function BookingEditorForm({
       };
 
       if (!response.ok || !result.booking) {
+        setFieldErrors(safeCmsFieldErrors(result.fields));
         setFeedback({ tone: "error", text: result.error ?? "The booking could not be saved." });
         return;
       }
@@ -130,7 +161,7 @@ export function BookingEditorForm({
   }
 
   return (
-    <form className={styles.form} onChange={markDirty} onSubmit={save}>
+    <CmsValidatedForm className={styles.form} onChange={markDirty} onSubmit={save} serverErrors={fieldErrors}>
       <section className={styles.section}>
         <header className={styles.sectionHeader}><h2>Appointment status & time</h2><p>Rescheduled times are checked against hours, closures and capacity before saving.</p></header>
         <div className={styles.grid}>
@@ -145,6 +176,7 @@ export function BookingEditorForm({
           <label className={styles.field}>Massage therapist
             <select
               disabled={appointmentLocked}
+              data-cms-clear-custom-when="status localDate localTime therapistId"
               name="therapistId"
               onChange={(event) => setTherapistId(event.target.value)}
               value={therapistId}
@@ -157,7 +189,7 @@ export function BookingEditorForm({
             <small>Assign a therapist before confirming or rescheduling. Existing unassigned appointments can still have their notes updated. Changing the therapist rechecks availability and requires a change reason. {booking.demo ? "Demo mode does not send emails." : "Assigned therapists receive appointment updates in separate emails."}</small>
           </label>
           <label className={styles.field}>Change reason
-            <select defaultValue="" name="changeReason">
+            <select data-cms-clear-custom-when="status localDate localTime therapistId changeReason" defaultValue="" name="changeReason">
               <option value="">Not changing status or time</option>
               {bookingChangeReasons.map((reason) => <option key={reason} value={reason}>{reason.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}</option>)}
             </select>
@@ -171,6 +203,6 @@ export function BookingEditorForm({
         <span aria-live="polite">{feedback ? <span className={styles[feedback.tone]} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Booking version ${version}${dirty ? " · unsaved changes" : ""}`}</span>
         <button disabled={saving} type="submit">{saving ? "Saving..." : "Save booking"}</button>
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }

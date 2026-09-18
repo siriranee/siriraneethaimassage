@@ -489,21 +489,11 @@ export class MockCmsRepository implements CmsRepository {
         booking.assignedStaffId !== query.therapistId
       ) return false;
       if (
-        query.attention === "expired" &&
-        !(
-          booking.status === "pending" &&
-          booking.capacityExpiresAt &&
-          booking.capacityExpiresAt <= nowIso
-        )
-      ) return false;
-      if (
         query.attention === "unassigned" &&
         !(
           !booking.assignedStaffId?.trim() &&
           booking.endsAt > nowIso &&
-          (booking.status === "confirmed" ||
-            (booking.status === "pending" &&
-              (!booking.capacityExpiresAt || booking.capacityExpiresAt > nowIso)))
+          (booking.status === "confirmed" || booking.status === "pending")
         )
       ) return false;
       if (query.search && !includesSearch(booking, query.search)) return false;
@@ -553,10 +543,7 @@ export class MockCmsRepository implements CmsRepository {
           (booking) =>
             booking.assignedStaffId === therapistId &&
             booking.endsAt > afterIso &&
-            (booking.status === "confirmed" ||
-              (booking.status === "pending" &&
-                (!booking.capacityExpiresAt ||
-                  booking.capacityExpiresAt > afterIso))),
+            (booking.status === "confirmed" || booking.status === "pending"),
         )
         .sort((first, second) => first.startsAt.localeCompare(second.startsAt))
         .map(({ reference, serviceId }) => ({ reference, serviceId })),
@@ -576,10 +563,7 @@ export class MockCmsRepository implements CmsRepository {
     );
 
     return booking
-      ? {
-          status: booking.status,
-          capacityExpiresAt: booking.capacityExpiresAt,
-        }
+      ? { status: booking.status }
       : null;
   }
 

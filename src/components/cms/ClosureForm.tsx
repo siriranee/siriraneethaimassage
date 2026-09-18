@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import type { CmsClosure } from "@/domain/cms/types";
+import { CmsValidatedForm, safeCmsFieldErrors } from "./CmsValidatedForm";
 import { useUnsavedChanges } from "./useUnsavedChanges";
 import styles from "./CmsEditorForm.module.css";
 
@@ -11,14 +12,30 @@ export function ClosureForm({ defaultDate, closure }: Readonly<{ defaultDate: st
   const router = useRouter();
   const [closedAllDay, setClosedAllDay] = useState(closure?.closedAllDay ?? true);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const { dirty, markDirty, markSaved } = useUnsavedChanges();
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
+    const starts = form.elements.namedItem("startsAtLocal");
+    const ends = form.elements.namedItem("endsAtLocal");
+    if (starts instanceof HTMLInputElement) starts.setCustomValidity("");
+    if (ends instanceof HTMLInputElement) {
+      ends.setCustomValidity(
+        !closedAllDay &&
+          starts instanceof HTMLInputElement &&
+          starts.value >= ends.value
+          ? "End time must be later than start time."
+          : "",
+      );
+    }
+    if (!form.reportValidity()) return;
     setSaving(true);
     setFeedback(null);
-    const data = new FormData(event.currentTarget);
+    setFieldErrors({});
+    const data = new FormData(form);
 
     try {
       const response = await fetch(closure ? `/api/cms/closures/${closure.id}` : "/api/cms/closures", {
@@ -36,9 +53,10 @@ export function ClosureForm({ defaultDate, closure }: Readonly<{ defaultDate: st
           repeatWeeklyCount: closure ? 1 : Number(data.get("repeatWeeklyCount")),
         }),
       });
-      const result = (await response.json()) as { error?: string; closure?: { id: string; repeatedCount?: number } };
+      const result = (await response.json()) as { error?: string; fields?: unknown; closure?: { id: string; repeatedCount?: number } };
 
       if (!response.ok || !result.closure) {
+        setFieldErrors(safeCmsFieldErrors(result.fields));
         setFeedback({ tone: "error", text: result.error ?? "The closure could not be saved." });
         return;
       }
@@ -54,14 +72,14 @@ export function ClosureForm({ defaultDate, closure }: Readonly<{ defaultDate: st
   }
 
   return (
-    <form className={styles.form} onChange={markDirty} onSubmit={save}>
+    <CmsValidatedForm className={styles.form} onChange={markDirty} onSubmit={save} serverErrors={fieldErrors}>
       <section className={styles.section}>
         <header className={styles.sectionHeader}><h2>{closure ? "Edit closure or blocked time" : "Add closure or blocked time"}</h2><p>Conflicting active bookings must be resolved before an active closure can be saved.</p></header>
         <div className={styles.grid}>
           <label className={styles.field}>Date<input defaultValue={closure?.localDate ?? defaultDate} name="localDate" required type="date" /></label>
-          <label className={styles.checkbox}><input checked={closedAllDay} onChange={(event) => setClosedAllDay(event.target.checked)} type="checkbox" /><span>Day off<small>Clear this to block only part of the day.</small></span></label>
+          <label className={styles.checkbox}><input checked={closedAllDay} name="closedAllDay" onChange={(event) => setClosedAllDay(event.target.checked)} type="checkbox" /><span>Day off<small>Clear this to block only part of the day.</small></span></label>
           <label className={styles.field}>Starts<input defaultValue={closure?.startsAtLocal || "12:00"} disabled={closedAllDay} name="startsAtLocal" required={!closedAllDay} type="time" /></label>
-          <label className={styles.field}>Ends<input defaultValue={closure?.endsAtLocal || "13:00"} disabled={closedAllDay} name="endsAtLocal" required={!closedAllDay} type="time" /></label>
+          <label className={styles.field}>Ends<input data-cms-after-field="startsAtLocal" data-cms-after-unless-checked="closedAllDay" defaultValue={closure?.endsAtLocal || "13:00"} disabled={closedAllDay} name="endsAtLocal" required={!closedAllDay} type="time" /></label>
           {!closure ? <label className={styles.field}>Repeat weekly<input defaultValue={1} max={12} min={1} name="repeatWeeklyCount" required type="number" /><small>Creates 1–12 weekly closures atomically after every date passes conflict checks.</small></label> : null}
           {closure ? <label className={styles.checkbox}><input defaultChecked={closure.active} name="active" type="checkbox" /><span>Closure active<small>Clear this to retain the history while releasing the blocked time.</small></span></label> : null}
           <label className={styles.fullField}>Internal reason<input defaultValue={closure?.reason ?? ""} maxLength={200} minLength={2} name="reason" placeholder="Holiday, maintenance or private block" required /></label>
@@ -72,6 +90,6 @@ export function ClosureForm({ defaultDate, closure }: Readonly<{ defaultDate: st
         <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Dublin local time${dirty ? " · unsaved changes" : ""}`}</span>
         <button disabled={saving} type="submit">{saving ? "Saving..." : closure ? "Save closure" : "Add closure"}</button>
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }

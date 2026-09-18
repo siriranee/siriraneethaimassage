@@ -5,6 +5,10 @@ import { useState, type FormEvent } from "react";
 
 import type { CmsSiteSettings } from "@/domain/cms/types";
 
+import {
+  CmsValidatedForm,
+  safeCmsFieldErrors,
+} from "./CmsValidatedForm";
 import styles from "./CmsEditorForm.module.css";
 
 function basePayload(site: CmsSiteSettings) {
@@ -37,12 +41,31 @@ export function OpeningHoursForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
   const [version, setVersion] = useState(site.version);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
+    site.weeklyHours.forEach((_, index) => {
+      const open = form.elements.namedItem(`open-${index}`);
+      const opens = form.elements.namedItem(`opens-${index}`);
+      const closes = form.elements.namedItem(`closes-${index}`);
+      if (closes instanceof HTMLInputElement) {
+        closes.setCustomValidity(
+          open instanceof HTMLInputElement &&
+            open.checked &&
+            opens instanceof HTMLInputElement &&
+            opens.value >= closes.value
+            ? "Closing time must be later than opening time."
+            : "",
+        );
+      }
+    });
+    if (!form.reportValidity()) return;
     setSaving(true);
     setFeedback(null);
-    const data = new FormData(event.currentTarget);
+    setFieldErrors({});
+    const data = new FormData(form);
     const weeklyHours = site.weeklyHours.map((row, index) => ({
       day: row.day,
       open: data.get(`open-${index}`) === "on",
@@ -61,13 +84,19 @@ export function OpeningHoursForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
           openingHoursConfirmed: data.get("openingHoursConfirmed") === "on",
         }),
       });
-      const result = (await response.json()) as { error?: string; site?: CmsSiteSettings };
+      const result = (await response.json()) as {
+        error?: string;
+        fields?: unknown;
+        site?: CmsSiteSettings;
+      };
 
       if (!response.ok || !result.site) {
+        setFieldErrors(safeCmsFieldErrors(result.fields));
         setFeedback({ tone: "error", text: result.error ?? "Opening hours could not be saved." });
         return;
       }
 
+      setFieldErrors({});
       setVersion(result.site.version);
       setFeedback({ tone: "success", text: "Opening hours saved and published." });
       router.refresh();
@@ -79,15 +108,19 @@ export function OpeningHoursForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
   }
 
   return (
-    <form className={styles.form} onSubmit={save}>
+    <CmsValidatedForm
+      className={styles.form}
+      onSubmit={save}
+      serverErrors={fieldErrors}
+    >
       <section className={styles.section}>
         <header className={styles.sectionHeader}><h2>Regular weekly hours</h2><p>Times are local to Europe/Dublin. Closed days retain their times for easy reopening.</p></header>
         <div className={styles.priceList}>
           {site.weeklyHours.map((row, index) => (
             <div className={styles.priceRow} key={row.day}>
-              <label className={styles.checkbox}><input defaultChecked={row.open} name={`open-${index}`} type="checkbox" /><span>{row.day}<small>Open for appointments</small></span></label>
-              <label>Opens<input defaultValue={row.opens} name={`opens-${index}`} required type="time" /></label>
-              <label>Closes<input defaultValue={row.closes} name={`closes-${index}`} required type="time" /></label>
+              <label className={styles.checkbox}><input data-cms-field={`weeklyHours.${index}.open`} defaultChecked={row.open} name={`open-${index}`} type="checkbox" /><span>{row.day}<small>Open for appointments</small></span></label>
+              <label>Opens<input data-cms-field={`weeklyHours.${index}.opens`} defaultValue={row.opens} name={`opens-${index}`} required type="time" /></label>
+              <label>Closes<input data-cms-after-field={`weeklyHours.${index}.opens`} data-cms-after-when-checked={`weeklyHours.${index}.open`} data-cms-field={`weeklyHours.${index}.closes`} defaultValue={row.closes} name={`closes-${index}`} required type="time" /></label>
             </div>
           ))}
         </div>
@@ -105,6 +138,6 @@ export function OpeningHoursForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
         <span aria-live="polite">{feedback ? <span className={feedback.tone === "error" ? styles.error : styles.success} role={feedback.tone === "error" ? "alert" : undefined}>{feedback.text}</span> : `Published version ${version}`}</span>
         <button disabled={saving} type="submit">{saving ? "Saving and publishing..." : "Save and publish opening hours"}</button>
       </div>
-    </form>
+    </CmsValidatedForm>
   );
 }

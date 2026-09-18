@@ -1,0 +1,70 @@
+.validatedForm :global(input[aria-invalid="true"]),
+.validatedForm :global(select[aria-invalid="true"]),
+.validatedForm :global(textarea[aria-invalid="true"]),
+.validatedForm :global(fieldset[aria-invalid="true"]) {
+  border-color: var(--color-danger) !important;
+  box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--color-danger) 16%, transparent);
+}
+
+.validatedForm :global(label[data-cms-validation-error])::after {
+  content: attr(data-cms-validation-error);
+  display: block;
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.summary {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 12;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 38%, transparent);
+  border-radius: 0.75rem;
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+  box-shadow: 0 0.8rem 2rem rgb(var(--color-purple-950-rgb) / 0.12);
+}
+
+.summary p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+}
+
+.summary ul {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.summary button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.45;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+.summary button:hover,
+.summary button:focus-visible {
+  color: var(--color-purple-900);
+}
+
+@media (max-width: 680px) {
+  .summary {
+    top: 0.35rem;
+  }
+}
+

@@ -21,8 +21,7 @@ export type AssignmentRepository = Pick<CmsRepository,
 
 export function isAssignmentCandidate(booking: AssignmentCandidate, now: string) {
   return !booking.assignedStaffId && booking.endsAt > now &&
-    (booking.status === "confirmed" || (booking.status === "pending" &&
-      (!booking.capacityExpiresAt || booking.capacityExpiresAt > now)));
+    (booking.status === "confirmed" || booking.status === "pending");
 }
 
 export function assignmentPlanHash(therapistId: string, candidates: readonly AssignmentCandidate[]) {

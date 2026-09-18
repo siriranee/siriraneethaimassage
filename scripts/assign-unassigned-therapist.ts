@@ -51,9 +51,7 @@ async function main() {
             endsAt: { $gt: now },
             $and: [
               { $or: [{ assignedStaffId: "" }, { assignedStaffId: null }, { assignedStaffId: { $exists: false } }] },
-              { $or: [{ status: "confirmed" }, { status: "pending", $or: [
-                { capacityExpiresAt: "" }, { capacityExpiresAt: null }, { capacityExpiresAt: { $exists: false } }, { capacityExpiresAt: { $gt: now } },
-              ] }] },
+              { $or: [{ status: "confirmed" }, { status: "pending" }] },
             ],
           }, { session, projection: {
             _id: 1, reference: 1, status: 1, serviceId: 1, durationMinutes: 1,

@@ -401,6 +401,43 @@ export function BookingPlanner({
   ]);
 
   useEffect(() => {
+    if (
+      !preferredDate ||
+      !selectedDuration ||
+      !selectedService ||
+      !selectedTherapist ||
+      confirmation ||
+      submissionState === "submitting"
+    ) {
+      return;
+    }
+
+    const refreshAvailability = () => {
+      setAvailabilityRefresh((value) => value + 1);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshAvailability();
+    };
+    const refreshInterval = window.setInterval(refreshAvailability, 30_000);
+
+    window.addEventListener("focus", refreshAvailability);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("focus", refreshAvailability);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [
+    confirmation,
+    preferredDate,
+    selectedDuration,
+    selectedService,
+    selectedTherapist,
+    submissionState,
+  ]);
+
+  useEffect(() => {
     if (submissionState === "error") {
       errorRef.current?.focus();
     }
@@ -865,7 +902,9 @@ export function BookingPlanner({
                         <Clock3 />
                       </span>
                       <div>
-                        <span>Available times · Dublin time</span>
+                        <span>
+                          Available times for {selectedTherapist?.name ?? "your therapist"} · Dublin time
+                        </span>
                         <h4 id="available-time-title">
                           {preferredDate
                             ? formatLocalDate(preferredDate)

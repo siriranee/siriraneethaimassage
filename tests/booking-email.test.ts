@@ -42,7 +42,7 @@ function booking(overrides: Partial<CmsBooking> = {}): CmsBooking {
     timezone: "Europe/Dublin",
     status: "pending",
     source: "website",
-    capacityExpiresAt: "2026-09-03T10:30:00.000Z",
+    capacityExpiresAt: "",
     assignedStaffId: "",
     assignedStaffName: "",
     internalNotes: "Never include this internal note.",
@@ -96,6 +96,8 @@ test("owner booking email renders Thai first and English second with complete op
   assert.match(message.text, /Open booking in CMS: https:\/\/siriranee\.example/);
   assert.match(message.text, /2026/);
   assert.doesNotMatch(message.text, /2569/);
+  assert.doesNotMatch(message.html, /Temporary capacity|กันคิวชั่วคราว/);
+  assert.doesNotMatch(message.text, /Temporary capacity|กันคิวชั่วคราว/);
 
   for (const forbidden of [
     "Never include this internal note.",

@@ -4,7 +4,12 @@ import { LoaderCircle, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
+import {
+  useRef,
+  useState,
+  type FocusEvent,
+  type FormEvent,
+} from "react";
 
 import type {
   CmsTeamEditorRecord,
@@ -52,14 +57,106 @@ type TeamDeleteResponse = Readonly<{
   deleted?: unknown;
 }>;
 
+const teamFieldOrder = [
+  "name",
+  "publicRole",
+  "slug",
+  "fullName",
+  "shortBio",
+  "imageAlt",
+  "serviceIds",
+  "notificationEmail",
+  "contactPhone",
+] as const;
+
+const teamFieldLabels: Readonly<Record<string, string>> = {
+  name: "Display name",
+  publicRole: "Public role",
+  slug: "Booking link name",
+  fullName: "Full professional name",
+  shortBio: "Short introduction",
+  imageAlt: "Portrait description",
+  serviceIds: "Treatments offered",
+  notificationEmail: "Therapist notification email",
+  contactPhone: "Private therapist phone",
+};
+
+function normaliseTeamFieldName(name: string) {
+  return name === "serviceIds" || name.startsWith("serviceIds.")
+    ? "serviceIds"
+    : name;
+}
+
 function safeFieldErrors(value: unknown): FieldErrors {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return Object.fromEntries(
-    Object.entries(value).filter(
-      (entry): entry is [string, string] =>
-        typeof entry[1] === "string" && Boolean(entry[1].trim()),
-    ),
-  );
+  const errors: Record<string, string> = {};
+  for (const [name, message] of Object.entries(value)) {
+    if (typeof message !== "string" || !message.trim()) continue;
+    const field = normaliseTeamFieldName(name);
+    if (!errors[field]) errors[field] = message.trim();
+  }
+  return errors;
+}
+
+function fieldControl(
+  form: HTMLFormElement,
+  field: string,
+): HTMLInputElement | HTMLTextAreaElement | null {
+  if (field === "serviceIds") {
+    return form.querySelector<HTMLInputElement>('input[name="serviceIds"]');
+  }
+  const control = form.elements.namedItem(field);
+  return control instanceof HTMLInputElement ||
+    control instanceof HTMLTextAreaElement
+    ? control
+    : null;
+}
+
+function operationalAssignmentEnabled(form: HTMLFormElement) {
+  const control = form.elements.namedItem("operationalActive");
+  return control instanceof HTMLInputElement && control.checked && !control.disabled;
+}
+
+function clientFieldError(form: HTMLFormElement, field: string) {
+  if (field === "serviceIds") {
+    return operationalAssignmentEnabled(form) &&
+      !form.querySelector<HTMLInputElement>('input[name="serviceIds"]:checked')
+      ? "Select at least one treatment for an active therapist."
+      : "";
+  }
+
+  const control = fieldControl(form, field);
+  if (!control || control.disabled) return "";
+  const value = control.value.trim();
+  const required = control.required ||
+    (field === "notificationEmail" && operationalAssignmentEnabled(form));
+  if (required && !value) return `${teamFieldLabels[field] ?? "This field"} is required.`;
+  if (!value) return "";
+  if (control.minLength > 0 && value.length < control.minLength) {
+    return `Use at least ${control.minLength} characters.`;
+  }
+  if (control.maxLength > 0 && value.length > control.maxLength) {
+    return `Use no more than ${control.maxLength} characters.`;
+  }
+  if (field === "notificationEmail" && control.validity.typeMismatch) {
+    return "Enter a valid therapist notification email.";
+  }
+  if (field === "slug" && control.validity.patternMismatch) {
+    return "Use lowercase letters, numbers and single hyphens.";
+  }
+  if (field === "contactPhone" && control.validity.patternMismatch) {
+    return "Enter at least 7 digits using only spaces, brackets, dots or hyphens between them.";
+  }
+  return control.validity.valid ? "" : control.validationMessage;
+}
+
+function collectClientFieldErrors(form: HTMLFormElement): FieldErrors {
+  const errors: Record<string, string> = {};
+  for (const field of teamFieldOrder) {
+    const message = clientFieldError(form, field);
+    if (message) errors[field] = message;
+  }
+  return errors;
 }
 
 function isTeamEditorRecord(value: unknown): value is CmsTeamEditorRecord {
@@ -105,7 +202,10 @@ export function TeamEditorForm({
   services: readonly ServiceOption[];
 }>) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
   const saveLockRef = useRef(false);
+  const touchedFieldsRef = useRef(new Set<string>());
   const [version, setVersion] = useState(member.version);
   const [contactVersion, setContactVersion] = useState(member.contactVersion);
   const [imageUrl, setImageUrl] = useState(member.imageUrl);
@@ -134,22 +234,92 @@ export function TeamEditorForm({
     return [hintId, fieldError(name) ? `${name}-error` : ""].filter(Boolean).join(" ") || undefined;
   }
 
+  function focusField(name: string) {
+    const form = formRef.current;
+    if (!form) return;
+    const control = fieldControl(form, normaliseTeamFieldName(name));
+    if (!control) {
+      errorSummaryRef.current?.focus();
+      return;
+    }
+    control.focus();
+    control.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function focusErrorSummary() {
+    window.requestAnimationFrame(() => {
+      errorSummaryRef.current?.focus();
+      errorSummaryRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  }
+
+  function updateClientFieldError(form: HTMLFormElement, name: string) {
+    const field = normaliseTeamFieldName(name);
+    if (!teamFieldOrder.includes(field as (typeof teamFieldOrder)[number])) return;
+    const message = clientFieldError(form, field);
+    setFieldErrors((current) => {
+      if (message === (current[field] ?? "")) return current;
+      const next = { ...current };
+      if (message) next[field] = message;
+      else delete next[field];
+      return next;
+    });
+    setFeedback((current) => current?.tone === "error" ? null : current);
+  }
+
+  function validateDependentBookingFields(form: HTMLFormElement) {
+    for (const field of ["notificationEmail", "serviceIds"] as const) {
+      if (touchedFieldsRef.current.has(field) || fieldErrors[field]) {
+        updateClientFieldError(form, field);
+      }
+    }
+  }
+
+  function handleFieldBlur(event: FocusEvent<HTMLFormElement>) {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+    const field = normaliseTeamFieldName(target.name);
+    if (!field) return;
+    touchedFieldsRef.current.add(field);
+    updateClientFieldError(event.currentTarget, field);
+  }
+
+  function handleFieldChange(event: FormEvent<HTMLFormElement>) {
+    markDirty();
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+    const field = normaliseTeamFieldName(target.name);
+    if (field && (touchedFieldsRef.current.has(field) || fieldErrors[field])) {
+      updateClientFieldError(event.currentTarget, field);
+    }
+    if (field === "operationalActive" || field === "archived") {
+      window.requestAnimationFrame(() => {
+        if (formRef.current) validateDependentBookingFields(formRef.current);
+      });
+    }
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saveLockRef.current || preparationBusy) return;
     const form = event.currentTarget;
-    if (!form.reportValidity()) return;
-    const data = new FormData(form);
-    if (
-      data.get("operationalActive") === "on" &&
-      data.getAll("serviceIds").length === 0
-    ) {
-      const message = "Select at least one treatment for an active therapist.";
-      setFieldErrors({ serviceIds: message });
-      setFeedback({ tone: "error", text: message });
-      form.querySelector<HTMLInputElement>('input[name="serviceIds"]')?.focus();
+    const clientErrors = collectClientFieldErrors(form);
+    if (Object.keys(clientErrors).length) {
+      for (const field of Object.keys(clientErrors)) {
+        touchedFieldsRef.current.add(field);
+      }
+      setFieldErrors(clientErrors);
+      setFeedback({
+        tone: "error",
+        text: "Please correct the highlighted therapist details.",
+      });
+      focusErrorSummary();
       return;
     }
+    const data = new FormData(form);
 
     saveLockRef.current = true;
     setSaving(true);
@@ -221,7 +391,12 @@ export function TeamEditorForm({
         serverRollback = submissionId
           ? parseCmsMediaServerRollbackSummary(result.mediaRollback, submissionId, stagedAssets)
           : null;
-        setFieldErrors(safeFieldErrors(result.fields));
+        const responseFieldErrors = safeFieldErrors(result.fields);
+        setFieldErrors(responseFieldErrors);
+        for (const field of Object.keys(responseFieldErrors)) {
+          touchedFieldsRef.current.add(field);
+        }
+        if (Object.keys(responseFieldErrors).length) focusErrorSummary();
         throw new TeamSaveError(result.error);
       }
       if (!isTeamEditorRecord(result.member)) throw new TeamSaveError(TEAM_SAVE_AMBIGUOUS_MESSAGE);
@@ -331,12 +506,37 @@ export function TeamEditorForm({
   }
 
   return (
-    <form aria-busy={locked} className={styles.form} onChange={markDirty} onSubmit={save}>
+    <form
+      aria-busy={locked}
+      className={styles.form}
+      noValidate
+      onBlur={handleFieldBlur}
+      onChange={handleFieldChange}
+      onSubmit={save}
+      ref={formRef}
+    >
       <fieldset className={styles.formFields} disabled={locked}>
         {Object.keys(fieldErrors).length ? (
-          <div className={teamStyles.errorSummary} role="alert">
-            <strong>Please check the highlighted therapist details.</strong>
-            <span>{Object.values(fieldErrors)[0]}</span>
+          <div
+            aria-labelledby="therapist-error-summary-title"
+            className={teamStyles.errorSummary}
+            ref={errorSummaryRef}
+            role="alert"
+            tabIndex={-1}
+          >
+            <strong id="therapist-error-summary-title">
+              Please check the highlighted therapist details.
+            </strong>
+            <ul>
+              {Object.entries(fieldErrors).map(([field, message]) => (
+                <li key={field}>
+                  <button onClick={() => focusField(field)} type="button">
+                    <span>{teamFieldLabels[field] ? `${teamFieldLabels[field]}: ` : ""}</span>
+                    {message}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
 
@@ -347,24 +547,25 @@ export function TeamEditorForm({
           </header>
           <div className={styles.grid}>
             <label className={styles.field}>Display name
-              <input aria-describedby={describedBy("name")} aria-invalid={Boolean(fieldError("name"))} defaultValue={member.name} maxLength={80} minLength={2} name="name" required />
+              <input aria-describedby={describedBy("name")} aria-invalid={Boolean(fieldError("name"))} defaultValue={member.name} id="therapist-name" maxLength={80} minLength={2} name="name" required />
               {fieldError("name") ? <small className={teamStyles.fieldError} id="name-error">{fieldError("name")}</small> : null}
             </label>
             <label className={styles.field}>Public role
-              <input aria-describedby={describedBy("publicRole")} aria-invalid={Boolean(fieldError("publicRole"))} defaultValue={member.publicRole} maxLength={120} minLength={2} name="publicRole" required />
+              <input aria-describedby={describedBy("publicRole")} aria-invalid={Boolean(fieldError("publicRole"))} defaultValue={member.publicRole} id="therapist-public-role" maxLength={120} minLength={2} name="publicRole" required />
               {fieldError("publicRole") ? <small className={teamStyles.fieldError} id="publicRole-error">{fieldError("publicRole")}</small> : null}
             </label>
             <label className={styles.field}>Booking link name
-              <input aria-describedby={describedBy("slug", "therapist-slug-hint")} aria-invalid={Boolean(fieldError("slug"))} autoCapitalize="none" defaultValue={member.slug} maxLength={100} minLength={2} name="slug" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required spellCheck={false} />
+              <input aria-describedby={describedBy("slug", "therapist-slug-hint")} aria-invalid={Boolean(fieldError("slug"))} autoCapitalize="none" defaultValue={member.slug} id="therapist-slug" maxLength={100} minLength={2} name="slug" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required spellCheck={false} />
               <small id="therapist-slug-hint">Lowercase letters, numbers and single hyphens. Changing this also changes preselected booking links.</small>
               {fieldError("slug") ? <small className={teamStyles.fieldError} id="slug-error">{fieldError("slug")}</small> : null}
             </label>
             <label className={styles.field}>Full professional name
-              <input aria-describedby="therapist-full-name-hint" defaultValue={member.fullName} maxLength={120} minLength={2} name="fullName" required />
+              <input aria-describedby={describedBy("fullName", "therapist-full-name-hint")} aria-invalid={Boolean(fieldError("fullName"))} defaultValue={member.fullName} id="therapist-full-name" maxLength={120} minLength={2} name="fullName" required />
               <small id="therapist-full-name-hint">Kept with the profile record for administrative clarity. Public pages use the display name.</small>
+              {fieldError("fullName") ? <small className={teamStyles.fieldError} id="fullName-error">{fieldError("fullName")}</small> : null}
             </label>
             <label className={styles.fullField}>Short introduction
-              <textarea aria-describedby={describedBy("shortBio", "therapist-short-bio-hint")} aria-invalid={Boolean(fieldError("shortBio"))} defaultValue={member.shortBio} maxLength={300} minLength={20} name="shortBio" required rows={3} />
+              <textarea aria-describedby={describedBy("shortBio", "therapist-short-bio-hint")} aria-invalid={Boolean(fieldError("shortBio"))} defaultValue={member.shortBio} id="therapist-short-bio" maxLength={300} minLength={20} name="shortBio" required rows={3} />
               <small id="therapist-short-bio-hint">A concise introduction for profile cards and booking choices.</small>
               {fieldError("shortBio") ? <small className={teamStyles.fieldError} id="shortBio-error">{fieldError("shortBio")}</small> : null}
             </label>
@@ -400,7 +601,7 @@ export function TeamEditorForm({
               ) : null}
             </div>
             <label className={styles.fullField}>Portrait description
-              <input aria-describedby={describedBy("imageAlt", "therapist-image-alt-hint")} aria-invalid={Boolean(fieldError("imageAlt"))} maxLength={180} minLength={8} name="imageAlt" onChange={(event) => setImageAlt(event.target.value)} required={Boolean(imageUrl || preparedImage)} value={imageAlt} />
+              <input aria-describedby={describedBy("imageAlt", "therapist-image-alt-hint")} aria-invalid={Boolean(fieldError("imageAlt"))} id="therapist-image-alt" maxLength={180} minLength={8} name="imageAlt" onChange={(event) => setImageAlt(event.target.value)} required={Boolean(imageUrl || preparedImage)} value={imageAlt} />
               <small id="therapist-image-alt-hint">Describe the visible portrait for customers who cannot see it.</small>
               {fieldError("imageAlt") ? <small className={teamStyles.fieldError} id="imageAlt-error">{fieldError("imageAlt")}</small> : null}
             </label>
@@ -417,6 +618,7 @@ export function TeamEditorForm({
               aria-describedby={fieldError("serviceIds") ? "serviceIds-error" : undefined}
               aria-invalid={Boolean(fieldError("serviceIds"))}
               className={teamStyles.serviceFieldset}
+              id="therapist-service-ids"
             >
               <legend>Treatments offered</legend>
               <p>These choices control which treatments can be booked with this therapist.</p>
@@ -442,12 +644,12 @@ export function TeamEditorForm({
           </header>
           <div className={styles.grid}>
             <label className={styles.fullField}>Therapist notification email
-              <input aria-describedby={describedBy("notificationEmail", "therapist-email-hint")} aria-invalid={Boolean(fieldError("notificationEmail"))} autoComplete="off" defaultValue={member.notificationEmail} maxLength={254} name="notificationEmail" required={operationalActive} type="email" />
+              <input aria-describedby={describedBy("notificationEmail", "therapist-email-hint")} aria-invalid={Boolean(fieldError("notificationEmail"))} autoComplete="off" defaultValue={member.notificationEmail} id="therapist-notification-email" maxLength={254} name="notificationEmail" required={operationalActive} type="email" />
               <small id="therapist-email-hint">Private recipient address used for this therapist&apos;s assigned-booking notifications when delivery is enabled.</small>
               {fieldError("notificationEmail") ? <small className={teamStyles.fieldError} id="notificationEmail-error">{fieldError("notificationEmail")}</small> : null}
             </label>
             <label className={styles.fullField}>Private therapist phone
-              <input aria-describedby={describedBy("contactPhone", "therapist-phone-hint")} aria-invalid={Boolean(fieldError("contactPhone"))} autoComplete="off" defaultValue={member.contactPhone} inputMode="tel" maxLength={30} name="contactPhone" type="tel" />
+              <input aria-describedby={describedBy("contactPhone", "therapist-phone-hint")} aria-invalid={Boolean(fieldError("contactPhone"))} autoComplete="off" defaultValue={member.contactPhone} id="therapist-contact-phone" inputMode="tel" maxLength={30} name="contactPhone" pattern="(?=(?:[^0-9]*[0-9]){7})\+?[0-9\s().\-]{7,30}" type="tel" />
               <small id="therapist-phone-hint">Optional private CMS contact number. It is never published on the website.</small>
               {fieldError("contactPhone") ? <small className={teamStyles.fieldError} id="contactPhone-error">{fieldError("contactPhone")}</small> : null}
             </label>

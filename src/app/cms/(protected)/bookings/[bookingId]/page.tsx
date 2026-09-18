@@ -8,7 +8,6 @@ import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
 import { CmsRetryBookingEmail } from "@/components/cms/CmsRetryBookingEmail";
 import { CmsNotice, CmsPageHeader, CmsPanel, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { bookingEmailDeliveryFeedback } from "@/domain/cms/notification-presentation";
-import { isPendingCapacityExpired } from "@/domain/booking/status";
 import { isBookingEmailDeliveryUncertain } from "@/domain/booking/email-retry-policy";
 import { canCmsRole } from "@/domain/cms/permissions";
 import { compareCmsTeamMembersByName } from "@/domain/cms/team";
@@ -33,7 +32,6 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
     getCmsContent(),
   ]);
   if (!booking) notFound();
-  const expiredPending = isPendingCapacityExpired(booking);
   const latestCustomerEmail = [...notifications]
     .sort((first, second) => second.createdAt.localeCompare(first.createdAt))
     .find((notification) =>
@@ -106,12 +104,6 @@ export default async function CmsBookingDetailPage({ params }: PageProps) {
       {!booking.demo && !booking.customer.email && (booking.status === "confirmed" || booking.status === "cancelled") ? (
         <CmsNotice tone="warning" title="Booking saved without a customer email">
           No customer email address was provided. Contact the customer directly about this appointment.
-        </CmsNotice>
-      ) : null}
-
-      {expiredPending ? (
-        <CmsNotice tone="warning" title="Temporary capacity hold has expired">
-          This pending request no longer blocks the appointment time. Confirming or rescheduling it will recheck opening hours, closures and current capacity before saving.
         </CmsNotice>
       ) : null}
 
