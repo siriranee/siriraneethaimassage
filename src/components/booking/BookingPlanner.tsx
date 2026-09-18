@@ -73,6 +73,11 @@ type PublicAvailabilityResponse = {
   readonly slots: readonly PublicSlot[];
 };
 
+type UnavailableSelectedTime = Pick<
+  PublicSlot,
+  "localTime" | "localTimeLabel"
+>;
+
 type PublicBookingSnapshot = {
   readonly reference: string;
   readonly serviceName: string;
@@ -263,6 +268,8 @@ export function BookingPlanner({
   const [minimumDate] = useState(currentDublinDate);
   const [availableSlots, setAvailableSlots] =
     useState<readonly PublicSlot[]>([]);
+  const [unavailableSelectedTime, setUnavailableSelectedTime] =
+    useState<UnavailableSelectedTime | null>(null);
   const [availabilityMode, setAvailabilityMode] =
     useState<AvailabilityMode | null>(null);
   const [availabilityRefresh, setAvailabilityRefresh] = useState(0);
@@ -324,6 +331,24 @@ export function BookingPlanner({
   const selectedTimeSlot = availableSlots.find(
     (slot) => slot.localTime === selectedTime,
   );
+  const displayedTimeSlots = [
+    ...availableSlots.map((slot) => ({
+      kind: "available" as const,
+      localTime: slot.localTime,
+      localTimeLabel: slot.localTimeLabel,
+      slotId: slot.slotId,
+    })),
+    ...(unavailableSelectedTime
+      ? [
+          {
+            kind: "unavailable" as const,
+            localTime: unavailableSelectedTime.localTime,
+            localTimeLabel: unavailableSelectedTime.localTimeLabel,
+            slotId: `unavailable-${unavailableSelectedTime.localTime}`,
+          },
+        ]
+      : []),
+  ].sort((first, second) => first.localTime.localeCompare(second.localTime));
   const contactPreferenceHref = selectedService
     ? buildContactPreferenceHref({
         serviceSlug: selectedService.slug,
@@ -366,21 +391,38 @@ export function BookingPlanner({
         if (!response.ok) throw new Error(result.message);
 
         const slots = result.slots ?? [];
+        const selectedTimeStillAvailable = selectedTime
+          ? slots.some((slot) => slot.localTime === selectedTime)
+          : true;
         setAvailableSlots(slots);
         setAvailabilityMode(result.status);
-        setAvailabilityMessage(result.message);
+        setAvailabilityMessage(
+          selectedTime && !selectedTimeStillAvailable
+            ? `${selectedTime} is no longer available. Choose another time.`
+            : result.message,
+        );
         setAvailabilityState(
           result.status === "disabled" ? "disabled" : "ready",
         );
-        setSelectedTime((current) =>
-          current && !slots.some((slot) => slot.localTime === current)
-            ? ""
-            : current,
-        );
+        if (selectedTime && !selectedTimeStillAvailable) {
+          setUnavailableSelectedTime({
+            localTime: selectedTime,
+            localTimeLabel: selectedTime,
+          });
+          setSelectedTime("");
+        } else {
+          setUnavailableSelectedTime((current) =>
+            current &&
+            slots.some((slot) => slot.localTime === current.localTime)
+              ? null
+              : current,
+          );
+        }
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         setAvailableSlots([]);
+        setUnavailableSelectedTime(null);
         setAvailabilityMode(null);
         setSelectedTime("");
         setAvailabilityState("error");
@@ -398,6 +440,7 @@ export function BookingPlanner({
     selectedDuration,
     selectedService,
     selectedTherapist,
+    selectedTime,
   ]);
 
   useEffect(() => {
@@ -491,6 +534,7 @@ export function BookingPlanner({
     setSelectedTherapistId(nextTherapist?.id ?? "");
     setPreferredDate("");
     setSelectedTime("");
+    setUnavailableSelectedTime(null);
     setAvailableSlots([]);
     setAvailabilityMode(null);
     setAvailabilityState("idle");
@@ -500,6 +544,7 @@ export function BookingPlanner({
   function selectDuration(durationMinutes: number) {
     setSelectedDuration(durationMinutes);
     setSelectedTime("");
+    setUnavailableSelectedTime(null);
     setAvailableSlots([]);
     setAvailabilityMode(null);
     setAvailabilityState(preferredDate ? "loading" : "idle");
@@ -510,6 +555,7 @@ export function BookingPlanner({
     setSelectedTherapistId(therapistId);
     setPreferredDate("");
     setSelectedTime("");
+    setUnavailableSelectedTime(null);
     setAvailableSlots([]);
     setAvailabilityMode(null);
     setAvailabilityMessage("");
@@ -520,6 +566,7 @@ export function BookingPlanner({
   function selectDate(value: string) {
     setPreferredDate(value);
     setSelectedTime("");
+    setUnavailableSelectedTime(null);
     setAvailableSlots([]);
     setAvailabilityMode(null);
     setAvailabilityMessage(
@@ -531,6 +578,7 @@ export function BookingPlanner({
 
   function selectTime(value: string) {
     setSelectedTime(value);
+    setUnavailableSelectedTime(null);
     resetSubmission();
   }
 
@@ -603,6 +651,10 @@ export function BookingPlanner({
         );
 
         if (response.status === 409) {
+          setUnavailableSelectedTime({
+            localTime: selectedTime,
+            localTimeLabel: selectedTimeSlot?.localTimeLabel ?? selectedTime,
+          });
           setSelectedTime("");
           setAvailableSlots([]);
           setAvailabilityState("loading");
@@ -628,6 +680,7 @@ export function BookingPlanner({
   function startAnotherBooking() {
     formRef.current?.reset();
     setSelectedTime("");
+    setUnavailableSelectedTime(null);
     resetSubmission();
     setAvailabilityRefresh((value) => value + 1);
   }
@@ -952,14 +1005,38 @@ export function BookingPlanner({
                         <strong>Online times are not live yet</strong>
                         <p>Confirmed appointment options will appear here when they are ready.</p>
                       </div>
-                    ) : availableSlots.length ? (
+                    ) : displayedTimeSlots.length ? (
                       <div
                         aria-labelledby="available-time-title"
                         className={styles.timeSlotGrid}
                         role="radiogroup"
                       >
-                        {availableSlots.map((slot) => {
+                        {displayedTimeSlots.map((slot) => {
                           const inputId = `booking-time-${slot.slotId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+
+                          if (slot.kind === "unavailable") {
+                            return (
+                              <label
+                                className={`${styles.timeOption} ${styles.timeOptionGhost}`}
+                                htmlFor={inputId}
+                                key={slot.slotId}
+                              >
+                                <input
+                                  aria-label={`${slot.localTimeLabel}, no longer available`}
+                                  className={styles.timeRadio}
+                                  disabled
+                                  id={inputId}
+                                  name="preferredTime"
+                                  type="radio"
+                                  value={slot.localTime}
+                                />
+                                <span className={styles.timeOptionContent}>
+                                  <strong>{slot.localTimeLabel}</strong>
+                                  <small>No longer available</small>
+                                </span>
+                              </label>
+                            );
+                          }
 
                           return (
                             <label

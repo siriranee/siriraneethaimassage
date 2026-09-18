@@ -543,6 +543,31 @@
   font-size: var(--fs-sm);
 }
 
+.timeOptionContent small {
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.timeOptionGhost {
+  cursor: not-allowed;
+}
+
+.timeOptionGhost .timeOptionContent {
+  border-color: rgb(var(--color-purple-700-rgb) / 0.38);
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.62;
+}
+
+.timeOptionGhost .timeOptionContent strong {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 0.08em;
+}
+
 .timeRadio:checked + .timeOptionContent {
   border-color: var(--color-purple-700);
   background: linear-gradient(145deg, var(--color-purple-700), var(--color-purple-800));
@@ -562,6 +587,11 @@
   .timeOption:hover .timeOptionContent {
     border-color: var(--color-purple-600);
     transform: translateY(-1px);
+  }
+
+  .timeOptionGhost:hover .timeOptionContent {
+    border-color: rgb(var(--color-purple-700-rgb) / 0.38);
+    transform: none;
   }
 }
 
