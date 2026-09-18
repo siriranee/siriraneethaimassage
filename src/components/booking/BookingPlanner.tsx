@@ -63,6 +63,7 @@ type PublicSlot = {
   readonly startsAt: string;
   readonly endsAt: string;
   readonly timezone: "Europe/Dublin";
+  readonly available: boolean;
 };
 
 type AvailabilityMode = "disabled" | "planning" | "live";
@@ -333,18 +334,23 @@ export function BookingPlanner({
   );
   const displayedTimeSlots = [
     ...availableSlots.map((slot) => ({
-      kind: "available" as const,
+      kind: slot.available ? "available" as const : "unavailable" as const,
       localTime: slot.localTime,
       localTimeLabel: slot.localTimeLabel,
       slotId: slot.slotId,
+      unavailableLabel: slot.available ? "" : "Unavailable",
     })),
-    ...(unavailableSelectedTime
+    ...(unavailableSelectedTime &&
+    !availableSlots.some(
+      (slot) => slot.localTime === unavailableSelectedTime.localTime,
+    )
       ? [
           {
             kind: "unavailable" as const,
             localTime: unavailableSelectedTime.localTime,
             localTimeLabel: unavailableSelectedTime.localTimeLabel,
             slotId: `unavailable-${unavailableSelectedTime.localTime}`,
+            unavailableLabel: "No longer available",
           },
         ]
       : []),
@@ -392,7 +398,10 @@ export function BookingPlanner({
 
         const slots = result.slots ?? [];
         const selectedTimeStillAvailable = selectedTime
-          ? slots.some((slot) => slot.localTime === selectedTime)
+          ? slots.some(
+              (slot) =>
+                slot.localTime === selectedTime && slot.available,
+            )
           : true;
         setAvailableSlots(slots);
         setAvailabilityMode(result.status);
@@ -1022,7 +1031,7 @@ export function BookingPlanner({
                                 key={slot.slotId}
                               >
                                 <input
-                                  aria-label={`${slot.localTimeLabel}, no longer available`}
+                                  aria-label={`${slot.localTimeLabel}, ${slot.unavailableLabel.toLowerCase()}`}
                                   className={styles.timeRadio}
                                   disabled
                                   id={inputId}
@@ -1032,7 +1041,7 @@ export function BookingPlanner({
                                 />
                                 <span className={styles.timeOptionContent}>
                                   <strong>{slot.localTimeLabel}</strong>
-                                  <small>No longer available</small>
+                                  <small>{slot.unavailableLabel}</small>
                                 </span>
                               </label>
                             );

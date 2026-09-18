@@ -90,7 +90,7 @@ export async function getPublicAvailability(input: {
     repository.listConfirmedBookingOccupancy(input.localDate, input.localDate),
     repository.listClosures(input.localDate, input.localDate),
   ]);
-  const slots = getAvailabilitySlots({
+  const availabilityInput = {
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
     therapistId: therapist.id,
@@ -98,6 +98,14 @@ export async function getPublicAvailability(input: {
     weeklyHours: content.site.weeklyHours,
     closures,
     bookings,
+  } as const;
+  const availableSlots = getAvailabilitySlots(availabilityInput);
+  const availableSlotIds = new Set(
+    availableSlots.map((slot) => slot.slotId),
+  );
+  const slots = getAvailabilitySlots({
+    ...availabilityInput,
+    bookings: [],
   }).map((slot) => ({
     slotId: slot.slotId,
     localDate: slot.localDate,
@@ -106,6 +114,7 @@ export async function getPublicAvailability(input: {
     startsAt: slot.startsAt,
     endsAt: slot.endsAt,
     timezone: slot.timezone,
+    available: availableSlotIds.has(slot.slotId),
   }));
 
   return {

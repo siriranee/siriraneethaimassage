@@ -423,9 +423,10 @@ test("contact handoff resolves service and price from the published snapshot", a
 });
 
 test("booking page uses the custom month calendar and visual time choices", async () => {
-  const [planner, plannerStyles, calendar, calendarStyles, calendarLegend] = await Promise.all([
+  const [planner, plannerStyles, publicAvailability, calendar, calendarStyles, calendarLegend] = await Promise.all([
     source("src/components/booking/BookingPlanner.tsx"),
     source("src/components/booking/BookingPlanner.module.css"),
+    source("src/server/booking/public-availability.ts"),
     source("src/components/booking/BookingCalendar.tsx"),
     source("src/components/booking/BookingCalendar.module.css"),
     source("src/components/booking/CalendarLegend.tsx"),
@@ -436,9 +437,17 @@ test("booking page uses the custom month calendar and visual time choices", asyn
   assert.match(planner, /name="preferredTime"/);
   assert.match(planner, /setUnavailableSelectedTime/);
   assert.match(planner, /No longer available/);
+  assert.match(planner, /slot\.available \? "available"/);
+  assert.match(planner, /unavailableLabel: slot\.available \? "" : "Unavailable"/);
   assert.match(planner, /displayedTimeSlots\.length/);
   assert.match(plannerStyles, /\.timeOptionGhost/);
   assert.match(plannerStyles, /cursor:\s*not-allowed/);
+  assert.match(publicAvailability, /const availableSlotIds = new Set/);
+  assert.match(publicAvailability, /bookings:\s*\[\]/);
+  assert.match(
+    publicAvailability,
+    /available:\s*availableSlotIds\.has\(slot\.slotId\)/,
+  );
   assert.match(calendar, /\/api\/public\/availability\/calendar/);
   assert.match(calendar, /<CalendarLegend \/>/);
   assert.match(calendarLegend, /aria-label="Calendar legend"/);
