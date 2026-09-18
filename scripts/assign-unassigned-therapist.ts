@@ -56,14 +56,13 @@ async function main() {
           }, { session, projection: {
             _id: 1, reference: 1, status: 1, serviceId: 1, durationMinutes: 1,
             localDate: 1, localTime: 1, startsAt: 1, endsAt: 1, version: 1,
-            assignedStaffId: 1, capacityExpiresAt: 1,
+            assignedStaffId: 1,
           } }).limit(101).toArray();
           return rows.map(({ _id, ...row }) => ({ id: _id, ...row }) as AssignmentCandidate);
         },
         lockTherapist: (id) => repository.lockTherapist(id),
         lockBookingDate: (date) => repository.lockBookingDate(date),
         listBookingOccupancy: (from, to) => repository.listBookingOccupancy(from, to),
-        listActiveHolds: (now) => repository.listActiveHolds(now),
         listClosures: (from, to) => repository.listClosures(from, to),
         assign: async (booking, therapist, now) => {
           const update = await bookings.updateOne({

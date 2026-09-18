@@ -18,7 +18,6 @@ import type {
   CmsAuditEvent,
   CmsBooking,
   CmsFutureTherapistBooking,
-  CmsBookingHold,
   CmsBookingNotification,
   CmsEmailDeliveryEvent,
   CmsBookingOccupancy,
@@ -69,7 +68,6 @@ const collections = {
   audit: "cmsAuditEvents",
   bookings: "cmsBookings",
   closures: "cmsClosures",
-  holds: "cmsBookingHolds",
   notifications: "cmsBookingNotifications",
   emailDeliveryEvents: "cmsBookingEmailDeliveryEvents",
   dayLocks: "cmsBookingDayLocks",
@@ -118,6 +116,8 @@ function decodeBooking(value: Document | null): CmsBooking | null {
   if (!value) return null;
   const { _id, customerEncrypted, ...rest } = value;
   delete rest.retentionExpiresAtDate;
+  delete rest.capacityExpiresAt;
+  delete rest.holdTokenHash;
 
   if (typeof customerEncrypted !== "string") {
     throw new Error("Booking customer data is not encrypted.");
@@ -133,6 +133,18 @@ function decodeBooking(value: Document | null): CmsBooking | null {
       typeof rest.assignedStaffName === "string" ? rest.assignedStaffName : "",
     customer,
   } as CmsBooking;
+}
+
+function decodeBookingOccupancy(row: Document): CmsBookingOccupancy {
+  return {
+    id: String(row._id),
+    localDate: String(row.localDate ?? ""),
+    startsAt: String(row.startsAt ?? ""),
+    endsAt: String(row.endsAt ?? ""),
+    status: String(row.status) as CmsBookingOccupancy["status"],
+    assignedStaffId:
+      typeof row.assignedStaffId === "string" ? row.assignedStaffId : "",
+  };
 }
 
 function encodeTherapistContact(
@@ -764,7 +776,6 @@ export class MongoCmsRepository implements CmsRepository {
             startsAt: 1,
             endsAt: 1,
             status: 1,
-            capacityExpiresAt: 1,
             assignedStaffId: 1,
           },
         },
@@ -772,19 +783,37 @@ export class MongoCmsRepository implements CmsRepository {
       .sort({ startsAt: 1 })
       .toArray();
 
-    return rows.map((row) => ({
-      id: String(row._id),
-      localDate: String(row.localDate ?? ""),
-      startsAt: String(row.startsAt ?? ""),
-      endsAt: String(row.endsAt ?? ""),
-      status: String(row.status) as CmsBookingOccupancy["status"],
-      expiresAt:
-        typeof row.capacityExpiresAt === "string"
-          ? row.capacityExpiresAt
-          : "",
-      assignedStaffId:
-        typeof row.assignedStaffId === "string" ? row.assignedStaffId : "",
-    }));
+    return rows.map(decodeBookingOccupancy);
+  }
+
+  async listConfirmedBookingOccupancy(
+    from: string,
+    to: string,
+  ): Promise<readonly CmsBookingOccupancy[]> {
+    const db = await this.db();
+    const rows = await db
+      .collection<CmsMongoDocument>(collections.bookings)
+      .find(
+        {
+          localDate: { $gte: from, $lte: to },
+          status: "confirmed",
+        },
+        {
+          ...this.options(),
+          projection: {
+            _id: 1,
+            localDate: 1,
+            startsAt: 1,
+            endsAt: 1,
+            status: 1,
+            assignedStaffId: 1,
+          },
+        },
+      )
+      .sort({ startsAt: 1 })
+      .toArray();
+
+    return rows.map(decodeBookingOccupancy);
   }
 
   async listBookings(query: CmsBookingQuery = {}) {
@@ -1158,56 +1187,6 @@ export class MongoCmsRepository implements CmsRepository {
       await this.reconcileEmailDeliveryEvents(notification.providerMessageId);
     }
     return result.matchedCount === 1;
-  }
-
-  async listActiveHolds(nowIso: string) {
-    const db = await this.db();
-    const rows = await db
-      .collection<CmsMongoDocument>(collections.holds)
-      .find(
-        { status: "active", expiresAt: { $gt: nowIso } },
-        this.options(),
-      )
-      .toArray();
-    return rows.map((row) => {
-      const hold = decode<CmsBookingHold>(row)!;
-      return {
-        ...hold,
-        assignedStaffId:
-          typeof hold.assignedStaffId === "string" ? hold.assignedStaffId : "",
-      };
-    });
-  }
-
-  async findHoldByTokenHash(tokenHash: string) {
-    const db = await this.db();
-    const hold = decode<CmsBookingHold>(
-      await db
-        .collection<CmsMongoDocument>(collections.holds)
-        .findOne({ tokenHash }, this.options()),
-    );
-    return hold
-      ? {
-          ...hold,
-          assignedStaffId:
-            typeof hold.assignedStaffId === "string"
-              ? hold.assignedStaffId
-              : "",
-        }
-      : null;
-  }
-
-  async saveHold(hold: CmsBookingHold) {
-    const db = await this.db();
-    await db.collection<CmsMongoDocument>(collections.holds).replaceOne(
-      { _id: hold.id },
-      {
-        ...encode(hold),
-        expiresAtDate: new Date(hold.expiresAt),
-      },
-      { ...this.options(), upsert: true },
-    );
-    return hold;
   }
 
   async lockBookingDate(localDate: string) {

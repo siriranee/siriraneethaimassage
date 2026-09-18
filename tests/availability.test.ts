@@ -78,7 +78,6 @@ function settings(
     bookingHorizonDays: 60,
     bufferBeforeMinutes: 0,
     bufferAfterMinutes: 0,
-    holdMinutes: 10,
     cancellationCutoffMinutes: 1440,
     provisionalNotice: "",
     version: 1,
@@ -122,7 +121,6 @@ function slots(
     weeklyHours: weeklyHours(),
     closures: [],
     bookings: [],
-    holds: [],
     now: "2026-05-01T10:00:00Z",
     enforceWindow: false,
     ...overrides,
@@ -202,14 +200,12 @@ test("different therapists can work concurrently while spa capacity remains", ()
   );
 });
 
-test("a submitted pending request stays unavailable for its therapist", () => {
+test("a submitted pending request does not reserve therapist or spa capacity", () => {
   const booking = {
     startsAt: "2026-06-01T09:00:00Z",
     endsAt: "2026-06-01T10:00:00Z",
     assignedStaffId: "therapist-a",
     status: "pending" as const,
-    // Legacy requests may still contain this old technical expiry value.
-    expiresAt: "2026-05-01T00:00:00Z",
   };
   const sameTherapist = slots({
     therapistId: "therapist-a",
@@ -222,10 +218,13 @@ test("a submitted pending request stays unavailable for its therapist", () => {
     bookings: [booking],
   });
 
-  assert.ok(!sameTherapist.some((slot) => slot.localTime === "10:00"));
+  assert.equal(
+    sameTherapist.find((slot) => slot.localTime === "10:00")?.remainingCapacity,
+    2,
+  );
   assert.equal(
     otherTherapist.find((slot) => slot.localTime === "10:00")?.remainingCapacity,
-    1,
+    2,
   );
 });
 
@@ -278,44 +277,28 @@ test("partial and all-day closures remove intersecting slots", () => {
   );
 });
 
-test("submitted pending bookings keep the slot while only technical holds expire", () => {
+test("only confirmed bookings reserve appointment capacity", () => {
   const pendingBooking = slots({
-    now: "2026-06-01T08:00:00Z",
     bookings: [
       {
         startsAt: "2026-06-01T09:00:00Z",
         endsAt: "2026-06-01T10:00:00Z",
         status: "pending",
-        expiresAt: "2026-06-01T07:59:59Z",
       },
     ],
   });
-  const expiredHold = slots({
-    now: "2026-06-01T08:00:00Z",
-    holds: [
+  const confirmedBooking = slots({
+    bookings: [
       {
         startsAt: "2026-06-01T09:00:00Z",
         endsAt: "2026-06-01T10:00:00Z",
-        status: "active",
-        expiresAt: "2026-06-01T07:59:59Z",
-      },
-    ],
-  });
-  const activeHold = slots({
-    now: "2026-06-01T08:00:00Z",
-    holds: [
-      {
-        startsAt: "2026-06-01T09:00:00Z",
-        endsAt: "2026-06-01T10:00:00Z",
-        status: "active",
-        expiresAt: "2026-06-01T08:10:00Z",
+        status: "confirmed",
       },
     ],
   });
 
-  assert.ok(!pendingBooking.some((slot) => slot.localTime === "10:00"));
-  assert.ok(expiredHold.some((slot) => slot.localTime === "10:00"));
-  assert.ok(!activeHold.some((slot) => slot.localTime === "10:00"));
+  assert.ok(pendingBooking.some((slot) => slot.localTime === "10:00"));
+  assert.ok(!confirmedBooking.some((slot) => slot.localTime === "10:00"));
 });
 
 test("buffers, notice windows and booking horizon are enforced", () => {
@@ -384,7 +367,6 @@ test("calendar marks regular closed weekdays and all-day closures as days off", 
     weeklyHours: mondayClosed,
     closures: [],
     bookings: [],
-    holds: [],
     now: "2026-05-01T10:00:00Z",
     minimumDate: "2026-05-01",
     maximumDate: "2026-06-30",
@@ -409,7 +391,6 @@ test("calendar distinguishes available, fully booked and outside-window days", (
     weeklyHours: weeklyHours("10:00", "11:00"),
     closures: [],
     bookings: [],
-    holds: [],
     now: "2026-05-01T10:00:00Z",
     minimumDate: "2026-05-01",
     maximumDate: "2026-06-30",
@@ -455,7 +436,6 @@ test("calendar keeps partially open days available and labels no-slot days unava
       }),
     ],
     bookings: [],
-    holds: [],
     now: "2026-05-01T10:00:00Z",
     minimumDate: "2026-05-01",
     maximumDate: "2026-06-30",

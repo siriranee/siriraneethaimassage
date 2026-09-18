@@ -188,8 +188,11 @@ function assertPersistenceReady(repository: CmsRepository) {
 async function findSlot(
   repository: CmsRepository,
   input: Pick<BookingInput, "serviceId" | "therapistId" | "durationMinutes" | "localDate" | "localTime">,
-  excludedBookingId?: string,
-  existingAppointment = false,
+  options: {
+    readonly excludedBookingId?: string;
+    readonly existingAppointment?: boolean;
+    readonly ignoreBookingOccupancy?: boolean;
+  } = {},
 ) {
   const content = await repository.getContent();
   const service = content.services.find(
@@ -227,26 +230,29 @@ async function findSlot(
   }
 
   const now = new Date().toISOString();
-  const { bookings, holds, closures } =
+  const { bookings, closures } =
     await readTransactionalAvailability(
       repository,
       input.localDate,
-      now,
     );
   const slots = getAvailabilitySlots({
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
     therapistId: therapist?.id,
-    // Existing requests can be handled near their start time. Capacity, hours,
-    // therapist eligibility and the prohibition on past slots still apply.
-    settings: existingAppointment
+    // Existing requests can be handled near their start time. Opening hours,
+    // closures, therapist eligibility and the prohibition on past slots still
+    // apply; a pure confirmation can separately bypass booking occupancy below.
+    settings: options.existingAppointment
       ? { ...content.bookingSettings, minimumNoticeMinutes: 0 }
       : content.bookingSettings,
     now,
     weeklyHours: content.site.weeklyHours,
     closures,
-    bookings: bookings.filter((booking) => booking.id !== excludedBookingId),
-    holds,
+    bookings: options.ignoreBookingOccupancy
+      ? []
+      : bookings.filter(
+          (booking) => booking.id !== options.excludedBookingId,
+        ),
   });
   const slot = slots.find((item) => item.localTime === input.localTime);
 
@@ -302,9 +308,8 @@ export async function getAdminAvailability(input: {
     );
   }
 
-  const [bookings, holds, closures] = await Promise.all([
-    repository.listBookingOccupancy(input.localDate, input.localDate),
-    repository.listActiveHolds(new Date().toISOString()),
+  const [bookings, closures] = await Promise.all([
+    repository.listConfirmedBookingOccupancy(input.localDate, input.localDate),
     repository.listClosures(input.localDate, input.localDate),
   ]);
 
@@ -316,7 +321,6 @@ export async function getAdminAvailability(input: {
     weeklyHours: content.site.weeklyHours,
     closures,
     bookings,
-    holds,
   });
 }
 
@@ -393,13 +397,11 @@ export async function createAdminBooking(
       timezone: "Europe/Dublin",
       status: input.status,
       source: input.source,
-      capacityExpiresAt: "",
       assignedStaffId: therapist?.id ?? "",
       assignedStaffName: therapist?.name ?? "",
       internalNotes: input.internalNotes,
       privacyAcceptedAt: "",
       privacyNoticeVersion: "admin-captured",
-      holdTokenHash: "",
       idempotencyKeyHash,
       requestFingerprintHash,
       demo: repository.mode === "mock",
@@ -550,6 +552,11 @@ export async function updateAdminBooking(
     if (
       appointmentChanged && (status === "pending" || status === "confirmed")
     ) {
+      const confirmingExistingRequest =
+        current.status === "pending" &&
+        status === "confirmed" &&
+        !timeChanged &&
+        !assignmentChanged;
       const result = await findSlot(
         transaction,
         {
@@ -559,8 +566,14 @@ export async function updateAdminBooking(
           localDate: nextDate,
           localTime: nextTime,
         },
-        current.id,
-        !timeChanged,
+        {
+          excludedBookingId: current.id,
+          existingAppointment: !timeChanged,
+          // Pending requests do not reserve capacity. Staff can therefore
+          // approve multiple already-received requests for the same time.
+          // Hours, closures, therapist eligibility and past dates still apply.
+          ignoreBookingOccupancy: confirmingExistingRequest,
+        },
       );
       startsAt = result.slot.startsAt;
       endsAt = result.slot.endsAt;
@@ -574,7 +587,6 @@ export async function updateAdminBooking(
       localDate: nextDate,
       localTime: nextTime,
       status,
-      capacityExpiresAt: "",
       assignedStaffId: nextTherapistId,
       assignedStaffName,
       internalNotes,
@@ -707,12 +719,13 @@ async function assertClosureHasNoBookingConflict(
   input: ClosureInput,
 ) {
   if (!input.active) return;
-  const bookings = await repository.listBookingOccupancy(input.localDate, input.localDate);
-  const nowIso = new Date().toISOString();
+  const bookings = await repository.listBookingOccupancy(
+    input.localDate,
+    input.localDate,
+  );
   const active = bookings.filter(
     (booking) =>
-      (booking.status === "pending" || booking.status === "confirmed") &&
-      (!booking.expiresAt || booking.expiresAt > nowIso),
+      booking.status === "pending" || booking.status === "confirmed",
   );
   if (!active.length) return;
 

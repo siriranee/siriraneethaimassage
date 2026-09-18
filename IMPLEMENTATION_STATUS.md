@@ -52,12 +52,12 @@ Updated: 3 September 2026
   JSON, validation, rate limiting, idempotency and encrypted customer details.
 - Privacy-preserving booking-status lookup by booking ID or reference; it
   exposes status copy only and keeps identifiers out of page URLs.
-- Fully booked capacity checks with pending-hold expiry, closures, buffers,
-  notice period, booking horizon and Europe/Dublin daylight-saving handling.
+- Confirmed-booking capacity checks with closures, buffers, notice period,
+  booking horizon and Europe/Dublin daylight-saving handling. Pending requests
+  remain available for staff review without reserving a public time slot.
 - Customers never see, submit or select a therapist, and booking management has
   no staff-assignment workflow. Privileged staff, calendar and price fields are
   rejected by the public booking API.
-- Expired pending requests release capacity and are clearly flagged in the CMS.
 - Automated TypeScript, lint, content, environment, availability, permission,
   security-contract and production-build checks.
 - Sticky CMS navbar and responsive left navigation drawer. Retired CMS Pages,
@@ -92,7 +92,7 @@ Updated: 3 September 2026
   transfer wording.
 - Owner confirmation of the Resend sender domain and recipient address through
   a real production test email.
-- Booking response-time, failed-email review and expired-request procedures.
+- Booking response-time, failed-email review and pending-request follow-up procedures.
 - Production hosting access to the verified Cloudinary credentials, signed
   upload preset, provider retention policy and final image approval workflow.
 - Automated backup frequency, retention and restore-test schedule.
@@ -124,7 +124,7 @@ still need verification after the production deployment.
 2. Configure hosting with the verified MongoDB and Cloudinary accounts, Resend
    API key, verified sender and owner recipient, then configure monitoring.
 3. Approve the final privacy notice and retention schedule.
-4. Establish failed-email review, response-time and expired-request procedures.
+4. Establish failed-email review, response-time and pending-request follow-up procedures.
 5. Configure automated encrypted backups and complete an isolated restore drill.
 6. Replace initial test access with unique, high-entropy production
    administrator credentials without retaining plaintext passwords.

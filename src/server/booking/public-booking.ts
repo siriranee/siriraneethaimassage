@@ -214,11 +214,10 @@ export async function createPublicBooking(
         );
       }
 
-      const { bookings, holds, closures } =
+      const { bookings, closures } =
         await readTransactionalAvailability(
           transaction,
           localDate,
-          new Date().toISOString(),
         );
       const slot = getAvailabilitySlots({
         localDate,
@@ -228,7 +227,6 @@ export async function createPublicBooking(
         weeklyHours: content.site.weeklyHours,
         closures,
         bookings,
-        holds,
       }).find((item) => item.localTime === localTime);
 
       if (!slot) {
@@ -260,13 +258,11 @@ export async function createPublicBooking(
         timezone: "Europe/Dublin",
         status: "pending",
         source: "website",
-        capacityExpiresAt: "",
         assignedStaffId: therapist.id,
         assignedStaffName: therapist.name,
         internalNotes: "Website request awaiting internal confirmation.",
         privacyAcceptedAt: now,
         privacyNoticeVersion: bookingPrivacyNotice.version,
-        holdTokenHash: "",
         idempotencyKeyHash,
         requestFingerprintHash,
         demo: false,

@@ -65,7 +65,7 @@ async function main() {
             await repository.saveContent(prepared, content.revision);
             await repository.savePublication({ id: "safety-second-publication", revision: prepared.revision, publishedAt: new Date().toISOString(), publishedBy: fixture.actor.id, snapshot: prepared });
             // Precreate empty collections so the test isolates document-lock races.
-            for (const name of ["cmsTherapistLocks", "cmsBookingDayLocks", "cmsBookings", "cmsBookingHolds", "cmsClosures", "cmsBookingNotifications", "cmsAuditEvents"]) {
+            for (const name of ["cmsTherapistLocks", "cmsBookingDayLocks", "cmsBookings", "cmsClosures", "cmsBookingNotifications", "cmsAuditEvents"]) {
               if (!(await database.listCollections({ name }).toArray()).length) await database.createCollection(name);
             }
 

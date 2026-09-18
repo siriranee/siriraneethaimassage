@@ -1,4 +1,4 @@
 export const bookingPrivacyNotice = {
-  version: "2026-09-16",
-  updatedLabel: "16 September 2026",
+  version: "2026-09-18",
+  updatedLabel: "18 September 2026",
 } as const;

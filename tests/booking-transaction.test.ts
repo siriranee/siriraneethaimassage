@@ -20,22 +20,18 @@ test("transactional availability reads never overlap on one session", async () =
 
   const result = await readTransactionalAvailability(
     {
-      listBookingOccupancy: () => trackedRead("bookings"),
-      listActiveHolds: () => trackedRead("holds"),
+      listConfirmedBookingOccupancy: () => trackedRead("bookings"),
       listClosures: () => trackedRead("closures"),
     },
     "2026-09-03",
-    "2026-09-03T08:00:00Z",
   );
 
   assert.equal(maximumActiveReads, 1);
   assert.deepEqual(events, [
     "bookings:start",
     "bookings:end",
-    "holds:start",
-    "holds:end",
     "closures:start",
     "closures:end",
   ]);
-  assert.deepEqual(result, { bookings: [], holds: [], closures: [] });
+  assert.deepEqual(result, { bookings: [], closures: [] });
 });

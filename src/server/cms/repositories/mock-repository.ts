@@ -4,7 +4,6 @@ import type {
   CmsAuditEvent,
   CmsBooking,
   CmsFutureTherapistBooking,
-  CmsBookingHold,
   CmsBookingNotification,
   CmsEmailDeliveryEvent,
   CmsBookingQuery,
@@ -45,7 +44,6 @@ type MockState = {
   audit: CmsAuditEvent[];
   bookings: CmsBooking[];
   closures: CmsClosure[];
-  holds: CmsBookingHold[];
   notifications: CmsBookingNotification[];
   emailDeliveryEvents: CmsEmailDeliveryEvent[];
 };
@@ -68,14 +66,6 @@ function normaliseBooking(booking: CmsBooking): CmsBooking {
       typeof booking.assignedStaffName === "string"
         ? booking.assignedStaffName
         : "",
-  };
-}
-
-function normaliseHold(hold: CmsBookingHold): CmsBookingHold {
-  return {
-    ...hold,
-    assignedStaffId:
-      typeof hold.assignedStaffId === "string" ? hold.assignedStaffId : "",
   };
 }
 
@@ -112,7 +102,6 @@ function createState(): MockState {
     audit: [],
     bookings: [...createMockBookings()],
     closures: [],
-    holds: [],
     notifications: [],
     emailDeliveryEvents: [],
   };
@@ -524,7 +513,29 @@ export class MockCmsRepository implements CmsRepository {
           startsAt: booking.startsAt,
           endsAt: booking.endsAt,
           status: booking.status,
-          expiresAt: booking.capacityExpiresAt || "",
+          assignedStaffId:
+            typeof booking.assignedStaffId === "string"
+              ? booking.assignedStaffId
+              : "",
+        })),
+    );
+  }
+
+  async listConfirmedBookingOccupancy(from: string, to: string) {
+    return clone(
+      this.state.bookings
+        .filter(
+          (booking) =>
+            booking.status === "confirmed" &&
+            booking.localDate >= from &&
+            booking.localDate <= to,
+        )
+        .map((booking) => ({
+          id: booking.id,
+          localDate: booking.localDate,
+          startsAt: booking.startsAt,
+          endsAt: booking.endsAt,
+          status: booking.status,
           assignedStaffId:
             typeof booking.assignedStaffId === "string"
               ? booking.assignedStaffId
@@ -756,28 +767,6 @@ export class MockCmsRepository implements CmsRepository {
       await this.reconcileEmailDeliveryEvents(notification.providerMessageId);
     }
     return true;
-  }
-
-  async listActiveHolds(nowIso: string) {
-    return clone(
-      this.state.holds
-        .filter(
-          (hold) => hold.status === "active" && hold.expiresAt > nowIso,
-        )
-        .map(normaliseHold),
-    );
-  }
-
-  async findHoldByTokenHash(tokenHash: string) {
-    const hold = this.state.holds.find((item) => item.tokenHash === tokenHash);
-    return clone(hold ? normaliseHold(hold) : null);
-  }
-
-  async saveHold(hold: CmsBookingHold) {
-    const index = this.state.holds.findIndex((item) => item.id === hold.id);
-    if (index >= 0) this.state.holds[index] = clone(hold);
-    else this.state.holds.push(clone(hold));
-    return clone(hold);
   }
 
   async lockBookingDate(localDate: string) {

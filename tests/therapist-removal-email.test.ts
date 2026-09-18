@@ -49,9 +49,9 @@ async function fixture() {
     serviceId: "thai", serviceSlug: "traditional-thai", serviceName: "Original Thai Massage", durationMinutes: 60,
     priceCents: 6500, currency: "EUR", localDate: "2026-10-01", localTime: "11:00", timezone: "Europe/Dublin",
     startsAt: "2026-10-01T10:00:00.000Z", endsAt: "2026-10-01T11:00:00.000Z", source: "website",
-    capacityExpiresAt: "", assignedStaffId: team[0].id, assignedStaffName: team[0].name,
+    assignedStaffId: team[0].id, assignedStaffName: team[0].name,
     internalNotes: "Private internal note", privacyAcceptedAt: "2026-09-17T10:00:00.000Z", privacyNoticeVersion: "2026-09-01",
-    holdTokenHash: "private-hold", idempotencyKeyHash: "private-key", requestFingerprintHash: "private-fingerprint", demo: false,
+    idempotencyKeyHash: "private-key", requestFingerprintHash: "private-fingerprint", demo: false,
     createdAt: "2026-09-17T10:00:00.000Z", updatedAt: "2026-09-17T10:00:00.000Z", updatedBy: "test",
   };
   const reassigned: CmsBooking = { ...original, version: 3, assignedStaffId: team[1].id, assignedStaffName: team[1].name,
@@ -93,8 +93,8 @@ test("combined reassignment and reschedule sends the previous therapist only the
   assert.doesNotMatch(f.requests[0].payload.text!, /New Oil Massage|14:00|90 minutes/);
   assert.deepEqual(f.requests[1].payload.to, ["therapist-1@example.test"]);
   assert.match(f.requests[1].payload.text!, /New Oil Massage|14:00|90 minutes/);
-  assert.doesNotMatch(JSON.stringify(f.notifications), /Private Customer|private@example|Private internal|Private customer|private-hold/);
-  assert.doesNotMatch(JSON.stringify(f.requests), /Private Customer|private@example|Private internal|Private customer|private-hold/);
+  assert.doesNotMatch(JSON.stringify(f.notifications), /Private Customer|private@example|Private internal|Private customer|private-key/);
+  assert.doesNotMatch(JSON.stringify(f.requests), /Private Customer|private@example|Private internal|Private customer|private-key/);
   await f.service.deliverTherapistBookingEmail(f.repository, f.reassigned, f.removal, f.options);
   assert.equal(f.requests.length, 2, "accepted removal must not be sent twice");
 });

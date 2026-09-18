@@ -4,7 +4,6 @@ import type {
   CmsAuditEvent,
   CmsBooking,
   CmsFutureTherapistBooking,
-  CmsBookingHold,
   CmsBookingNotification,
   CmsEmailDeliveryEvent,
   CmsBookingOccupancy,
@@ -108,6 +107,10 @@ export interface CmsRepository {
     from: string,
     to: string,
   ): Promise<readonly CmsBookingOccupancy[]>;
+  listConfirmedBookingOccupancy(
+    from: string,
+    to: string,
+  ): Promise<readonly CmsBookingOccupancy[]>;
   listFutureActiveTherapistBookings(
     therapistId: string,
     afterIso: string,
@@ -160,10 +163,6 @@ export interface CmsRepository {
     notification: CmsBookingNotification,
     claimId: string,
   ): Promise<boolean>;
-
-  listActiveHolds(nowIso: string): Promise<readonly CmsBookingHold[]>;
-  findHoldByTokenHash(tokenHash: string): Promise<CmsBookingHold | null>;
-  saveHold(hold: CmsBookingHold): Promise<CmsBookingHold>;
 
   lockBookingDate(localDate: string): Promise<void>;
   /** Serialize therapist changes and assignments inside a transaction, before date locks. */

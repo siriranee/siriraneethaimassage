@@ -36,8 +36,8 @@ async function setup(status: CmsBooking["status"] = "confirmed") {
     customer: { name: "Fictional Customer", phone: "+353000000", email: "private@example.test", notes: "Private customer note" },
     serviceId: "test-service", serviceSlug: "test-service", serviceName: "Test Treatment", durationMinutes: 60, priceCents: 6500, currency: "EUR",
     startsAt: "2026-09-19T10:00:00.000Z", endsAt: "2026-09-19T11:00:00.000Z", localDate: "2026-09-19", localTime: "11:00", timezone: "Europe/Dublin",
-    source: "website", capacityExpiresAt: "", assignedStaffId: "test-therapist", assignedStaffName: "Test Therapist", internalNotes: "Private internal note",
-    privacyAcceptedAt: "", privacyNoticeVersion: "", holdTokenHash: "", idempotencyKeyHash: "", requestFingerprintHash: "",
+    source: "website", assignedStaffId: "test-therapist", assignedStaffName: "Test Therapist", internalNotes: "Private internal note",
+    privacyAcceptedAt: "", privacyNoticeVersion: "", idempotencyKeyHash: "", requestFingerprintHash: "",
     createdAt: failed.createdAt, updatedAt: failed.updatedAt, updatedBy: "test",
   });
   await repository.saveNotification(failed);

@@ -11,7 +11,7 @@ function candidate(id: string, overrides: Partial<AssignmentCandidate> = {}): As
   return {
     id, reference: `SRN-TEST-${id}`, status: "confirmed", serviceId: "treatment", durationMinutes: 60,
     localDate: "2099-01-10", localTime: "11:00", startsAt: "2099-01-10T11:00:00.000Z", endsAt: "2099-01-10T12:00:00.000Z",
-    version: 3, assignedStaffId: "", capacityExpiresAt: "", ...overrides,
+    version: 3, assignedStaffId: "", ...overrides,
   };
 }
 
@@ -29,14 +29,13 @@ function setup(initial = [candidate("one")]) {
   const operations: string[] = [];
   const repository: AssignmentRepository = {
     readContent: async () => content,
-    listCandidates: async () => stored.map(({ id, reference, status, serviceId, durationMinutes, localDate, localTime, startsAt, endsAt, version, assignedStaffId, capacityExpiresAt }) => ({ id, reference, status, serviceId, durationMinutes, localDate, localTime, startsAt, endsAt, version, assignedStaffId, capacityExpiresAt })),
+    listCandidates: async () => stored.map(({ id, reference, status, serviceId, durationMinutes, localDate, localTime, startsAt, endsAt, version, assignedStaffId }) => ({ id, reference, status, serviceId, durationMinutes, localDate, localTime, startsAt, endsAt, version, assignedStaffId })),
     lockTherapist: async (id) => { operations.push(`therapist:${id}`); },
     lockBookingDate: async (date) => { operations.push(`date:${date}`); },
     listBookingOccupancy: async (from) => stored.filter((booking) => booking.localDate === from).map((booking) => ({
       id: booking.id, startsAt: booking.startsAt, endsAt: booking.endsAt, localDate: booking.localDate, status: booking.status,
-      assignedStaffId: booking.assignedStaffId ?? "", expiresAt: booking.capacityExpiresAt ?? "",
+      assignedStaffId: booking.assignedStaffId ?? "",
     })),
-    listActiveHolds: async () => [],
     listClosures: async () => [],
     assign: async (booking, therapist) => {
       operations.push(`assign:${booking.id}`);
@@ -63,21 +62,20 @@ test("assignment dry run is read-only, PII-free and includes submitted pending b
     candidate("one"), candidate("cancelled", { status: "cancelled" }),
     candidate("past", { endsAt: "2098-01-01T10:00:00.000Z" }),
     candidate("assigned", { assignedStaffId: "another-therapist" }),
-    candidate("legacy-pending", {
+    candidate("pending", {
       status: "pending",
-      capacityExpiresAt: "2098-01-01T10:00:00.000Z",
       localTime: "13:00",
       startsAt: "2099-01-10T13:00:00.000Z",
       endsAt: "2099-01-10T14:00:00.000Z",
     }),
   ]);
   // Irrelevant fixture rows deliberately overlap. Submitted pending bookings
-  // remain active candidates even if an old record still has an expiry value.
+  // remain active candidates until staff resolves them.
   const result = await fixture.run({ therapistId });
   assert.equal(result.count, 2);
   assert.deepEqual(result.bookings.map((booking) => booking.reference), [
-    "SRN-TEST-legacy-pending",
     "SRN-TEST-one",
+    "SRN-TEST-pending",
   ]);
   assert.deepEqual(fixture.operations, []);
   assert.deepEqual(fixture.audits(), []);
@@ -85,10 +83,10 @@ test("assignment dry run is read-only, PII-free and includes submitted pending b
   assert.equal(result.emailsSent, 0);
 });
 
-test("missing and null assignment qualify, including pending bookings with legacy expiry data", () => {
+test("missing and null assignment qualify, including pending bookings", () => {
   assert.equal(isAssignmentCandidate(candidate("a", { assignedStaffId: null }), now), true);
   assert.equal(isAssignmentCandidate(candidate("a", { assignedStaffId: undefined }), now), true);
-  assert.equal(isAssignmentCandidate(candidate("a", { status: "pending", capacityExpiresAt: now }), now), true);
+  assert.equal(isAssignmentCandidate(candidate("a", { status: "pending" }), now), true);
   assert.equal(isAssignmentCandidate(candidate("a", { status: "completed" }), now), false);
 });
 
@@ -146,7 +144,7 @@ test("the entire batch is revalidated before writes if availability changed afte
   const fixture = setup();
   const plan = await fixture.run({ therapistId });
   fixture.repository.listBookingOccupancy = async () => [
-    { id: "other", localDate: "2099-01-10", startsAt: "2099-01-10T11:00:00Z", endsAt: "2099-01-10T12:00:00Z", status: "confirmed", assignedStaffId: therapistId, expiresAt: "" },
+    { id: "other", localDate: "2099-01-10", startsAt: "2099-01-10T11:00:00Z", endsAt: "2099-01-10T12:00:00Z", status: "confirmed", assignedStaffId: therapistId },
   ] satisfies CmsBookingOccupancy[];
   await assert.rejects(fixture.run({ therapistId, apply: true, expectedPlan: plan.planHash }), /conflicts/);
   assert.ok(!fixture.operations.some((operation) => operation.startsWith("assign:")));

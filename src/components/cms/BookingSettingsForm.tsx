@@ -54,7 +54,6 @@ export function BookingSettingsForm({
       bookingHorizonDays: Number(data.get("bookingHorizonDays")),
       bufferBeforeMinutes: Number(data.get("bufferBeforeMinutes")),
       bufferAfterMinutes: Number(data.get("bufferAfterMinutes")),
-      holdMinutes: settings.holdMinutes,
       cancellationCutoffMinutes: settings.cancellationCutoffMinutes,
       provisionalNotice: data.get("provisionalNotice"),
     };

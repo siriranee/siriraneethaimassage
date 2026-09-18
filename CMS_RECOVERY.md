@@ -52,11 +52,10 @@ The current application uses:
 - cmsBookings
 - cmsBookingNotifications
 - cmsClosures
-- cmsBookingHolds
 - cmsBookingDayLocks
 - cmsMediaAssets
 
-TTL indexes may remove expired sessions, login attempts and booking holds.
+TTL indexes may remove expired sessions and login attempts.
 Audit events are retained for 365 days from creation and then expire through a
 TTL index. A logical backup is therefore a point-in-time operational snapshot,
 not a permanent history of expired records.

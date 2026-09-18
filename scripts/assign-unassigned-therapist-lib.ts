@@ -8,10 +8,10 @@ import type { CmsRepository } from "../src/server/cms/repositories/repository";
 export type AssignmentCandidate = Pick<CmsBooking,
   "id" | "reference" | "status" | "serviceId" | "durationMinutes" |
   "localDate" | "localTime" | "startsAt" | "endsAt" | "version"
-> & { readonly assignedStaffId?: string | null; readonly capacityExpiresAt?: string | null };
+> & { readonly assignedStaffId?: string | null };
 
 export type AssignmentRepository = Pick<CmsRepository,
-  "lockTherapist" | "lockBookingDate" | "listBookingOccupancy" | "listActiveHolds" | "listClosures"
+  "lockTherapist" | "lockBookingDate" | "listBookingOccupancy" | "listClosures"
 > & {
   readContent(): Promise<CmsContentState>;
   listCandidates(now: string): Promise<readonly AssignmentCandidate[]>;
@@ -60,7 +60,6 @@ export async function assignUnassignedTherapist(
     // Do not parallelize operations sharing a MongoDB transaction session.
     const occupancy = (await repository.listBookingOccupancy(date, date)).map((booking) =>
       candidateIds.has(booking.id) ? { ...booking, assignedStaffId: therapist.id } : booking);
-    const holds = await repository.listActiveHolds(now);
     const closures = await repository.listClosures(date, date);
     for (const booking of candidates.filter((candidate) => candidate.localDate === date)) {
       if (!Number.isInteger(booking.version) || booking.version < 1 || !therapist.serviceIds.includes(booking.serviceId)) {
@@ -73,7 +72,7 @@ export async function assignUnassignedTherapist(
         settings: { ...content.bookingSettings, minimumNoticeMinutes: 0 },
         weeklyHours: content.site.weeklyHours,
         bookings: occupancy.filter((candidate) => candidate.id !== booking.id),
-        holds, closures, now,
+        closures, now,
       });
       const slot = slots.find((candidate) => candidate.localTime === booking.localTime);
       if (!slot || Date.parse(slot.startsAt) !== Date.parse(booking.startsAt) || Date.parse(slot.endsAt) !== Date.parse(booking.endsAt)) {

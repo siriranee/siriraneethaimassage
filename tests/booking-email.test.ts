@@ -42,13 +42,11 @@ function booking(overrides: Partial<CmsBooking> = {}): CmsBooking {
     timezone: "Europe/Dublin",
     status: "pending",
     source: "website",
-    capacityExpiresAt: "",
     assignedStaffId: "",
     assignedStaffName: "",
     internalNotes: "Never include this internal note.",
     privacyAcceptedAt: "2026-09-03T10:00:00.000Z",
     privacyNoticeVersion: "2026-09-03",
-    holdTokenHash: "secret-hold-hash",
     idempotencyKeyHash: "secret-idempotency-hash",
     requestFingerprintHash: "secret-fingerprint-hash",
     demo: false,
@@ -101,7 +99,6 @@ test("owner booking email renders Thai first and English second with complete op
 
   for (const forbidden of [
     "Never include this internal note.",
-    "secret-hold-hash",
     "secret-idempotency-hash",
     "secret-fingerprint-hash",
   ]) {
@@ -214,7 +211,6 @@ test("customer confirmation email contains safe appointment and public business 
     "Quiet room if possible.",
     "Never include this internal note.",
     "11111111-2222-4333-8444-555555555555",
-    "secret-hold-hash",
     "secret-idempotency-hash",
     "secret-fingerprint-hash",
     "Open booking in CMS",
@@ -283,7 +279,6 @@ test("customer cancellation email clearly closes the appointment without exposin
     "Quiet room if possible.",
     "Never include this internal note.",
     "11111111-2222-4333-8444-555555555555",
-    "secret-hold-hash",
     "secret-idempotency-hash",
     "secret-fingerprint-hash",
     "Open booking in CMS",
@@ -345,7 +340,6 @@ test("therapist schedule emails contain appointment details but no customer iden
       "Quiet room if possible.",
       "Never include this internal note.",
       "11111111-2222-4333-8444-555555555555",
-      "secret-hold-hash",
       "secret-idempotency-hash",
       "secret-fingerprint-hash",
     ]) {

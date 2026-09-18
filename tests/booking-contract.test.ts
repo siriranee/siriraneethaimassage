@@ -192,9 +192,10 @@ test("booking settings use the API response contract and gate public enablement"
   assert.match(form, /bookingSettings\?: CmsBookingSettings/);
   assert.doesNotMatch(form, /settings\?: CmsBookingSettings/);
   assert.match(form, /disabled=\{!canEnablePublicBooking\}/);
-  assert.match(form, /holdMinutes:\s*settings\.holdMinutes/);
+  assert.doesNotMatch(form, /holdMinutes/);
+  assert.doesNotMatch(validation, /integer\(source\.holdMinutes/);
+  assert.match(validation, /delete currentWithoutLegacyHold\.holdMinutes/);
   assert.match(form, /cancellationCutoffMinutes:\s*settings\.cancellationCutoffMinutes/);
-  assert.doesNotMatch(form, /name="holdMinutes"/);
   assert.doesNotMatch(form, /name="cancellationCutoffMinutes"/);
   assert.match(validation, /publicBookingEnabled[\s\S]*?!rulesConfirmed \|\| !openingHoursConfirmed/);
   assert.match(readiness, /getCmsMode\(\) === "mongodb"/);
@@ -226,6 +227,8 @@ test("booking mutations validate therapist assignment and unsafe initial statuse
   assert.match(service, /assignedStaffId:\s*therapist\?\.id \?\? ""/);
   assert.match(service, /status === "confirmed" && !therapist/);
   assert.match(service, /assignmentChanged/);
+  assert.match(service, /confirmingExistingRequest/);
+  assert.match(service, /ignoreBookingOccupancy:\s*confirmingExistingRequest/);
 });
 
 test("therapist lifecycle checks use a bounded-data future assignment query", async () => {
@@ -597,13 +600,13 @@ test("month availability uses one bounded repository read per operational source
 
   assert.match(
     availability,
-    /listBookingOccupancy\(firstDate\.toString\(\), lastDate\.toString\(\)\)/,
+    /listConfirmedBookingOccupancy\([\s\S]*?firstDate\.toString\(\),[\s\S]*?lastDate\.toString\(\)/,
   );
   assert.match(
     availability,
     /listClosures\(firstDate\.toString\(\), lastDate\.toString\(\)\)/,
   );
-  assert.match(availability, /listActiveHolds\(now\.toString\(\)\)/);
+  assert.doesNotMatch(availability, /listActiveHolds|cmsBookingHolds/);
   assert.match(route, /Cache-Control/);
   assert.match(route, /no-store/);
 });

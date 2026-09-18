@@ -58,7 +58,6 @@ const bookingSettings: CmsBookingSettings = {
   bookingHorizonDays: 60,
   bufferBeforeMinutes: 0,
   bufferAfterMinutes: 0,
-  holdMinutes: 10,
   cancellationCutoffMinutes: 1440,
   provisionalNotice:
     "These booking rules are mock values and must be confirmed by the owner before public date and time booking is enabled.",

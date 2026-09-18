@@ -80,16 +80,53 @@ test("existing future requests confirm inside the notice window, but a reschedul
   await assert.rejects(createAdminBooking({ ...fixture.input, localTime: "14:00" }, fixture.context), /outside opening hours, blocked or fully booked/);
 });
 
-test("confirmation still rejects past appointments, therapist conflicts, closures and unavailable therapists", async (t) => {
+test("overlapping pending requests can both be confirmed for their original time", async () => {
+  const fixture = await setup();
+  const {
+    createAdminBooking,
+    getAdminAvailability,
+    updateAdminBooking,
+  } = await import("@/server/cms/booking-service");
+  const first = await createAdminBooking(fixture.input, fixture.context);
+  const second = await createAdminBooking(
+    { ...fixture.input, customerName: "Demo Second Safety Guest" },
+    fixture.context,
+  );
+
+  const firstConfirmed = await updateAdminBooking(
+    first.id,
+    { status: "confirmed", changeReason: "customer-request" },
+    first.version,
+    fixture.context,
+  );
+  const secondConfirmed = await updateAdminBooking(
+    second.id,
+    { status: "confirmed", changeReason: "customer-request" },
+    second.version,
+    fixture.context,
+  );
+
+  assert.equal(firstConfirmed.status, "confirmed");
+  assert.equal(secondConfirmed.status, "confirmed");
+  assert.equal(firstConfirmed.startsAt, secondConfirmed.startsAt);
+  assert.equal(firstConfirmed.assignedStaffId, secondConfirmed.assignedStaffId);
+  const availability = await getAdminAvailability({
+    serviceId: fixture.service.id,
+    therapistId: fixture.therapist.id,
+    durationMinutes: 60,
+    localDate: fixture.localDate,
+  });
+  assert.ok(!availability.some((slot) => slot.localTime === fixture.input.localTime));
+});
+
+test("confirmation still rejects past appointments, closures and unavailable therapists", async (t) => {
   const { createAdminBooking, updateAdminBooking } = await import("@/server/cms/booking-service");
-  for (const blocker of ["past", "therapist-conflict", "closure", "inactive-therapist"]) {
+  for (const blocker of ["past", "closure", "inactive-therapist"]) {
     await t.test(blocker, async () => {
       const fixture = await setup();
       let booking = await createAdminBooking(fixture.input, fixture.context);
       if (blocker === "past") {
         booking = await fixture.repository.saveBooking({ ...booking, localDate: "2000-01-01", startsAt: "2000-01-01T12:00:00Z", endsAt: "2000-01-01T13:00:00Z" }, booking.version);
-      } else if (blocker === "therapist-conflict") {
-        await fixture.repository.saveBooking({ ...booking, id: "conflicting-booking", reference: "SRN-CONFLICT", status: "confirmed", idempotencyKeyHash: "conflicting-idempotency" });
       } else if (blocker === "closure") {
         await fixture.repository.saveClosure({ id: "safety-closure", localDate: fixture.localDate, closedAllDay: true, startsAtLocal: "", endsAtLocal: "", reason: "Test closure", publicLabel: "Closed", active: true, version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), updatedBy: fixture.actor.id });
       } else {
@@ -194,20 +231,6 @@ test("therapist deletion removes every assigned booking atomically and preserves
     targetTeamMemberId: otherTherapist.id,
     providerMessageId: "unrelated-provider-message",
   });
-  await fixture.repository.saveHold({
-    id: "assigned-therapist-hold",
-    tokenHash: "assigned-hold-token",
-    serviceId: fixture.service.id,
-    durationMinutes: 60,
-    startsAt: assigned.startsAt,
-    endsAt: assigned.endsAt,
-    localDate: assigned.localDate,
-    assignedStaffId: fixture.therapist.id,
-    status: "active",
-    expiresAt: "2099-01-01T00:00:00.000Z",
-    createdAt: new Date().toISOString(),
-  });
-
   const expectedReferences = [historical.reference, assigned.reference];
   assert.deepEqual(
     await getCmsTeamDeletionImpact(fixture.therapist.id),
@@ -245,14 +268,13 @@ test("therapist deletion removes every assigned booking atomically and preserves
   assert.equal((await fixture.repository.getBooking(unrelated.id))?.assignedStaffId, otherTherapist.id);
   assert.deepEqual(await fixture.repository.listNotifications(assigned.id), []);
   assert.equal((await fixture.repository.listNotifications(unrelated.id)).length, 1);
-  // Separate therapist contact and short-lived capacity holds are retained until
-  // the owner explicitly authorizes deleting those records too.
+  // Separate therapist contact data is retained until the owner explicitly
+  // authorizes deleting that private operational record too.
   assert.equal(
     (await fixture.repository.getTherapistContact(fixture.therapist.id))
       ?.notificationEmail,
     "demo.therapist@example.invalid",
   );
-  assert.ok(await fixture.repository.findHoldByTokenHash("assigned-hold-token"));
   const published = await fixture.repository.getPublishedContent();
   assert.equal(published?.snapshot.team.some(
     (member) => member.id === fixture.therapist.id,

@@ -287,18 +287,6 @@ try {
       { retentionExpiresAtDate: 1 },
       { name: "cms_bookings_retention_ttl", expireAfterSeconds: 0 },
     ),
-    db.collection("cmsBookingHolds").createIndex(
-      { tokenHash: 1 },
-      { name: "cms_holds_token_unique", unique: true },
-    ),
-    db.collection("cmsBookingHolds").createIndex(
-      { expiresAtDate: 1 },
-      { name: "cms_holds_expiry_ttl", expireAfterSeconds: 0 },
-    ),
-    db.collection("cmsBookingHolds").createIndex(
-      { status: 1, expiresAt: 1 },
-      { name: "cms_holds_status_expiry" },
-    ),
     db.collection("cmsClosures").createIndex(
       { localDate: 1, active: 1 },
       { name: "cms_closures_local_date" },

@@ -92,11 +92,6 @@
   gap: 0.35rem;
 }
 
-.expiredHold {
-  color: var(--color-warning) !important;
-  font-weight: 800;
-}
-
 .table code {
   color: var(--color-purple-700);
   font-size: var(--fs-sm);

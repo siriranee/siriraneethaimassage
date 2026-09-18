@@ -555,6 +555,10 @@ export function parseBookingSettingsUpdate(
     value && typeof value === "object"
       ? (value as Record<string, unknown>)
       : {};
+  const currentWithoutLegacyHold = {
+    ...current,
+  } as CmsBookingSettings & { holdMinutes?: unknown };
+  delete currentWithoutLegacyHold.holdMinutes;
   const rulesConfirmed = source.rulesConfirmed === true;
   const publicBookingEnabled = source.publicBookingEnabled === true;
 
@@ -572,7 +576,7 @@ export function parseBookingSettingsUpdate(
   }
 
   return {
-    ...current,
+    ...currentWithoutLegacyHold,
     publicBookingEnabled,
     rulesConfirmed,
     slotIntervalMinutes: integer(
@@ -611,7 +615,6 @@ export function parseBookingSettingsUpdate(
       0,
       120,
     ),
-    holdMinutes: integer(source.holdMinutes, "holdMinutes", 2, 30),
     cancellationCutoffMinutes: integer(
       source.cancellationCutoffMinutes,
       "cancellationCutoffMinutes",

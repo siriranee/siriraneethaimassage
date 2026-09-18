@@ -155,7 +155,6 @@ export type CmsBookingSettings = {
   readonly bookingHorizonDays: number;
   readonly bufferBeforeMinutes: number;
   readonly bufferAfterMinutes: number;
-  readonly holdMinutes: number;
   readonly cancellationCutoffMinutes: number;
   readonly provisionalNotice: string;
   readonly version: number;
@@ -326,14 +325,12 @@ export type CmsBooking = {
   readonly timezone: "Europe/Dublin";
   readonly status: BookingStatus;
   readonly source: BookingSource;
-  readonly capacityExpiresAt: string;
   readonly assignedStaffId: string;
   readonly assignedStaffName: string;
   readonly internalNotes: string;
   readonly lastChangeReason?: BookingChangeReason;
   readonly privacyAcceptedAt: string;
   readonly privacyNoticeVersion: string;
-  readonly holdTokenHash: string;
   readonly idempotencyKeyHash: string;
   readonly requestFingerprintHash: string;
   readonly demo: boolean;
@@ -349,7 +346,6 @@ export type CmsBookingOccupancy = {
   readonly startsAt: string;
   readonly endsAt: string;
   readonly status: BookingStatus;
-  readonly expiresAt: string;
   readonly assignedStaffId: string;
 };
 
@@ -357,20 +353,6 @@ export type CmsFutureTherapistBooking = Pick<
   CmsBooking,
   "reference" | "serviceId"
 >;
-
-export type CmsBookingHold = {
-  readonly id: string;
-  readonly tokenHash: string;
-  readonly serviceId: string;
-  readonly durationMinutes: number;
-  readonly startsAt: string;
-  readonly endsAt: string;
-  readonly localDate: string;
-  readonly assignedStaffId: string;
-  readonly status: "active" | "consumed" | "expired" | "released";
-  readonly expiresAt: string;
-  readonly createdAt: string;
-};
 
 export type CmsClosure = {
   readonly id: string;

@@ -91,11 +91,11 @@ export default async function PrivacyPage() {
           <p>
             Booking records are retained for two years after the appointment and
             then deleted automatically. Operational notification records and CMS
-            audit records are retained for one year. A new pending request reserves
-            appointment capacity for 15 minutes unless it is confirmed; after that,
-            it stops blocking the time slot while the booking record follows the
-            two-year retention period. Provider systems may apply their own
-            documented retention periods.
+            audit records are retained for one year. A pending request does not
+            reserve appointment capacity, so another customer may request the same
+            time before the shop confirms it. Confirmed appointments block new
+            requests according to the shop&apos;s therapist and capacity settings.
+            Provider systems may apply their own documented retention periods.
           </p>
         </section>
 

@@ -78,7 +78,6 @@ export function classifyAvailabilityCalendarDay(
   const unoccupiedSlots = getAvailabilitySlots({
     ...availabilityInput,
     bookings: [],
-    holds: [],
   });
 
   return {

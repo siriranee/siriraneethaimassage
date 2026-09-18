@@ -628,7 +628,6 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.equal(publicBooking.assignedStaffId, primaryTherapist.id);
   assert.equal(publicBooking.assignedStaffName, primaryTherapist.name);
   assert.ok(publicBooking.privacyAcceptedAt);
-  assert.equal(publicBooking.capacityExpiresAt, "");
 
   const idempotentRetry = await createPublicBooking(publicRequest, {
     idempotencyKey: "isolated-public-booking-request-0001",
@@ -654,16 +653,25 @@ test("isolated launch verification covers services, ten bookings and administrat
       ),
     CmsConflictError,
   );
-  await assert.rejects(
-    () =>
-      createPublicBooking(publicRequest, {
-        idempotencyKey: "isolated-public-booking-request-0002",
-        requestId: "isolated-public-booking-capacity-conflict",
-        sendOwnerBookingEmail,
-      }),
-    CmsConflictError,
+  const overlappingPublicBooking = await createPublicBooking(publicRequest, {
+    idempotencyKey: "isolated-public-booking-request-0002",
+    requestId: "isolated-public-booking-overlap",
+    sendOwnerBookingEmail,
+  });
+  assert.equal(overlappingPublicBooking.status, "pending");
+  assert.equal(overlappingPublicBooking.startsAt, publicBooking.startsAt);
+  assert.equal(
+    overlappingPublicBooking.assignedStaffId,
+    publicBooking.assignedStaffId,
   );
-  assert.deepEqual(ownerEmailAttempts, [publicBooking.id]);
+  assert.equal(
+    (await repository.listBookings({ from: publicDate, to: publicDate })).length,
+    2,
+  );
+  assert.deepEqual(ownerEmailAttempts, [
+    publicBooking.id,
+    overlappingPublicBooking.id,
+  ]);
 
   const failedEmailDate = Temporal.PlainDate.from(publicDate)
     .add({ days: 1 })
@@ -739,6 +747,37 @@ test("isolated launch verification covers services, ten bookings and administrat
     context,
   );
   assert.equal(confirmedPublicBooking.status, "confirmed");
+  await assert.rejects(
+    () =>
+      createPublicBooking(publicRequest, {
+        idempotencyKey: "isolated-public-booking-request-0004",
+        requestId: "isolated-public-booking-confirmed-conflict",
+        sendOwnerBookingEmail,
+      }),
+    (error: unknown) =>
+      error instanceof CmsConflictError &&
+      error.message ===
+        "That time has just become unavailable. Please choose another.",
+  );
+  const confirmedOverlappingBooking = await updateAdminBooking(
+    overlappingPublicBooking.id,
+    {
+      status: "confirmed",
+      internalNotes: "",
+      changeReason: "other-operational",
+    },
+    overlappingPublicBooking.version,
+    context,
+  );
+  assert.equal(confirmedOverlappingBooking.status, "confirmed");
+  assert.equal(
+    confirmedOverlappingBooking.startsAt,
+    confirmedPublicBooking.startsAt,
+  );
+  assert.deepEqual(ownerEmailAttempts, [
+    publicBooking.id,
+    overlappingPublicBooking.id,
+  ]);
   const customerNotificationId =
     customerBookingConfirmationEmailNotificationId(publicBooking.id);
   assert.equal(
@@ -886,7 +925,6 @@ test("isolated launch verification covers services, ten bookings and administrat
   const queryNow = Date.now();
   const futureStartsAt = new Date(queryNow + 86_400_000).toISOString();
   const futureEndsAt = new Date(queryNow + 90_000_000).toISOString();
-  const legacyExpiry = new Date(queryNow - 60_000).toISOString();
   const unassignedFixture = {
     ...cancelledPublicBooking,
     id: "isolated-unassigned-active",
@@ -896,16 +934,14 @@ test("isolated launch verification covers services, ten bookings and administrat
     endsAt: futureEndsAt,
     assignedStaffId: "",
     assignedStaffName: "",
-    capacityExpiresAt: "",
     version: 1,
   };
   await repository.saveBooking(unassignedFixture);
   await repository.saveBooking({
     ...unassignedFixture,
-    id: "isolated-unassigned-legacy-pending",
-    reference: "SIR-UNASSIGNED-LEGACY-PENDING",
+    id: "isolated-unassigned-pending",
+    reference: "SIR-UNASSIGNED-PENDING",
     status: "pending",
-    capacityExpiresAt: legacyExpiry,
   });
   await repository.saveBooking({
     ...unassignedFixture,
@@ -926,7 +962,7 @@ test("isolated launch verification covers services, ten bookings and administrat
   ).map((booking) => booking.id);
   assert.deepEqual(attentionBookingIds, [
     unassignedFixture.id,
-    "isolated-unassigned-legacy-pending",
+    "isolated-unassigned-pending",
   ]);
   assert.ok(
     (

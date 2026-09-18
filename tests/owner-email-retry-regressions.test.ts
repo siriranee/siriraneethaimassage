@@ -34,10 +34,10 @@ function booking(): CmsBooking {
     serviceName: "Traditional Thai Massage", durationMinutes: 60, priceCents: 6500, currency: "EUR",
     startsAt: "2026-09-19T10:00:00.000Z", endsAt: "2026-09-19T11:00:00.000Z",
     localDate: "2026-09-19", localTime: "11:00", timezone: "Europe/Dublin",
-    status: "pending", source: "website", capacityExpiresAt: "2026-09-17T10:30:00.000Z",
+    status: "pending", source: "website",
     assignedStaffId: "therapist-a", assignedStaffName: "Therapist A", internalNotes: "",
     privacyAcceptedAt: "2026-09-17T10:00:00.000Z", privacyNoticeVersion: "2026-09-03",
-    holdTokenHash: "", idempotencyKeyHash: "test-hash", requestFingerprintHash: "test-fingerprint",
+    idempotencyKeyHash: "test-hash", requestFingerprintHash: "test-fingerprint",
     demo: false, version: 1, createdAt: "2026-09-17T10:00:00.000Z",
     updatedAt: "2026-09-17T10:00:00.000Z", updatedBy: "public-booking",
   };

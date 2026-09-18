@@ -1,15 +1,13 @@
 import type {
-  CmsBookingHold,
   CmsBookingOccupancy,
   CmsClosure,
 } from "@/domain/cms/types";
 
 type TransactionalAvailabilityReader = {
-  listBookingOccupancy(
+  listConfirmedBookingOccupancy(
     from: string,
     to: string,
   ): Promise<readonly CmsBookingOccupancy[]>;
-  listActiveHolds(nowIso: string): Promise<readonly CmsBookingHold[]>;
   listClosures(from?: string, to?: string): Promise<readonly CmsClosure[]>;
 };
 
@@ -20,11 +18,12 @@ type TransactionalAvailabilityReader = {
 export async function readTransactionalAvailability(
   repository: TransactionalAvailabilityReader,
   localDate: string,
-  nowIso: string,
 ) {
-  const bookings = await repository.listBookingOccupancy(localDate, localDate);
-  const holds = await repository.listActiveHolds(nowIso);
+  const bookings = await repository.listConfirmedBookingOccupancy(
+    localDate,
+    localDate,
+  );
   const closures = await repository.listClosures(localDate, localDate);
 
-  return { bookings, holds, closures } as const;
+  return { bookings, closures } as const;
 }

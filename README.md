@@ -301,8 +301,8 @@ aborts the entire batch. Re-run the dry run afterward to verify no candidates re
 
 This maintenance command preserves appointment times, customer data, notes,
 status and existing email records; it adds an audit event and increments each
-booking version. It sends no email and does not assign past, terminal or expired
-pending bookings. Normal CMS reassignment remains the correct workflow when
+booking version. It sends no email and does not assign past or terminal
+bookings. Normal CMS reassignment remains the correct workflow when
 customers and therapists should receive appointment-change notifications.
 
 Keep capacity at one while the older non-therapist-aware version is live. After

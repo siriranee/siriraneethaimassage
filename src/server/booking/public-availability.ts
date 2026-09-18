@@ -86,9 +86,8 @@ export async function getPublicAvailability(input: {
     };
   }
 
-  const [bookings, holds, closures] = await Promise.all([
-    repository.listBookingOccupancy(input.localDate, input.localDate),
-    repository.listActiveHolds(new Date().toISOString()),
+  const [bookings, closures] = await Promise.all([
+    repository.listConfirmedBookingOccupancy(input.localDate, input.localDate),
     repository.listClosures(input.localDate, input.localDate),
   ]);
   const slots = getAvailabilitySlots({
@@ -99,7 +98,6 @@ export async function getPublicAvailability(input: {
     weeklyHours: content.site.weeklyHours,
     closures,
     bookings,
-    holds,
   }).map((slot) => ({
     slotId: slot.slotId,
     localDate: slot.localDate,
@@ -202,9 +200,11 @@ export async function getPublicAvailabilityCalendar(input: {
   }
 
   const lastDate = firstDate.with({ day: firstDate.daysInMonth });
-  const [bookings, holds, closures] = await Promise.all([
-    repository.listBookingOccupancy(firstDate.toString(), lastDate.toString()),
-    repository.listActiveHolds(now.toString()),
+  const [bookings, closures] = await Promise.all([
+    repository.listConfirmedBookingOccupancy(
+      firstDate.toString(),
+      lastDate.toString(),
+    ),
     repository.listClosures(firstDate.toString(), lastDate.toString()),
   ]);
 
@@ -218,7 +218,6 @@ export async function getPublicAvailabilityCalendar(input: {
       weeklyHours: content.site.weeklyHours,
       closures,
       bookings,
-      holds,
       now: now.toString(),
       minimumDate: minimumDate.toString(),
       maximumDate: maximumDate.toString(),

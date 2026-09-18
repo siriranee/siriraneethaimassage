@@ -11,13 +11,7 @@ export type AvailabilityOccupancy = {
   readonly startsAt: string;
   readonly endsAt: string;
   readonly assignedStaffId?: string;
-  readonly status?:
-    | BookingStatus
-    | "active"
-    | "consumed"
-    | "expired"
-    | "released";
-  readonly expiresAt?: string;
+  readonly status: BookingStatus;
 };
 
 export type AvailabilitySlot = {
@@ -40,7 +34,6 @@ export type AvailabilityInput = {
   readonly weeklyHours: readonly CmsWeeklyHours[];
   readonly closures: readonly CmsClosure[];
   readonly bookings: readonly AvailabilityOccupancy[];
-  readonly holds: readonly AvailabilityOccupancy[];
   readonly now?: string;
   readonly enforceWindow?: boolean;
 };
@@ -95,24 +88,11 @@ function maximumConcurrent(
   end: number,
   occupancy: readonly AvailabilityOccupancy[],
   settings: CmsBookingSettings,
-  now: Temporal.Instant,
 ) {
   const events: { at: number; delta: number }[] = [];
 
   for (const item of occupancy) {
-    if (
-      item.status &&
-      !["pending", "confirmed", "active"].includes(item.status)
-    ) {
-      continue;
-    }
-    if (
-      item.status === "active" &&
-      item.expiresAt &&
-      Temporal.Instant.compare(Temporal.Instant.from(item.expiresAt), now) <= 0
-    ) {
-      continue;
-    }
+    if (item.status !== "confirmed") continue;
 
     const itemStart =
       Temporal.Instant.from(item.startsAt).epochMilliseconds -
@@ -144,24 +124,11 @@ function hasTherapistConflict(
   end: number,
   occupancy: readonly AvailabilityOccupancy[],
   settings: CmsBookingSettings,
-  now: Temporal.Instant,
   therapistId: string,
 ) {
   return occupancy.some((item) => {
     if (item.assignedStaffId !== therapistId) return false;
-    if (
-      item.status &&
-      !["pending", "confirmed", "active"].includes(item.status)
-    ) {
-      return false;
-    }
-    if (
-      item.status === "active" &&
-      item.expiresAt &&
-      Temporal.Instant.compare(Temporal.Instant.from(item.expiresAt), now) <= 0
-    ) {
-      return false;
-    }
+    if (item.status !== "confirmed") return false;
 
     const itemStart =
       Temporal.Instant.from(item.startsAt).epochMilliseconds -
@@ -242,7 +209,7 @@ export function getAvailabilitySlots(input: AvailabilityInput): readonly Availab
   }
 
   const slots: AvailabilitySlot[] = [];
-  const occupancy = [...input.bookings, ...input.holds];
+  const occupancy = input.bookings;
 
   for (
     let candidate = openMinutes;
@@ -284,7 +251,6 @@ export function getAvailabilitySlots(input: AvailabilityInput): readonly Availab
       occupiedEnd,
       occupancy,
       input.settings,
-      now,
     );
     const remainingCapacity = input.settings.maxConcurrentBookings - used;
     if (remainingCapacity < 1) continue;
@@ -295,7 +261,6 @@ export function getAvailabilitySlots(input: AvailabilityInput): readonly Availab
         occupiedEnd,
         occupancy,
         input.settings,
-        now,
         input.therapistId,
       )
     ) {

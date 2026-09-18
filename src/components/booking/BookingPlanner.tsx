@@ -663,9 +663,10 @@ export function BookingPlanner({
                 ✓
               </span>
               <h3>Request received</h3>
-              <p>
-                Reference: <strong>{confirmation.reference}</strong>. We’ll
-                contact you to confirm.
+               <p>
+                 Reference: <strong>{confirmation.reference}</strong>. We’ll
+                 contact you to confirm. Until then, another customer may request
+                 the same time.
               </p>
               <dl className={styles.confirmationDetails}>
                 <div>
@@ -1122,8 +1123,9 @@ export function BookingPlanner({
                     <input name="privacyAccepted" required type="checkbox" />
                     <span>
                       I have read the{" "}
-                      <Link href="/privacy">privacy notice</Link> and understand
-                      that this is a pending request until Siriranee confirms it.
+                       <Link href="/privacy">privacy notice</Link> and understand
+                       that this pending request does not reserve the time until
+                       Siriranee confirms it.
                     </span>
                   </label>
 

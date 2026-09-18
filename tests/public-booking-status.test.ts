@@ -63,12 +63,7 @@ test("public status hides internal no-show detail and keeps submitted requests p
   }
 
   assert.equal(
-    createPublicBookingStatusSnapshot(
-      {
-        status: "pending",
-        capacityExpiresAt: "2026-09-03T07:59:59Z",
-      } as unknown as PublicBookingStatusSource,
-    ).code,
+    createPublicBookingStatusSnapshot({ status: "pending" }).code,
     "pending",
   );
 });
