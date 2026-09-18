@@ -185,10 +185,13 @@ test("service validation rejects list overflow and URL collisions without retire
   for (const slug of [
     "back-neck-massage",
     "back-neck-shoulder-massage",
+    "neck-shoulder-upper-back-massage",
     "full-body-massage",
     "couples-massage",
     "head-massage",
+    "head-spa",
     "foot-massage-reflexology",
+    "foot-reflexology-spa",
     "cupping-therapy",
     "sports-massage",
   ]) {

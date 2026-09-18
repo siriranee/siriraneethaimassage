@@ -16,11 +16,9 @@ const publicRoutes = [
   "/services",
   "/services/traditional-thai-massage",
   "/services/hot-oil-massage",
-  "/services/neck-shoulder-upper-back-massage",
+  "/services/foot-massage-back-neck-head",
   "/services/deep-tissue-massage",
   "/services/hot-stone-massage",
-  "/services/head-spa",
-  "/services/foot-reflexology-spa",
   "/visit",
 ];
 
@@ -787,10 +785,13 @@ check(
 check(!homeResponse.headers.has("x-powered-by"), "X-Powered-By header is exposed");
 
 for (const [source, destination] of [
-  ["/services/back-neck-shoulder-massage", "/services/neck-shoulder-upper-back-massage"],
-  ["/services/back-neck-massage", "/services/neck-shoulder-upper-back-massage"],
-  ["/services/head-massage", "/services/head-spa"],
-  ["/services/foot-massage-reflexology", "/services/foot-reflexology-spa"],
+  ["/services/back-neck-shoulder-massage", "/services/foot-massage-back-neck-head"],
+  ["/services/back-neck-massage", "/services/foot-massage-back-neck-head"],
+  ["/services/neck-shoulder-upper-back-massage", "/services/foot-massage-back-neck-head"],
+  ["/services/head-massage", "/services/foot-massage-back-neck-head"],
+  ["/services/head-spa", "/services/foot-massage-back-neck-head"],
+  ["/services/foot-massage-reflexology", "/services/foot-massage-back-neck-head"],
+  ["/services/foot-reflexology-spa", "/services/foot-massage-back-neck-head"],
   ["/masseuses", "/book"],
 ]) {
   const result = await request(source, { redirect: "manual" });

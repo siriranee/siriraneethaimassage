@@ -44,12 +44,17 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/services/back-neck-shoulder-massage",
-        destination: "/services/neck-shoulder-upper-back-massage",
+        destination: "/services/foot-massage-back-neck-head",
         permanent: true,
       },
       {
         source: "/services/back-neck-massage",
-        destination: "/services/neck-shoulder-upper-back-massage",
+        destination: "/services/foot-massage-back-neck-head",
+        permanent: true,
+      },
+      {
+        source: "/services/neck-shoulder-upper-back-massage",
+        destination: "/services/foot-massage-back-neck-head",
         permanent: true,
       },
       {
@@ -64,12 +69,22 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/services/head-massage",
-        destination: "/services/head-spa",
+        destination: "/services/foot-massage-back-neck-head",
+        permanent: true,
+      },
+      {
+        source: "/services/head-spa",
+        destination: "/services/foot-massage-back-neck-head",
         permanent: true,
       },
       {
         source: "/services/foot-massage-reflexology",
-        destination: "/services/foot-reflexology-spa",
+        destination: "/services/foot-massage-back-neck-head",
+        permanent: true,
+      },
+      {
+        source: "/services/foot-reflexology-spa",
+        destination: "/services/foot-massage-back-neck-head",
         permanent: true,
       },
       {

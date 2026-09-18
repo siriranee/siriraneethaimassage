@@ -68,9 +68,9 @@ export default async function PromotionsPage() {
               <h2>Give the gift of calm</h2>
               <p>
                 A Siriranee gift voucher lets someone choose how they would like
-                to unwind, whether that is a soothing hot oil massage, Head Spa,
-                Back &amp; Neck Massage or Foot &amp; Reflexology Spa. Choose the
-                value with our team and use it towards any current treatment.
+                to unwind, whether that is a soothing hot oil massage or foot
+                massage including back, neck and head. Choose the value with our
+                team and use it towards any current treatment.
               </p>
               <Link href="/contact">
                 Arrange a gift voucher <ArrowUpRight aria-hidden="true" />

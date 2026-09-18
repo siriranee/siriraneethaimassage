@@ -23,10 +23,13 @@ import {
 export const RESERVED_LEGACY_SERVICE_SLUGS = [
   "back-neck-massage",
   "back-neck-shoulder-massage",
+  "neck-shoulder-upper-back-massage",
   "full-body-massage",
   "couples-massage",
   "head-massage",
+  "head-spa",
   "foot-massage-reflexology",
+  "foot-reflexology-spa",
   "cupping-therapy",
   "sports-massage",
 ] as const;

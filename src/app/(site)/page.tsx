@@ -240,8 +240,8 @@ export default async function HomePage() {
               <p className="lead">
                 Treat someone special to time for themselves. A Siriranee gift
                 voucher lets them choose how they would like to unwind, whether
-                that is a soothing hot oil massage, Head Spa, Back &amp; Neck
-                Massage or Foot &amp; Reflexology Spa.
+                that is a soothing hot oil massage or foot massage including
+                back, neck and head.
               </p>
             </header>
 
