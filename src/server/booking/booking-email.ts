@@ -56,7 +56,12 @@ export type TherapistBookingEmailInput = Pick<
   | "localTime"
   | "timezone"
   | "status"
->;
+> & {
+  readonly customer: Pick<
+    CmsBooking["customer"],
+    "name" | "phone" | "email" | "notes"
+  >;
+};
 
 export type CustomerBookingEmailBusiness = {
   readonly name: string;
@@ -675,82 +680,207 @@ This operational email was sent because this address was provided for booking ${
   return { subject, html, text };
 }
 
+type TherapistEmailLanguageCopy = {
+  readonly eyebrow: string;
+  readonly heading: string;
+  readonly status: string;
+  readonly introduction: (therapistName: string) => string;
+  readonly subject: string;
+  readonly detailsHeading: string;
+};
+
 const therapistEmailEventCopy: Readonly<
   Record<
     TherapistBookingEmailEvent,
     {
-      readonly eyebrow: string;
-      readonly heading: string;
-      readonly status: string;
-      readonly introduction: (therapistName: string) => string;
-      readonly subject: (reference: string, businessName: string) => string;
+      readonly thai: TherapistEmailLanguageCopy;
+      readonly english: TherapistEmailLanguageCopy;
     }
   >
 > = {
   requested: {
-    eyebrow: "New booking request",
-    heading: "A customer has requested an appointment with you",
-    status: "Pending confirmation",
-    introduction: (therapistName) =>
-      `Hi ${therapistName}, a customer selected you for this booking request. The appointment is not confirmed yet.`,
-    subject: (reference, businessName) =>
-      `New booking request · ${reference} · ${businessName}`,
+    thai: {
+      eyebrow: "คำขอจองใหม่",
+      heading: "ลูกค้าส่งคำขอนัดหมายกับคุณ",
+      status: "รอการยืนยัน",
+      introduction: (therapistName) =>
+        `สวัสดี ${therapistName} ลูกค้าเลือกคุณสำหรับคำขอจองนี้ ขณะนี้นัดหมายยังไม่ได้รับการยืนยัน`,
+      subject: "คำขอจองใหม่",
+      detailsHeading: "รายละเอียดนัดหมายที่ขอ",
+    },
+    english: {
+      eyebrow: "New booking request",
+      heading: "A customer has requested an appointment with you",
+      status: "Pending confirmation",
+      introduction: (therapistName) =>
+        `Hi ${therapistName}, a customer selected you for this booking request. The appointment is not confirmed yet.`,
+      subject: "New booking request",
+      detailsHeading: "Requested appointment",
+    },
   },
   "request-updated": {
-    eyebrow: "Pending request updated",
-    heading: "A pending booking request has changed",
-    status: "Pending — updated request",
-    introduction: (therapistName) =>
-      `Hi ${therapistName}, a customer request assigned to you has updated appointment details. It is still pending and is not a confirmed appointment.`,
-    subject: (reference, businessName) =>
-      `PENDING request updated · ${reference} · ${businessName}`,
+    thai: {
+      eyebrow: "อัปเดตคำขอที่รอการยืนยัน",
+      heading: "รายละเอียดคำขอจองมีการเปลี่ยนแปลง",
+      status: "รอการยืนยัน — อัปเดตแล้ว",
+      introduction: (therapistName) =>
+        `สวัสดี ${therapistName} รายละเอียดนัดหมายของคำขอที่มอบหมายให้คุณมีการเปลี่ยนแปลง รายการนี้ยังรอการยืนยันและยังไม่ใช่นัดหมายที่ยืนยันแล้ว`,
+      subject: "อัปเดตคำขอที่รอการยืนยัน",
+      detailsHeading: "รายละเอียดนัดหมายที่อัปเดต",
+    },
+    english: {
+      eyebrow: "Pending request updated",
+      heading: "A pending booking request has changed",
+      status: "Pending — updated request",
+      introduction: (therapistName) =>
+        `Hi ${therapistName}, a customer request assigned to you has updated appointment details. It is still pending and is not a confirmed appointment.`,
+      subject: "PENDING request updated",
+      detailsHeading: "Requested appointment",
+    },
   },
   "request-withdrawn": {
-    eyebrow: "Pending request withdrawn",
-    heading: "A pending booking request is no longer assigned to you",
-    status: "Pending request withdrawn",
-    introduction: (therapistName) =>
-      `Hi ${therapistName}, the original pending request below has been withdrawn from you. It was not a confirmed appointment.`,
-    subject: (reference, businessName) =>
-      `Pending request withdrawn · ${reference} · ${businessName}`,
+    thai: {
+      eyebrow: "ถอนคำขอที่รอการยืนยัน",
+      heading: "คำขอจองนี้ไม่ได้มอบหมายให้คุณแล้ว",
+      status: "ถอนคำขอจากตารางของคุณแล้ว",
+      introduction: (therapistName) =>
+        `สวัสดี ${therapistName} คำขอเดิมด้านล่างถูกถอนออกจากคุณ รายการนี้ยังไม่เคยได้รับการยืนยัน`,
+      subject: "ถอนคำขอที่รอการยืนยัน",
+      detailsHeading: "คำขอเดิมที่ถูกถอน",
+    },
+    english: {
+      eyebrow: "Pending request withdrawn",
+      heading: "A pending booking request is no longer assigned to you",
+      status: "Pending request withdrawn",
+      introduction: (therapistName) =>
+        `Hi ${therapistName}, the original pending request below has been withdrawn from you. It was not a confirmed appointment.`,
+      subject: "Pending request withdrawn",
+      detailsHeading: "Original request withdrawn",
+    },
   },
   assigned: {
-    eyebrow: "Confirmed appointment",
-    heading: "A new appointment has been assigned to you",
-    status: "Assigned to you",
-    introduction: (therapistName) =>
-      `Hi ${therapistName}, a confirmed appointment has been added to your schedule.`,
-    subject: (reference, businessName) =>
-      `New confirmed appointment · ${reference} · ${businessName}`,
+    thai: {
+      eyebrow: "นัดหมายที่ยืนยันแล้ว",
+      heading: "มีนัดหมายใหม่เพิ่มในตารางของคุณ",
+      status: "มอบหมายให้คุณแล้ว",
+      introduction: (therapistName) =>
+        `สวัสดี ${therapistName} นัดหมายที่ยืนยันแล้วถูกเพิ่มในตารางงานของคุณ`,
+      subject: "นัดหมายใหม่ที่ยืนยันแล้ว",
+      detailsHeading: "รายละเอียดนัดหมาย",
+    },
+    english: {
+      eyebrow: "Confirmed appointment",
+      heading: "A new appointment has been assigned to you",
+      status: "Assigned to you",
+      introduction: (therapistName) =>
+        `Hi ${therapistName}, a confirmed appointment has been added to your schedule.`,
+      subject: "New confirmed appointment",
+      detailsHeading: "Appointment details",
+    },
   },
   rescheduled: {
-    eyebrow: "Appointment update",
-    heading: "An appointment has been rescheduled",
-    status: "Date or time updated",
-    introduction: (therapistName) =>
-      `Hi ${therapistName}, a confirmed appointment on your schedule has a new date or time.`,
-    subject: (reference, businessName) =>
-      `Appointment rescheduled · ${reference} · ${businessName}`,
+    thai: {
+      eyebrow: "อัปเดตนัดหมาย",
+      heading: "นัดหมายมีการเปลี่ยนวันหรือเวลา",
+      status: "อัปเดตวันหรือเวลาแล้ว",
+      introduction: (therapistName) =>
+        `สวัสดี ${therapistName} นัดหมายที่ยืนยันแล้วในตารางของคุณมีวันหรือเวลาใหม่`,
+      subject: "เปลี่ยนวันหรือเวลานัดหมาย",
+      detailsHeading: "รายละเอียดนัดหมายใหม่",
+    },
+    english: {
+      eyebrow: "Appointment update",
+      heading: "An appointment has been rescheduled",
+      status: "Date or time updated",
+      introduction: (therapistName) =>
+        `Hi ${therapistName}, a confirmed appointment on your schedule has a new date or time.`,
+      subject: "Appointment rescheduled",
+      detailsHeading: "Appointment details",
+    },
   },
   removed: {
-    eyebrow: "Assignment update",
-    heading: "An appointment has been removed from your schedule",
-    status: "No longer assigned to you",
-    introduction: (therapistName) =>
-      `Hi ${therapistName}, the original appointment below has been removed from your schedule.`,
-    subject: (reference, businessName) =>
-      `Appointment removed · ${reference} · ${businessName}`,
+    thai: {
+      eyebrow: "อัปเดตการมอบหมาย",
+      heading: "นัดหมายถูกนำออกจากตารางของคุณ",
+      status: "ไม่ได้มอบหมายให้คุณแล้ว",
+      introduction: (therapistName) =>
+        `สวัสดี ${therapistName} นัดหมายเดิมด้านล่างถูกนำออกจากตารางงานของคุณ`,
+      subject: "นำรายการนัดหมายออกแล้ว",
+      detailsHeading: "นัดหมายเดิมที่นำออก",
+    },
+    english: {
+      eyebrow: "Assignment update",
+      heading: "An appointment has been removed from your schedule",
+      status: "No longer assigned to you",
+      introduction: (therapistName) =>
+        `Hi ${therapistName}, the original appointment below has been removed from your schedule.`,
+      subject: "Appointment removed",
+      detailsHeading: "Original appointment removed",
+    },
   },
   cancelled: {
-    eyebrow: "Booking update",
-    heading: "A confirmed appointment has been cancelled",
-    status: "Cancelled",
-    introduction: (therapistName) =>
-      `Hi ${therapistName}, this confirmed appointment has been cancelled and is no longer active.`,
-    subject: (reference, businessName) =>
-      `Appointment cancelled · ${reference} · ${businessName}`,
+    thai: {
+      eyebrow: "อัปเดตการจอง",
+      heading: "นัดหมายที่ยืนยันแล้วถูกยกเลิก",
+      status: "ยกเลิกแล้ว",
+      introduction: (therapistName) =>
+        `สวัสดี ${therapistName} นัดหมายที่ยืนยันแล้วนี้ถูกยกเลิกและไม่มีผลแล้ว`,
+      subject: "ยกเลิกนัดหมาย",
+      detailsHeading: "รายละเอียดนัดหมายที่ยกเลิก",
+    },
+    english: {
+      eyebrow: "Booking update",
+      heading: "A confirmed appointment has been cancelled",
+      status: "Cancelled",
+      introduction: (therapistName) =>
+        `Hi ${therapistName}, this confirmed appointment has been cancelled and is no longer active.`,
+      subject: "Appointment cancelled",
+      detailsHeading: "Appointment details",
+    },
   },
 };
+
+function therapistEmailAction(input: {
+  readonly url?: string;
+  readonly buttonLabel: string;
+  readonly textLabel: string;
+  readonly note: string;
+}) {
+  if (!input.url) return { html: "", text: "" };
+
+  return {
+    html: `<p style="margin:24px 0 0;text-align:center;"><a href="${escapeHtml(input.url)}" style="display:inline-block;border-radius:999px;background:#5c2288;color:#fffdf7;font-size:15px;font-weight:800;line-height:1.2;padding:13px 22px;text-decoration:none;">${escapeHtml(input.buttonLabel)}</a></p><p style="margin:10px 0 0;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">${escapeHtml(input.note)}</p>`,
+    text: `${input.textLabel}: ${input.url}\n${input.note}\n`,
+  };
+}
+
+function therapistEmailSection(input: {
+  readonly language: "th" | "en-IE";
+  readonly copy: TherapistEmailLanguageCopy;
+  readonly therapistName: string;
+  readonly statusLabel: string;
+  readonly rows: readonly (readonly [string, string])[];
+  readonly customerHeading: string;
+  readonly customerRows: readonly (readonly [string, string, boolean?])[];
+  readonly actionHtml: string;
+  readonly guidance: string;
+}) {
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;"><tr><td lang="${input.language}" style="padding:30px 30px 32px;">
+    <p style="margin:0 0 7px;color:#7a590d;font-size:12px;font-weight:800;letter-spacing:.08em;line-height:1.4;text-transform:uppercase;">${escapeHtml(input.copy.eyebrow)}</p>
+    <h1 style="margin:0;color:#5c2288;font-size:26px;line-height:1.25;">${escapeHtml(input.copy.heading)}</h1>
+    <p dir="auto" style="margin:12px 0 20px;color:#3c3340;font-size:16px;line-height:1.65;">${escapeHtml(input.copy.introduction(input.therapistName))}</p>
+    <div style="margin:0 0 24px;padding:14px 16px;border:1px solid #d8c7d7;border-radius:12px;background:#f7f0fa;">
+      <span style="display:block;margin-bottom:3px;color:#675d64;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">${escapeHtml(input.statusLabel)}</span>
+      <strong style="color:#5c2288;font-size:18px;line-height:1.35;">${escapeHtml(input.copy.status)}</strong>
+    </div>
+    <h2 style="margin:0 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">${escapeHtml(input.copy.detailsHeading)}</h2>
+    <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">${input.rows.map(([label, value]) => detailRow(label, value)).join("")}</table>
+    <h2 style="margin:24px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">${escapeHtml(input.customerHeading)}</h2>
+    <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">${input.customerRows.map(([label, value, direction]) => detailRow(label, value, direction)).join("")}</table>
+    ${input.actionHtml}
+    <p style="margin:24px 0 0;color:#675d64;font-size:14px;line-height:1.6;">${escapeHtml(input.guidance)}</p>
+  </td></tr></table>`;
+}
 
 export function renderTherapistBookingEmail(
   booking: TherapistBookingEmailInput,
@@ -770,78 +900,141 @@ export function renderTherapistBookingEmail(
   const reference = cleanDisplayText(booking.reference);
   const serviceName = cleanDisplayText(booking.serviceName);
   const localTime = cleanDisplayText(booking.localTime);
+  const customerName = cleanDisplayText(booking.customer.name);
+  const customerPhone = cleanDisplayText(booking.customer.phone);
+  const customerEmail = cleanDisplayText(booking.customer.email);
+  const customerNotes = cleanDisplayText(booking.customer.notes, true);
   const cmsUrl = safeHttpUrl(input.cmsUrl);
   const confirmationUrl = safeHttpUrl(input.confirmationUrl);
   const isPendingRequest =
     input.event === "requested" || input.event === "request-updated";
-  const formattedDate = formatBookingDate(booking.localDate, "en-IE");
-  const subject = copy.subject(reference, businessName);
-  const detailsHeading = input.event === "removed"
-    ? "Original appointment removed"
-    : input.event === "request-withdrawn"
-      ? "Original request withdrawn"
-      : input.event === "requested" || input.event === "request-updated"
-      ? "Requested appointment"
-      : "Appointment details";
-  const preheader = `${copy.status}: ${formattedDate} at ${localTime} (Dublin time).`;
-  const rows = [
+  const thaiDate = formatBookingDate(
+    booking.localDate,
+    "th-TH-u-ca-gregory-nu-latn",
+  );
+  const englishDate = formatBookingDate(booking.localDate, "en-IE");
+  const subject = `${copy.thai.subject} / ${copy.english.subject} · ${reference} · ${businessName}`;
+  const preheader = `${copy.thai.status} / ${copy.english.status}: ${englishDate} ${localTime} (Dublin time).`;
+  const thaiRows = [
+    ["รหัสการจอง", reference],
+    ["บริการ", serviceName],
+    ["ระยะเวลา", `${booking.durationMinutes} นาที`],
+    ["วันที่", thaiDate],
+    ["เวลา", `${localTime} น. (เวลาดับลิน)`],
+  ] as const;
+  const englishRows = [
     ["Booking reference", reference],
     ["Treatment", serviceName],
     ["Duration", `${booking.durationMinutes} minutes`],
-    ["Date", formattedDate],
+    ["Date", englishDate],
     ["Time", `${localTime} (Dublin time)`],
   ] as const;
-  const callToActionHtml = isPendingRequest
+  const thaiCustomerRows = [
+    ["ชื่อ", customerName || "ไม่ได้ระบุ", true],
+    ["โทรศัพท์", customerPhone || "ไม่ได้ระบุ", true],
+    ["อีเมล", customerEmail || "ไม่ได้ระบุ", true],
+    ["หมายเหตุการจอง", customerNotes || "ไม่ได้ระบุ", true],
+  ] as const;
+  const englishCustomerRows = [
+    ["Name", customerName || "Not provided", true],
+    ["Phone", customerPhone || "Not provided", true],
+    ["Email", customerEmail || "Not provided", true],
+    ["Booking notes", customerNotes || "Not provided", true],
+  ] as const;
+  const thaiAction = isPendingRequest
     ? confirmationUrl
-      ? `<p style="margin:24px 0 0;text-align:center;"><a href="${escapeHtml(confirmationUrl)}" style="display:inline-block;border-radius:999px;background:#5c2288;color:#fffdf7;font-size:15px;font-weight:800;line-height:1.2;padding:13px 22px;text-decoration:none;">Review and confirm booking</a></p><p style="margin:10px 0 0;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">No CMS login is required. Opening this link only shows the appointment; press Confirm booking on the next page to approve it. Do not forward or share this private confirmation link.</p>`
-      : ""
-    : cmsUrl
-      ? `<p style="margin:24px 0 0;text-align:center;"><a href="${escapeHtml(cmsUrl)}" style="display:inline-block;border-radius:999px;background:#5c2288;color:#fffdf7;font-size:15px;font-weight:800;line-height:1.2;padding:13px 22px;text-decoration:none;">Open the staff CMS</a></p><p style="margin:10px 0 0;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">This link contains no access token. Sign in with your authorised account if needed.</p>`
-      : "";
-  const callToActionText = isPendingRequest && confirmationUrl
-    ? `Review and confirm booking (no login required): ${confirmationUrl}\nOpening this link alone will not confirm the booking. Press Confirm booking on the review page to approve it. Do not forward or share this private confirmation link.\n`
-    : !isPendingRequest && cmsUrl
-      ? `Staff CMS (sign-in required): ${cmsUrl}\n`
-      : "";
-  const operationalGuidance = isPendingRequest
+      ? therapistEmailAction({
+          url: confirmationUrl,
+          buttonLabel: "ตรวจสอบและยืนยันการจอง",
+          textLabel: "ตรวจสอบและยืนยันการจอง (ไม่ต้องเข้าสู่ระบบ)",
+          note: "ไม่ต้องเข้าสู่ระบบ CMS การเปิดลิงก์เพียงอย่างเดียวจะไม่ยืนยันการจอง ลิงก์จะแสดงรายละเอียดนัดหมายเท่านั้น กรุณากดปุ่มยืนยันในหน้าถัดไปเพื่ออนุมัติ และห้ามส่งต่อหรือแชร์ลิงก์ส่วนตัวนี้",
+        })
+      : therapistEmailAction({
+          buttonLabel: "ตรวจสอบและยืนยันการจอง",
+          textLabel: "ตรวจสอบและยืนยันการจอง",
+          note: "",
+        })
+    : therapistEmailAction({
+        url: cmsUrl,
+        buttonLabel: "เปิด CMS สำหรับพนักงาน",
+        textLabel: "CMS สำหรับพนักงาน (ต้องเข้าสู่ระบบ)",
+        note: "ลิงก์นี้ไม่มีโทเค็นเข้าสู่ระบบ กรุณาเข้าสู่ระบบด้วยบัญชีที่ได้รับอนุญาตหากระบบร้องขอ",
+      });
+  const englishAction = isPendingRequest
+    ? confirmationUrl
+      ? therapistEmailAction({
+          url: confirmationUrl,
+          buttonLabel: "Review and confirm booking",
+          textLabel: "Review and confirm booking (no login required)",
+          note: "No CMS login is required. Opening this link alone will not confirm the booking. It only shows the appointment; press Confirm booking on the next page to approve it. Do not forward or share this private confirmation link.",
+        })
+      : therapistEmailAction({
+          buttonLabel: "Review and confirm booking",
+          textLabel: "Review and confirm booking",
+          note: "",
+        })
+    : therapistEmailAction({
+        url: cmsUrl,
+        buttonLabel: "Open the staff CMS",
+        textLabel: "Staff CMS (sign-in required)",
+        note: "This link contains no access token. Sign in with your authorised account if needed.",
+      });
+  const thaiGuidance = isPendingRequest
+    ? confirmationUrl
+      ? `ยืนยันเฉพาะเมื่อคุณสามารถรับนัดหมายนี้ได้ หากรายละเอียดไม่ถูกต้อง กรุณาติดต่อ ${businessName}`
+      : `อีเมลนี้ไม่สามารถใช้ยืนยันคำขอได้ กรุณาติดต่อ ${businessName} ก่อนถือว่านัดหมายได้รับการยืนยัน`
+    : input.event === "request-withdrawn"
+      ? "อย่าถือว่าคำขอนี้เป็นนัดหมายที่ใช้งานอยู่ หากคิดว่ามีการถอนคำขอผิดพลาด กรุณาตรวจสอบใน CMS สำหรับพนักงาน"
+      : `หากข้อมูลอัปเดตตารางนี้ไม่ถูกต้อง กรุณาติดต่อ ${businessName} โดยตรง`;
+  const englishGuidance = isPendingRequest
     ? confirmationUrl
       ? `Confirm only if you can take this appointment. If the details are wrong, contact ${businessName} instead.`
       : `This email cannot confirm the request. Contact ${businessName} before treating it as confirmed.`
     : input.event === "request-withdrawn"
       ? "Do not treat this request as an active appointment. Check the staff CMS if you believe it was withdrawn in error."
       : `Please contact ${businessName} directly if this schedule update looks incorrect.`;
+  const thai = therapistEmailSection({
+    language: "th",
+    copy: copy.thai,
+    therapistName,
+    statusLabel: "สถานะตารางงาน",
+    rows: thaiRows,
+    customerHeading: "ข้อมูลลูกค้า",
+    customerRows: thaiCustomerRows,
+    actionHtml: thaiAction.html,
+    guidance: thaiGuidance,
+  });
+  const english = therapistEmailSection({
+    language: "en-IE",
+    copy: copy.english,
+    therapistName,
+    statusLabel: "Schedule status",
+    rows: englishRows,
+    customerHeading: "Customer details",
+    customerRows: englishCustomerRows,
+    actionHtml: englishAction.html,
+    guidance: englishGuidance,
+  });
 
   const html = `<!doctype html>
-<html lang="en-IE">
+<html lang="th">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light only">
     <title>${escapeHtml(subject)}</title>
   </head>
-  <body style="margin:0;padding:0;background:#f9f4ea;color:#2b2028;font-family:Arial,Tahoma,sans-serif;">
+  <body style="margin:0;padding:0;background:#f9f4ea;color:#2b2028;font-family:Tahoma,'Noto Sans Thai',Arial,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;background:#f9f4ea;">
       <tr>
         <td align="center" style="padding:24px 12px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:640px;border:1px solid #e6d9be;border-radius:18px;border-collapse:separate;overflow:hidden;background:#fffdf7;box-shadow:0 12px 36px rgba(43,32,40,.10);">
-            <tr><td style="padding:18px 30px;background:#5c2288;color:#fffdf7;font-size:17px;font-weight:800;line-height:1.4;">${escapeHtml(businessName)}</td></tr>
-            <tr><td style="padding:30px 30px 32px;">
-              <p style="margin:0 0 7px;color:#7a590d;font-size:12px;font-weight:800;letter-spacing:.08em;line-height:1.4;text-transform:uppercase;">${escapeHtml(copy.eyebrow)}</p>
-              <h1 style="margin:0;color:#5c2288;font-size:28px;line-height:1.25;">${escapeHtml(copy.heading)}</h1>
-              <p dir="auto" style="margin:12px 0 20px;color:#3c3340;font-size:16px;line-height:1.65;">${escapeHtml(copy.introduction(therapistName))}</p>
-              <div style="margin:0 0 24px;padding:14px 16px;border:1px solid #d8c7d7;border-radius:12px;background:#f7f0fa;">
-                <span style="display:block;margin-bottom:3px;color:#675d64;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">Schedule status</span>
-                <strong style="color:#5c2288;font-size:18px;line-height:1.35;">${escapeHtml(copy.status)}</strong>
-              </div>
-              <h2 style="margin:0 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">${escapeHtml(detailsHeading)}</h2>
-              <table role="table" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">
-                ${rows.map(([label, value]) => detailRow(label, value)).join("")}
-              </table>
-              ${callToActionHtml}
-              <p style="margin:24px 0 0;color:#675d64;font-size:14px;line-height:1.6;">${escapeHtml(operationalGuidance)}</p>
-            </td></tr>
-            <tr><td style="padding:17px 30px;background:#efe4f7;color:#675d64;font-size:12px;line-height:1.55;text-align:center;">This operational email contains only the appointment details needed for your work. Please handle customer information privately.</td></tr>
+            <tr><td lang="en-IE" style="padding:18px 30px;background:#5c2288;color:#fffdf7;font-size:17px;font-weight:800;line-height:1.4;">${escapeHtml(businessName)}</td></tr>
+            <tr><td>${thai}</td></tr>
+            <tr><td style="height:1px;background:#d8c7d7;"></td></tr>
+            <tr><td>${english}</td></tr>
+            <tr><td style="padding:17px 30px;background:#efe4f7;color:#675d64;font-size:12px;line-height:1.55;text-align:center;"><span lang="th">อีเมลสำหรับการทำงานนี้มีข้อมูลส่วนตัวของลูกค้าและรายละเอียดนัดหมาย กรุณาเก็บเป็นความลับและห้ามส่งต่อ</span><br><span lang="en-IE">This operational email contains private customer and appointment details. Keep it confidential and do not forward it.</span></td></tr>
           </table>
         </td>
       </tr>
@@ -849,20 +1042,42 @@ export function renderTherapistBookingEmail(
   </body>
 </html>`;
 
-  const text = `${copy.heading.toUpperCase()} — ${businessName}
+  const text = `${copy.thai.heading} — ${businessName}
 
-${copy.introduction(therapistName)}
+${copy.thai.introduction(therapistName)}
 
-Schedule status: ${copy.status}
+สถานะตารางงาน: ${copy.thai.status}
 
-${detailsHeading}
-${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}
+${copy.thai.detailsHeading}
+${thaiRows.map(([label, value]) => `${label}: ${value}`).join("\n")}
 
-${callToActionText}
+ข้อมูลลูกค้า
+${thaiCustomerRows.map(([label, value]) => `${label}: ${value}`).join("\n")}
 
-${operationalGuidance}
+${thaiAction.text}
+${thaiGuidance}
 
-This operational email contains only the appointment details needed for your work. Please handle customer information privately.`;
+อีเมลสำหรับการทำงานนี้มีข้อมูลส่วนตัวของลูกค้าและรายละเอียดนัดหมาย กรุณาเก็บเป็นความลับและห้ามส่งต่อ
+
+----------------------------------------
+
+${copy.english.heading.toUpperCase()} — ${businessName}
+
+${copy.english.introduction(therapistName)}
+
+Schedule status: ${copy.english.status}
+
+${copy.english.detailsHeading}
+${englishRows.map(([label, value]) => `${label}: ${value}`).join("\n")}
+
+Customer details
+${englishCustomerRows.map(([label, value]) => `${label}: ${value}`).join("\n")}
+
+${englishAction.text}
+
+${englishGuidance}
+
+This operational email contains private customer and appointment details. Keep it confidential and do not forward it.`;
 
   return { subject, html, text };
 }

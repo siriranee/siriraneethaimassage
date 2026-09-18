@@ -295,7 +295,7 @@ test("customer cancellation email clearly closes the appointment without exposin
   }
 });
 
-test("therapist schedule emails contain appointment details but no customer identity", async () => {
+test("therapist schedule emails render Thai first and English second with customer details", async () => {
   const { renderTherapistBookingEmail } = await import(
     "@/server/booking/booking-email"
   );
@@ -305,14 +305,14 @@ test("therapist schedule emails contain appointment details but no customer iden
     assignedStaffName: "Waen",
   });
   const expectations = [
-    ["requested", "Pending confirmation"],
-    ["assigned", "Assigned to you"],
-    ["rescheduled", "Date or time updated"],
-    ["removed", "No longer assigned to you"],
-    ["cancelled", "Cancelled"],
+    ["requested", "Pending confirmation", "รอการยืนยัน"],
+    ["assigned", "Assigned to you", "มอบหมายให้คุณแล้ว"],
+    ["rescheduled", "Date or time updated", "อัปเดตวันหรือเวลาแล้ว"],
+    ["removed", "No longer assigned to you", "ไม่ได้มอบหมายให้คุณแล้ว"],
+    ["cancelled", "Cancelled", "ยกเลิกแล้ว"],
   ] as const;
 
-  for (const [event, expectedStatus] of expectations) {
+  for (const [event, expectedStatus, expectedThaiStatus] of expectations) {
     const message = renderTherapistBookingEmail(assigned, {
       event,
       therapistName: "Waen <script>alert(1)</script>\u202E",
@@ -331,28 +331,49 @@ test("therapist schedule emails contain appointment details but no customer iden
       "SRN-20260910-ABC123",
       "Traditional Thai Massage",
       "60 minutes",
+      "60 นาที",
       "Thursday 10 September 2026",
+      "วันพฤหัสบดีที่ 10 กันยายน 2026",
       "10:00 (Dublin time)",
+      "10:00 น. (เวลาดับลิน)",
+      expectedThaiStatus,
       expectedLink,
+      "ข้อมูลลูกค้า",
+      "Customer details",
+      "Nok Example",
+      "nok@example.com",
+      "+353 85 123 4567",
+      "Please call before the appointment.",
+      "หมายเหตุการจอง",
+      "Booking notes",
     ]) {
       assert.match(
         rendered,
         new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
       );
     }
+    assert.match(message.subject, /^[\u0E00-\u0E7F]/);
+    assert.ok(
+      message.html.indexOf('<td lang="th" style="padding:30px') <
+        message.html.indexOf('<td lang="en-IE" style="padding:30px'),
+    );
+    assert.ok(
+      message.text.indexOf("สถานะตารางงาน") <
+        message.text.indexOf("Schedule status"),
+    );
     assert.match(message.html, /Waen &lt;script&gt;alert\(1\)&lt;\/script&gt;/);
     assert.doesNotMatch(message.html, /\u202E|<script>/);
     assert.doesNotMatch(message.text, /\u202E/);
     if (event === "requested") {
       assert.doesNotMatch(rendered, /https:\/\/siriranee\.com\/cms/);
       assert.match(rendered, /No CMS login is required/);
+      assert.match(rendered, /ไม่ต้องเข้าสู่ระบบ CMS/);
+      assert.match(rendered, /ตรวจสอบและยืนยันการจอง/);
+    } else {
+      assert.match(rendered, /เปิด CMS สำหรับพนักงาน/);
     }
 
     for (const forbidden of [
-      "Nok Example",
-      "nok@example.com",
-      "+353 85 123 4567",
-      "Quiet room if possible.",
       "Never include this internal note.",
       "11111111-2222-4333-8444-555555555555",
       "secret-idempotency-hash",
@@ -364,4 +385,35 @@ test("therapist schedule emails contain appointment details but no customer iden
       );
     }
   }
+});
+
+test("therapist emails escape customer HTML and show bilingual optional-field fallbacks", async () => {
+  const { renderTherapistBookingEmail } = await import(
+    "@/server/booking/booking-email"
+  );
+  const message = renderTherapistBookingEmail(
+    booking({
+      assignedStaffId: "therapist-waen",
+      customer: {
+        name: "Nok <Customer>",
+        phone: "\u202E+353 85 123 4567",
+        email: "",
+        notes: "First <b>line</b>\nSecond line",
+      },
+    }),
+    {
+      event: "requested",
+      therapistName: "Waen",
+      businessName: "Siriranee Thai Massage",
+      confirmationUrl:
+        "https://siriranee.com/book/confirm?token=signed-therapist-capability",
+    },
+  );
+
+  assert.match(message.html, /Nok &lt;Customer&gt;/);
+  assert.match(message.html, /First &lt;b&gt;line&lt;\/b&gt;<br>Second line/);
+  assert.doesNotMatch(message.html, /\u202E|<Customer>|<b>line<\/b>/);
+  assert.doesNotMatch(message.text, /\u202E/);
+  assert.match(message.text, /อีเมล: ไม่ได้ระบุ/);
+  assert.match(message.text, /Email: Not provided/);
 });

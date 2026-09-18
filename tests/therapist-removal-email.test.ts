@@ -94,7 +94,9 @@ test("combined reassignment and reschedule sends the previous therapist only the
   assert.deepEqual(f.requests[1].payload.to, ["therapist-1@example.test"]);
   assert.match(f.requests[1].payload.text!, /New Oil Massage|14:00|90 minutes/);
   assert.doesNotMatch(JSON.stringify(f.notifications), /Private Customer|private@example|Private internal|Private customer|private-key/);
-  assert.doesNotMatch(JSON.stringify(f.requests), /Private Customer|private@example|Private internal|Private customer|private-key/);
+  assert.match(f.requests[0].payload.text!, /Private Customer|private@example\.test|\+353855555555|Private customer note/);
+  assert.match(f.requests[1].payload.text!, /Private Customer|private@example\.test|\+353855555555|Private customer note/);
+  assert.doesNotMatch(JSON.stringify(f.requests), /Private internal note|private-key|private-fingerprint/);
   await f.service.deliverTherapistBookingEmail(f.repository, f.reassigned, f.removal, f.options);
   assert.equal(f.requests.length, 2, "accepted removal must not be sent twice");
 });

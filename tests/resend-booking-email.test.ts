@@ -344,7 +344,7 @@ test("Resend customer cancellation uses its own stable idempotency key and priva
   assert.doesNotMatch(String(fingerprint), /nok@example\.com|Nok Example/);
 });
 
-test("Resend therapist emails use a separate recipient, event key and privacy-minimised payload", async () => {
+test("Resend therapist emails use a separate recipient, event key and private customer payload", async () => {
   const {
     getTherapistBookingEmailDeliveryFingerprint,
     sendTherapistBookingEmail,
@@ -458,11 +458,23 @@ test("Resend therapist emails use a separate recipient, event key and privacy-mi
     "60 minutes",
     "Thursday 10 September 2026",
     "10:00 (Dublin time)",
+    "10:00 น. (เวลาดับลิน)",
+    "คำขอจองใหม่",
+    "รอการยืนยัน",
+    "ตรวจสอบและยืนยันการจอง",
+    "ไม่ต้องเข้าสู่ระบบ CMS",
     "Review and confirm booking",
     "no login required",
     "/book/confirm?token=",
     "Pending confirmation",
     "not confirmed yet",
+    "ข้อมูลลูกค้า",
+    "Customer details",
+    "Nok Example",
+    "nok@example.com",
+    "+353 85 123 4567",
+    "Quiet room if possible.",
+    "Booking notes",
   ]) {
     assert.match(
       rendered,
@@ -470,11 +482,8 @@ test("Resend therapist emails use a separate recipient, event key and privacy-mi
     );
   }
   for (const forbidden of [
-    "Nok Example",
-    "nok@example.com",
-    "+353 85 123 4567",
-    "Quiet room if possible.",
     "Private internal handling note.",
+    "11111111-2222-4333-8444-555555555555",
   ]) {
     assert.doesNotMatch(
       rendered,
@@ -494,7 +503,7 @@ test("Resend therapist emails use a separate recipient, event key and privacy-mi
     customerEmailBusiness,
     fingerprintOptions,
   );
-  assert.equal(
+  assert.notEqual(
     assignedFingerprint,
     getTherapistBookingEmailDeliveryFingerprint(
       {
@@ -505,6 +514,20 @@ test("Resend therapist emails use a separate recipient, event key and privacy-mi
           email: "different@example.com",
           notes: "Different private note",
         },
+        internalNotes: "Different internal note",
+      },
+      recipient,
+      "assigned",
+      4,
+      customerEmailBusiness,
+      fingerprintOptions,
+    ),
+  );
+  assert.equal(
+    assignedFingerprint,
+    getTherapistBookingEmailDeliveryFingerprint(
+      {
+        ...confirmed,
         internalNotes: "Different internal note",
       },
       recipient,

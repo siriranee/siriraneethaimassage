@@ -26,13 +26,16 @@ Howth, Dublin, Ireland.
 - URL-based booking filters, per-booking activity timelines, unsaved-change
   warnings and metadata-only notification records. A newly stored website
   request triggers one owner Resend alert in Thai and English plus a separate
-  privacy-minimised request email to the selected therapist. Either signed
+  Thai-first, English-second private operational request email to the selected
+  therapist with the customer contact details and booking note needed to manage
+  the appointment. Either signed
   review flow can confirm without a CMS login. When the booking is confirmed,
   Resend sends the customer an English confirmation with the appointment,
   published business contact details and safe public links.
   Confirmed therapist assignment, reschedule, removal and cancellation events
   are stored in a durable private outbox and sent after saving, using
-  privacy-minimised Resend templates.
+  Thai-first, English-second Resend templates with the relevant customer and
+  appointment details.
   Recipient addresses and rendered messages are never stored in notification
   records, and customer confirmation emails exclude customer and internal notes.
 - MongoDB persistence, username-and-password authentication, role-based access,
@@ -162,8 +165,10 @@ The normal production sequence is:
    set CMS_MEDIA_UPLOAD_READY=true.
 13. Send a test booking and confirm the owner email's Thai section, English
    section, reply-to address, secure review button and CMS booking link. Confirm
-   that the selected therapist receives one separate privacy-minimised pending
-   request email, can open its review button without signing in, and must press
+   that the selected therapist receives one separate private pending request
+   email with Thai first and English second, the correct customer details and
+   booking note, can open its review button
+   without signing in, and must press
    the confirmation button on the page. Then confirm that
    changing the booking from pending to confirmed sends one customer email with
    the correct Dublin appointment time and public links. Test
@@ -228,9 +233,11 @@ The notification address and optional phone number are operational data, not
 customer-facing content. In MongoDB they are stored separately with AES-256-GCM
 encryption under the existing `CMS_PII_ENCRYPTION_KEY`; they are excluded from
 publication snapshots and public APIs. A pending website request sends the
-selected therapist a privacy-minimised message that clearly says the appointment
-is not yet confirmed. After the shop confirms it, the durable outbox sends a
-separate assignment message and distinct messages for rescheduling, removal or
+selected therapist a private operational message with the customer name, phone,
+email and booking note that clearly says the appointment is not yet confirmed.
+Every therapist message presents Thai first and English second. Internal CMS
+notes are never included. After the shop confirms it, the durable outbox sends
+a separate assignment message and distinct messages for rescheduling, removal or
 reassignment, and cancellation. If the owner and therapist addresses are the
 same, the initial therapist copy is suppressed and the richer owner email is
 sent once. The existing `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are reused, so

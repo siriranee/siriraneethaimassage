@@ -135,7 +135,7 @@ test("pending request plans distinguish updates, reassignment and withdrawal", a
   );
 });
 
-test("pending therapist templates are explicit and contain no customer identity", async () => {
+test("pending therapist templates are explicit and include customer details", async () => {
   const { renderTherapistBookingEmail } = await import(
     "@/server/booking/booking-email"
   );
@@ -148,6 +148,12 @@ test("pending therapist templates are explicit and contain no customer identity"
     localTime: "13:00",
     timezone: "Europe/Dublin" as const,
     status: "pending" as const,
+    customer: {
+      name: "Poomtawee Example",
+      phone: "+353 89 000 0000",
+      email: "poomtawee@outlook.com",
+      notes: "Please use the side entrance.",
+    },
   };
   const updated = renderTherapistBookingEmail(booking, {
     event: "request-updated",
@@ -162,19 +168,49 @@ test("pending therapist templates are explicit and contain no customer identity"
     confirmationUrl: "https://siriranee.com/book/confirm?token=must-not-appear",
   });
 
-  assert.match(updated.subject, /^PENDING request updated/);
+  assert.match(
+    updated.subject,
+    /^อัปเดตคำขอที่รอการยืนยัน \/ PENDING request updated/,
+  );
+  assert.ok(
+    updated.html.indexOf('<td lang="th" style="padding:30px') <
+      updated.html.indexOf('<td lang="en-IE" style="padding:30px'),
+  );
+  assert.ok(
+    updated.text.indexOf("สถานะตารางงาน") <
+      updated.text.indexOf("Schedule status"),
+  );
+  assert.match(updated.text, /รอการยืนยันและยังไม่ใช่นัดหมายที่ยืนยันแล้ว/);
   assert.match(updated.text, /still pending and is not a confirmed appointment/i);
+  assert.match(updated.html, /ตรวจสอบและยืนยันการจอง/);
   assert.match(updated.html, /Review and confirm booking/);
+  assert.match(updated.text, /ไม่ต้องเข้าสู่ระบบ/);
   assert.match(updated.text, /no login required/i);
   assert.match(updated.text, /signed-capability/);
-  assert.match(withdrawn.subject, /^Pending request withdrawn/);
+  assert.match(
+    withdrawn.subject,
+    /^ถอนคำขอที่รอการยืนยัน \/ Pending request withdrawn/,
+  );
+  assert.match(withdrawn.text, /รายการนี้ยังไม่เคยได้รับการยืนยัน/);
   assert.match(withdrawn.text, /not a confirmed appointment/i);
   assert.match(withdrawn.text, /Do not treat this request as an active appointment/i);
   assert.doesNotMatch(`${withdrawn.html}${withdrawn.text}`, /must-not-appear/);
-  assert.doesNotMatch(
-    `${updated.html}${updated.text}${withdrawn.html}${withdrawn.text}`,
-    /customer name|customer email|customer phone|notes|poomtawee|@outlook/i,
-  );
+  const rendered = `${updated.html}${updated.text}${withdrawn.html}${withdrawn.text}`;
+  for (const expected of [
+    "ข้อมูลลูกค้า",
+    "Customer details",
+    "Poomtawee Example",
+    "+353 89 000 0000",
+    "poomtawee@outlook.com",
+    "Please use the side entrance.",
+    "หมายเหตุการจอง",
+    "Booking notes",
+  ]) {
+    assert.match(
+      rendered,
+      new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+  }
 });
 
 test("pending reassignment delivers an immutable withdrawal and a new pending request", async () => {
