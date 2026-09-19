@@ -568,7 +568,8 @@ test("isolated launch verification covers services, ten bookings and administrat
     therapistId: primaryTherapist.id,
     durationMinutes: 60,
     localDate: publicDate,
-    localTime: "08:00",
+    // Published closing is 20:00: this request exercises the extra final hour.
+    localTime: "20:00",
     privacyAccepted: true,
     website: "",
   };
@@ -665,6 +666,20 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.equal(ownerEmailAttempts.length, 0);
   assert.equal(therapistEmailAttempts.length, 0);
 
+  const { getPublicAvailability } = await import("@/server/booking/public-availability");
+  const { getAdminAvailability } = await import("@/server/cms/booking-service");
+  assert.equal((await getPublicAvailability(publicRequest)).slots.at(-1)?.localTime, "20:00");
+  assert.equal((await getAdminAvailability(publicRequest)).at(-1)?.localTime, "20:00");
+  await assert.rejects(
+    createPublicBooking({ ...publicRequest, localTime: "20:30" }, {
+      idempotencyKey: "isolated-beyond-extended-booking-window",
+      requestId: "isolated-beyond-extended-booking-window",
+      sendOwnerBookingEmail,
+      sendTherapistBookingEmail,
+    }),
+    CmsConflictError,
+  );
+
   const publicBooking = await createPublicBooking(publicRequest, {
     idempotencyKey: "isolated-public-booking-request-0001",
     requestId: "isolated-public-booking",
@@ -677,6 +692,8 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.equal(publicBooking.assignedStaffId, primaryTherapist.id);
   assert.equal(publicBooking.assignedStaffName, primaryTherapist.name);
   assert.ok(publicBooking.privacyAcceptedAt);
+  assert.equal(publicBooking.localTime, "20:00");
+  assert.equal(Temporal.Instant.from(publicBooking.endsAt).toZonedDateTimeISO("Europe/Dublin").hour, 21);
 
   await repository.saveBooking(
     {

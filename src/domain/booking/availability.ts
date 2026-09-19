@@ -41,6 +41,10 @@ export type AvailabilityInput = {
 const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
+// Owner-approved booking window: treatments and buffers may finish one hour
+// after the published closing time. Public and CMS booking checks share this rule.
+const closingExtensionMinutes = 60;
+
 function parseMinutes(value: string) {
   if (!timePattern.test(value)) throw new Error("Time must use HH:mm.");
   const [hours, minutes] = value.split(":").map(Number);
@@ -198,12 +202,17 @@ export function getAvailabilitySlots(input: AvailabilityInput): readonly Availab
 
   const openMinutes = parseMinutes(hours.opens);
   const closeMinutes = parseMinutes(hours.closes);
+  // Occupancy and closures are loaded by appointment date. Do not introduce
+  // overnight appointments that would bypass the following day's checks.
+  const latestEndMinutes = Math.min(closeMinutes + closingExtensionMinutes, 24 * 60);
   let openingStart: Temporal.Instant;
   let openingEnd: Temporal.Instant;
 
   try {
     openingStart = dublinInstant(input.localDate, hours.opens);
-    openingEnd = dublinInstant(input.localDate, hours.closes);
+    openingEnd = latestEndMinutes === 24 * 60
+      ? dublinInstant(date.add({ days: 1 }).toString(), "00:00")
+      : dublinInstant(input.localDate, formatMinutes(latestEndMinutes));
   } catch {
     return [];
   }
@@ -213,7 +222,7 @@ export function getAvailabilitySlots(input: AvailabilityInput): readonly Availab
 
   for (
     let candidate = openMinutes;
-    candidate + input.durationMinutes <= closeMinutes;
+    candidate + input.durationMinutes <= latestEndMinutes;
     candidate += input.settings.slotIntervalMinutes
   ) {
     const localTime = formatMinutes(candidate);

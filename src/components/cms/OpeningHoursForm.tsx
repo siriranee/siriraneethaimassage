@@ -114,7 +114,11 @@ export function OpeningHoursForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
       serverErrors={fieldErrors}
     >
       <section className={styles.section}>
-        <header className={styles.sectionHeader}><h2>Regular weekly hours</h2><p>Times are local to Europe/Dublin. Closed days retain their times for easy reopening.</p></header>
+        <header className={styles.sectionHeader}>
+          <h2>Regular weekly hours</h2>
+          <p>Times are local to Europe/Dublin. Closed days retain their times for easy reopening.</p>
+          <p>Bookings may finish up to one hour after the published closing time, but no later than midnight. The last start time depends on treatment duration and any buffers.</p>
+        </header>
         <div className={styles.priceList}>
           {site.weeklyHours.map((row, index) => (
             <div className={styles.priceRow} key={row.day}>
