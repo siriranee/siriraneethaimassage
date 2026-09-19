@@ -22,6 +22,7 @@ type ValidationIssue = Readonly<{
   label: string;
   message: string;
   source: "native" | "server";
+  unmapped?: boolean;
 }>;
 
 type CmsValidatedFormProps = Omit<
@@ -291,7 +292,6 @@ export const CmsValidatedForm = forwardRef<HTMLFormElement, CmsValidatedFormProp
     forwardedRef,
   ) {
     const formRef = useRef<HTMLFormElement | null>(null);
-    const summaryRef = useRef<HTMLDivElement>(null);
     const touchedRef = useRef(new Set<string>());
     const managedCustomValidityRef = useRef(new WeakSet<FormControl>());
     const syncedControlsRef = useRef(new Set<FormControl>());
@@ -475,7 +475,14 @@ export const CmsValidatedForm = forwardRef<HTMLFormElement, CmsValidatedFormProp
         control.scrollIntoView({ behavior: "smooth", block: "center" });
         return true;
       }
-      summaryRef.current?.focus();
+      const formError = form
+        ? Array.from(form.querySelectorAll<HTMLElement>("[data-cms-form-error]"))
+            .find((element) => element.dataset.cmsFormError === issue.field)
+        : undefined;
+      if (formError) {
+        formError.focus();
+        return true;
+      }
       return false;
     }
 
@@ -493,6 +500,7 @@ export const CmsValidatedForm = forwardRef<HTMLFormElement, CmsValidatedFormProp
           label: control ? controlLabel(control, field) : humaniseField(field),
           message,
           source: "server" as const,
+          unmapped: !control,
         };
       });
       setIssues((current) => [
@@ -587,31 +595,19 @@ export const CmsValidatedForm = forwardRef<HTMLFormElement, CmsValidatedFormProp
         onSubmitCapture={handleSubmitCapture}
         ref={assignRef}
       >
-        {issues.length ? (
-          <div
-            aria-atomic="true"
-            className={styles.summary}
-            ref={summaryRef}
-            role="alert"
-            tabIndex={-1}
-          >
-            <p>
-              {issues.length === 1
-                ? "Please correct this field:"
-                : `Please correct these ${issues.length} fields:`}
-            </p>
-            <ul>
-              {issues.map((issue, index) => (
-                <li id={`${instanceId}-validation-${index}`} key={`${issue.key}:${issue.source}`}>
-                  <button onClick={() => focusIssue(issue)} type="button">
-                    <strong>{issue.label}:</strong> {issue.message}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
         {children}
+        {issues.map((issue, index) => (
+          <p
+            className={issue.unmapped ? styles.formError : styles.accessibleError}
+            data-cms-form-error={issue.unmapped ? issue.field : undefined}
+            id={`${instanceId}-validation-${index}`}
+            key={`${issue.key}:${issue.source}`}
+            role="alert"
+            tabIndex={issue.unmapped ? -1 : undefined}
+          >
+            {issue.label}: {issue.message}
+          </p>
+        ))}
       </form>
     );
   },

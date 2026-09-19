@@ -1,10 +1,10 @@
 import { Ban, Clock3 } from "lucide-react";
-import { CmsBookingEmailAttentionNotice } from "@/components/cms/CmsBookingEmailAttentionNotice";
 
 import {
   CmsCalendar,
   type CmsCalendarBooking,
   type CmsCalendarClosure,
+  type CmsCalendarTherapist,
 } from "@/components/cms/CmsCalendar";
 import {
   CmsNotice,
@@ -19,9 +19,11 @@ import {
   normalizeCalendarMonth,
 } from "@/domain/booking/calendar-month";
 import { canCmsRole } from "@/domain/cms/permissions";
+import { isApprovedImageUrlForOwnership } from "@/lib/media/cloudinary-delivery";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsContent } from "@/server/cms/content-service";
 import { listCmsBookingEmailAttention, listCmsBookings, listCmsClosures } from "@/server/cms/read-service";
+import { getCloudinaryMediaOwnershipConfig } from "@/server/media/config";
 
 type PageProps = {
   readonly searchParams: Promise<
@@ -52,14 +54,35 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
       : monthFromCalendarDate(today) === month
         ? today
         : range.from;
-  const [content, bookings, closures, emailAttention] = await Promise.all([
+  const [content, bookings, closures] = await Promise.all([
     getCmsContent(),
     listCmsBookings({ from: range.from, to: range.to }),
     listCmsClosures(range.from, range.to),
-    listCmsBookingEmailAttention(),
   ]);
-  const visibleEmailAttention = await listCmsBookingEmailAttention(bookings.map((booking) => booking.id), 500);
-  const attentionByBooking = new Map(visibleEmailAttention.map((item) => [item.bookingId, item]));
+  const cloudinaryOwnership = getCloudinaryMediaOwnershipConfig();
+  const therapistProfiles = new Map<string, CmsCalendarTherapist>(
+    content.team.map((member) => [member.id, {
+      id: member.id,
+      name: member.name,
+      imageUrl: isApprovedImageUrlForOwnership(member.imageUrl, cloudinaryOwnership) ? member.imageUrl : "",
+      imageAlt: member.imageAlt,
+    }]),
+  );
+  // Include cancelled bookings: a hidden appointment can still need email review.
+  const bookingAssignments = new Map(bookings.map((booking) => [booking.id, booking.assignedStaffId]));
+  const emailAttention = (await listCmsBookingEmailAttention(bookings.map((booking) => booking.id), bookings.length))
+    .map((item) => ({ ...item, assignedStaffId: bookingAssignments.get(item.bookingId) ?? "" }));
+  // Keep historical assignments accessible even if their profile no longer exists.
+  for (const booking of bookings) {
+    if (booking.assignedStaffId && !therapistProfiles.has(booking.assignedStaffId)) {
+      therapistProfiles.set(booking.assignedStaffId, {
+        id: booking.assignedStaffId,
+        name: booking.assignedStaffName || "Former therapist",
+        imageUrl: "",
+        imageAlt: "",
+      });
+    }
+  }
   const calendarBookings: readonly CmsCalendarBooking[] = bookings
     .filter(
       (booking) =>
@@ -69,20 +92,18 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
     .map((booking) => ({
       id: booking.id,
       reference: booking.reference,
+      assignedStaffId: booking.assignedStaffId,
+      therapistName: therapistProfiles.get(booking.assignedStaffId)?.name ?? booking.assignedStaffName,
       customerName: booking.customer.name,
       customerPhone: booking.customer.phone,
-      hasCustomerEmail: Boolean(booking.customer.email),
-      customerNotes: booking.customer.notes,
+      customerEmail: booking.customer.email,
       serviceName: booking.serviceName,
-      assignedStaffId: booking.assignedStaffId,
-      therapistName: booking.assignedStaffName,
       durationMinutes: booking.durationMinutes,
+      priceCents: booking.priceCents,
+      endsAt: booking.endsAt,
       localDate: booking.localDate,
       localTime: booking.localTime,
       status: booking.status,
-      version: booking.version,
-      demo: booking.demo,
-      emailAttention: attentionByBooking.get(booking.id),
     }));
   const calendarClosures: readonly CmsCalendarClosure[] = closures
     .filter((closure) => closure.active)
@@ -116,17 +137,18 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
         </CmsNotice>
       ) : null}
 
-      <CmsBookingEmailAttentionNotice items={emailAttention} />
-
       <CmsCalendar
         bookings={calendarBookings}
         canManageBookings={canManageBookings}
         closedWeekdays={content.site.weeklyHours.map((hours) => !hours.open)}
         closures={calendarClosures}
+        emailAttention={emailAttention}
         initialSelectedDate={selectedDate}
         key={`${month}:${selectedDate}`}
         month={month}
+        therapists={[...therapistProfiles.values()].sort((first, second) => first.name.localeCompare(second.name))}
         today={today}
+        weeklyHours={content.site.weeklyHours}
       />
 
       <CmsNotice title="Customer booking rule">

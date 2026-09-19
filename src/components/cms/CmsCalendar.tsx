@@ -5,24 +5,28 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   Plus,
+  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
-import { useId, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useId, useMemo } from "react";
 
+import { CmsTherapistPortrait as TherapistPortrait } from "@/components/cms/CmsTherapistPortrait";
+import { CmsWorkSchedule } from "@/components/cms/CmsWorkSchedule";
 import { CalendarLegend } from "@/components/booking/CalendarLegend";
 import calendarStyles from "@/components/booking/BookingCalendar.module.css";
-import { CmsBookingQuickActions } from "@/components/cms/CmsBookingQuickActions";
-import { CmsBookingStatus } from "@/components/cms/CmsBookingStatus";
+import { CmsBookingEmailAttentionNotice } from "@/components/cms/CmsBookingEmailAttentionNotice";
+import { cmsCalendarHref as calendarHref, filterCmsCalendarBookings } from "@/domain/booking/cms-calendar";
 import {
   buildCalendarMonthCells,
   calendarWeekdayLabels,
   formatCalendarDate,
   formatCalendarMonth,
+  normalizeCalendarDate,
   shiftCalendarMonth,
 } from "@/domain/booking/calendar-month";
-import type { BookingStatus } from "@/domain/cms/types";
+import type { BookingStatus, CmsWeeklyHours } from "@/domain/cms/types";
 import type { CmsBookingEmailAttention } from "@/domain/cms/notification-presentation";
 
 import styles from "./CmsCalendar.module.css";
@@ -30,20 +34,25 @@ import styles from "./CmsCalendar.module.css";
 export type CmsCalendarBooking = {
   readonly id: string;
   readonly reference: string;
-  readonly customerName: string;
-  readonly customerPhone: string;
-  readonly hasCustomerEmail: boolean;
-  readonly customerNotes: string;
-  readonly serviceName: string;
   readonly assignedStaffId: string;
   readonly therapistName: string;
+  readonly customerName: string;
+  readonly customerPhone: string;
+  readonly customerEmail: string;
+  readonly serviceName: string;
   readonly durationMinutes: number;
+  readonly priceCents: number;
+  readonly endsAt: string;
   readonly localDate: string;
   readonly localTime: string;
   readonly status: BookingStatus;
-  readonly version: number;
-  readonly demo: boolean;
-  readonly emailAttention?: CmsBookingEmailAttention;
+};
+
+export type CmsCalendarTherapist = {
+  readonly id: string;
+  readonly name: string;
+  readonly imageUrl: string;
+  readonly imageAlt: string;
 };
 
 export type CmsCalendarClosure = {
@@ -61,9 +70,12 @@ type CmsCalendarProps = {
   readonly today: string;
   readonly initialSelectedDate: string;
   readonly bookings: readonly CmsCalendarBooking[];
+  readonly therapists: readonly CmsCalendarTherapist[];
+  readonly emailAttention: readonly (CmsBookingEmailAttention & { readonly assignedStaffId: string })[];
   readonly closures: readonly CmsCalendarClosure[];
   readonly canManageBookings: boolean;
   readonly closedWeekdays: readonly boolean[];
+  readonly weeklyHours: readonly CmsWeeklyHours[];
 };
 
 function groupByDate<T extends { readonly localDate: string }>(
@@ -78,12 +90,6 @@ function groupByDate<T extends { readonly localDate: string }>(
   }
 
   return groups;
-}
-
-function calendarHref(month: string, date?: string) {
-  const params = new URLSearchParams({ month });
-  if (date) params.set("date", date);
-  return `/cms/calendar?${params.toString()}`;
 }
 
 function isRegularDayOff(
@@ -134,23 +140,40 @@ export function CmsCalendar({
   today,
   initialSelectedDate,
   bookings,
+  therapists,
+  emailAttention,
   closures,
   canManageBookings,
   closedWeekdays,
+  weeklyHours,
 }: CmsCalendarProps) {
   const calendarHeadingId = useId();
   const calendarStatusId = useId();
   const agendaHeadingId = useId();
-  const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
+  const searchParams = useSearchParams();
+  const requestedDate = normalizeCalendarDate(searchParams.get("date") ?? "");
+  const selectedDate = requestedDate?.startsWith(`${month}-`) ? requestedDate : initialSelectedDate;
+  const selectedTherapistId = searchParams.get("therapistId") ?? "";
+  const selectedTherapistName = selectedTherapistId === "unassigned"
+    ? "Unassigned"
+    : therapists.find((therapist) => therapist.id === selectedTherapistId)?.name ?? "Selected therapist";
+  const filteredBookings = useMemo(
+    () => filterCmsCalendarBookings(bookings, selectedTherapistId),
+    [bookings, selectedTherapistId],
+  );
   const cells = useMemo(() => buildCalendarMonthCells(month), [month]);
-  const bookingsByDate = useMemo(() => groupByDate(bookings), [bookings]);
+  const filteredEmailAttention = useMemo(
+    () => filterCmsCalendarBookings(emailAttention, selectedTherapistId).slice(0, 8),
+    [emailAttention, selectedTherapistId],
+  );
+  const bookingsByDate = useMemo(() => groupByDate(filteredBookings), [filteredBookings]);
   const closuresByDate = useMemo(() => groupByDate(closures), [closures]);
   const selectedBookings = useMemo(
     () =>
       [...(bookingsByDate.get(selectedDate) ?? [])].sort(
         (first, second) =>
           first.localTime.localeCompare(second.localTime) ||
-          first.customerName.localeCompare(second.customerName),
+          first.therapistName.localeCompare(second.therapistName) || first.id.localeCompare(second.id),
       ),
     [bookingsByDate, selectedDate],
   );
@@ -174,14 +197,28 @@ export function CmsCalendar({
   const previousMonth = shiftCalendarMonth(month, -1);
   const nextMonth = shiftCalendarMonth(month, 1);
   const todayMonth = today.slice(0, 7);
+  const weekday = new Date(`${selectedDate}T12:00:00Z`).getUTCDay();
+  const hours = weeklyHours[weekday === 0 ? 6 : weekday - 1];
+  const scheduleTherapists = useMemo(() => {
+    const roster = [...therapists];
+    if (selectedTherapistId === "unassigned" || bookings.some((booking) => !booking.assignedStaffId.trim()) || emailAttention.some((item) => !item.assignedStaffId.trim())) {
+      roster.push({ id: "unassigned", name: "Unassigned", imageUrl: "", imageAlt: "" });
+    }
+    return selectedTherapistId ? roster.filter((therapist) => therapist.id === selectedTherapistId) : roster;
+  }, [therapists, bookings, emailAttention, selectedTherapistId]);
 
   function selectDate(localDate: string) {
-    setSelectedDate(localDate);
-    window.history.replaceState(null, "", calendarHref(month, localDate));
+    window.history.replaceState(null, "", calendarHref(month, localDate, selectedTherapistId));
+  }
+
+  function selectTherapist(therapistId: string) {
+    if (therapistId === selectedTherapistId) return;
+    window.history.pushState(null, "", calendarHref(month, selectedDate, therapistId));
   }
 
   return (
     <div className={styles.calendarLayout}>
+      <CmsBookingEmailAttentionNotice items={filteredEmailAttention} />
       <section
         aria-describedby={calendarStatusId}
         aria-labelledby={calendarHeadingId}
@@ -202,7 +239,7 @@ export function CmsCalendar({
             <Link
               aria-label={`Show ${formatCalendarMonth(previousMonth)}`}
               className={calendarStyles.monthButton}
-              href={calendarHref(previousMonth)}
+              href={calendarHref(previousMonth, undefined, selectedTherapistId)}
               scroll={false}
             >
               <ChevronLeft aria-hidden="true" />
@@ -219,7 +256,7 @@ export function CmsCalendar({
             ) : (
               <Link
                 className={calendarStyles.todayButton}
-                href={calendarHref(todayMonth, today)}
+                href={calendarHref(todayMonth, today, selectedTherapistId)}
                 scroll={false}
               >
                 Today
@@ -228,7 +265,7 @@ export function CmsCalendar({
             <Link
               aria-label={`Show ${formatCalendarMonth(nextMonth)}`}
               className={calendarStyles.monthButton}
-              href={calendarHref(nextMonth)}
+              href={calendarHref(nextMonth, undefined, selectedTherapistId)}
               scroll={false}
             >
               <ChevronRight aria-hidden="true" />
@@ -341,6 +378,7 @@ export function CmsCalendar({
           <p>
             {formatCalendarDate(selectedDate)} selected · {selectedBookings.length}{" "}
             appointment{selectedBookings.length === 1 ? "" : "s"}
+            {selectedTherapistId ? ` · ${selectedTherapistName}` : ""}
             {selectedPendingCount ? ` · ${selectedPendingCount} pending` : ""}
             {selectedRegularDayOff ? " · Day off" : ""}
             {selectedClosures.length
@@ -353,127 +391,60 @@ export function CmsCalendar({
       <section aria-labelledby={agendaHeadingId} className={styles.agenda}>
         <header className={styles.agendaHeader}>
           <div>
-            <span>Selected day</span>
+            <span>Daily work schedule · Dublin time</span>
             <h2 id={agendaHeadingId}>{formatCalendarDate(selectedDate)}</h2>
           </div>
-          <div className={styles.agendaActions}>
+          {canManageBookings ? <div className={styles.agendaActions}>
             <Link href={`/cms/bookings/new?date=${selectedDate}`}>
               <Plus aria-hidden="true" /> Add booking
             </Link>
             <Link href={`/cms/calendar/closures?date=${selectedDate}`}>
               <Ban aria-hidden="true" /> Block this day
             </Link>
-          </div>
+          </div> : null}
         </header>
 
         <div className={styles.agendaBody}>
-          {selectedRegularDayOff ? (
-            <div className={styles.agendaGroup}>
-              <h3>Business hours</h3>
-              <div className={styles.closureItem}>
-                <Ban aria-hidden="true" />
-                <span>
-                  <strong>Day off</strong>
-                  <small>Closed in the weekly business hours.</small>
-                </span>
-              </div>
+          <fieldset className={styles.therapistFilter}>
+            <legend>Massage therapist</legend>
+            <div className={styles.therapistChoices}>
+              <button aria-pressed={!selectedTherapistId} className={styles.therapistChoice} onClick={() => selectTherapist("")} type="button">
+                <span className={styles.therapistPortrait}><UsersRound aria-hidden="true" /></span>
+                <strong>All therapists</strong>
+              </button>
+              {therapists.map((therapist) => (
+                <button
+                  aria-label={`Show bookings for ${therapist.name}`}
+                  aria-pressed={selectedTherapistId === therapist.id}
+                  className={styles.therapistChoice}
+                  key={therapist.id}
+                  onClick={() => selectTherapist(therapist.id)}
+                  type="button"
+                >
+                  <TherapistPortrait {...therapist} />
+                  <strong>{therapist.name}</strong>
+                </button>
+              ))}
+              {bookings.some((booking) => !booking.assignedStaffId.trim()) || emailAttention.some((item) => !item.assignedStaffId.trim()) ? (
+                <button aria-pressed={selectedTherapistId === "unassigned"} className={styles.therapistChoice} onClick={() => selectTherapist("unassigned")} type="button">
+                  <TherapistPortrait name="Unassigned" imageUrl="" imageAlt="" />
+                  <strong>Unassigned</strong>
+                </button>
+              ) : null}
             </div>
-          ) : null}
-
-          {selectedClosures.length ? (
-            <div className={styles.agendaGroup}>
-              <h3>Closures</h3>
-              <ul>
-                {selectedClosures.map((closure) => (
-                  <li key={closure.id}>
-                    <Link
-                      className={styles.closureItem}
-                      href={`/cms/calendar/closures/${closure.id}/edit?date=${selectedDate}`}
-                    >
-                      <Ban aria-hidden="true" />
-                      <span>
-                        <strong>
-                          {closure.closedAllDay
-                            ? "Day off"
-                            : `${closure.startsAtLocal}–${closure.endsAtLocal}`}
-                        </strong>
-                        <small>
-                          {closure.reason}
-                          {closure.publicLabel
-                            ? ` · Public: ${closure.publicLabel}`
-                            : ""}
-                        </small>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {selectedBookings.length ? (
-            <div className={styles.agendaGroup}>
-              <h3>Appointments</h3>
-              <ul>
-                {selectedBookings.map((booking) => (
-                  <li key={booking.id}>
-                    <article className={styles.agendaBookingCard}>
-                      <div className={styles.agendaBookingMain}>
-                        <time dateTime={`${booking.localDate}T${booking.localTime}`}>
-                          <Clock3 aria-hidden="true" /> {booking.localTime}
-                        </time>
-                        <div>
-                          <strong>{booking.customerName}</strong>
-                          <small>
-                            {booking.serviceName} · {booking.durationMinutes} min ·{" "}
-                            {booking.reference}
-                            {booking.demo ? " · Fictional mock" : ""}
-                          </small>
-                          <dl className={styles.agendaBookingDetails}>
-                            <div>
-                              <dt>Therapist</dt>
-                              <dd>{booking.therapistName || "Unassigned"}</dd>
-                            </div>
-                            <div>
-                              <dt>Phone</dt>
-                              <dd>{booking.customerPhone}</dd>
-                            </div>
-                            <div>
-                              <dt>Notes</dt>
-                              <dd>{booking.customerNotes || "No notes provided"}</dd>
-                            </div>
-                          </dl>
-                          <CmsBookingStatus status={booking.status} />
-                        </div>
-                      </div>
-                      <footer className={styles.agendaBookingFooter}>
-                            <Link href={`/cms/bookings/${booking.id}`}>View</Link>
-                        {canManageBookings ? (
-                          <CmsBookingQuickActions
-                            booking={booking}
-                            emailAttention={booking.emailAttention}
-                            hasCustomerEmail={booking.hasCustomerEmail}
-                            isMock={booking.demo}
-                            key={`${booking.id}:${booking.version}`}
-                          />
-                        ) : null}
-                      </footer>
-                    </article>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {!selectedBookings.length &&
-          !selectedClosures.length &&
-          !selectedRegularDayOff ? (
-            <div className={styles.emptyAgenda}>
-              <CalendarDays aria-hidden="true" />
-              <strong>No appointments or closures</strong>
-              <p>This day is clear in the current operational calendar.</p>
-            </div>
-          ) : null}
+          </fieldset>
+          <p className={styles.scheduleStatus} role="status" aria-live="polite">
+            {selectedBookings.length} appointment{selectedBookings.length === 1 ? "" : "s"}
+            {selectedTherapistId ? ` · ${selectedTherapistName}` : " · All therapists"}
+            {selectedPendingCount ? ` · ${selectedPendingCount} pending` : ""}
+          </p>
+          <CmsWorkSchedule
+            date={selectedDate}
+            bookings={selectedBookings}
+            therapists={scheduleTherapists}
+            closures={selectedClosures}
+            hours={hours}
+          />
         </div>
       </section>
     </div>

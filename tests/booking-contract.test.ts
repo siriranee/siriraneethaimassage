@@ -171,10 +171,9 @@ test("CMS booking views use cards with accessible icon-only status actions", asy
   assert.match(viewStyles, /\.details \.bookingDetailStatus[\s\S]*display:\s*flex/);
 
   assert.match(calendarPage, /canManageBookings=\{canManageBookings\}/);
-  assert.match(calendar, /className=\{styles\.agendaBookingCard\}/);
-  assert.match(calendar, /<CmsBookingQuickActions/);
-  assert.match(calendar, /booking\.customerPhone/);
-  assert.match(calendar, /booking\.customerNotes \|\| "No notes provided"/);
+  assert.match(calendar, /<CmsWorkSchedule/);
+  assert.match(calendar, /<TherapistPortrait \{\.\.\.therapist\}/);
+  assert.doesNotMatch(calendar, /CmsBookingQuickActions|customerNotes|internalNotes/);
   assert.match(quickActions, /Confirm booking \$\{booking\.reference\} and email customer/);
   assert.match(quickActions, /No customer email is recorded/);
   assert.match(quickActions, /Cancel booking \$\{booking\.reference\} and email customer/);
@@ -540,6 +539,7 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
   assert.doesNotMatch(page, /isPendingCapacityExpired\(booking\)/);
   assert.match(page, /closedWeekdays=\{content\.site\.weeklyHours\.map/);
   assert.match(page, /<CmsCalendar/);
+  assert.match(page, /isApprovedImageUrlForOwnership\(member\.imageUrl, cloudinaryOwnership\) \? member\.imageUrl : ""/);
   assert.match(page, /key=\{`\$\{month\}:\$\{selectedDate\}`\}/);
   assert.doesNotMatch(page, /Calendar view|value="week"/);
 
@@ -567,17 +567,18 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
   assert.match(calendar, /Pending/);
   assert.match(calendar, /Partial closure/);
   assert.match(calendar, /isRegularDayOff/);
-  assert.match(calendar, /Closed in the weekly business hours\./);
-  assert.match(
-    calendarStyles,
-    /\.agendaBookingMain\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/,
-  );
-  assert.equal(
-    (calendarStyles.match(/\.agendaBookingMain\s*\{/g) ?? []).length,
-    1,
-  );
+  assert.match(calendar, /weeklyHours\[weekday === 0 \? 6 : weekday - 1\]/);
+  assert.doesNotMatch(calendarStyles, /\.agendaBookingMain|\.agendaBookingDetails|\.agendaBookingFooter/);
+  assert.match(calendar, /filterCmsCalendarBookings\(bookings, selectedTherapistId\)/);
+  assert.match(calendar, /groupByDate\(filteredBookings\)/);
+  assert.match(calendar, /window\.history\.pushState/);
+  assert.match(calendar, /useSearchParams\(\)/);
+  assert.match(calendar, /calendarHref\(previousMonth, undefined, selectedTherapistId\)/);
+  assert.match(calendar, /calendarHref\(nextMonth, undefined, selectedTherapistId\)/);
+  assert.match(calendar, /calendarHref\(todayMonth, today, selectedTherapistId\)/);
+  assert.match(calendarStyles, /\.therapistPortrait\s*\{/);
   assert.match(calendar, /\/cms\/bookings\/new\?date=\$\{selectedDate\}/);
-  assert.match(calendar, /\/cms\/calendar\/closures\/\$\{closure\.id\}\/edit/);
+  assert.match(calendar, /closures=\{selectedClosures\}/);
   assert.doesNotMatch(calendarStyles, /\.legend(?:\s|\{)/);
   assert.match(calendarStyles, /@media \(max-width: 390px\)/);
   assert.match(calendarStyles, /@media \(forced-colors: active\)/);
