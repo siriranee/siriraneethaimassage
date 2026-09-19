@@ -641,6 +641,30 @@ test("isolated launch verification covers services, ten bookings and administrat
       ),
     CmsValidationError,
   );
+  for (const invalidDetails of [
+    { customerName: " " },
+    { phone: "" },
+    { phone: "-------" },
+    { email: "" },
+    { email: "not-an-email" },
+    { privacyAccepted: false },
+    { notes: "x".repeat(601) },
+  ]) {
+    const field = Object.keys(invalidDetails)[0];
+    await assert.rejects(
+      () => createPublicBooking({ ...publicRequest, ...invalidDetails }, {
+        idempotencyKey: `isolated-invalid-contact-${field}`,
+        requestId: "isolated-invalid-contact",
+        sendOwnerBookingEmail,
+        sendTherapistBookingEmail,
+      }),
+      (error: unknown) => error instanceof CmsValidationError && Boolean(error.fields[field]),
+    );
+  }
+  assert.equal((await repository.listBookings({ from: publicDate, to: publicDate })).length, 0);
+  assert.equal(ownerEmailAttempts.length, 0);
+  assert.equal(therapistEmailAttempts.length, 0);
+
   const publicBooking = await createPublicBooking(publicRequest, {
     idempotencyKey: "isolated-public-booking-request-0001",
     requestId: "isolated-public-booking",
@@ -718,8 +742,8 @@ test("isolated launch verification covers services, ten bookings and administrat
   const bookingWithFailedEmail = await createPublicBooking(
     {
       ...publicRequest,
-      customerName: "Demo Public Guest Without Email",
-      email: "",
+      customerName: "Demo Public Guest With Email Failure",
+      email: "demo.failure@example.invalid",
       localDate: failedEmailDate,
     },
     {

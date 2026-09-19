@@ -18,6 +18,10 @@ import {
   getAcuityBookingOptions,
 } from "@/content/booking";
 import { buildContactPreferenceHref } from "@/lib/contact-links";
+import {
+  bookingContactFields,
+  validateBookingContact,
+} from "@/domain/booking/contact-validation";
 
 import styles from "./BookingPlanner.module.css";
 
@@ -279,7 +283,7 @@ export function BookingPlanner({
   >(initialDate ? "loading" : "idle");
   const [availabilityMessage, setAvailabilityMessage] = useState("");
   const [submissionState, setSubmissionState] = useState<
-    "idle" | "submitting" | "error" | "success"
+    "idle" | "submitting" | "invalid" | "error" | "success"
   >("idle");
   const [submissionMessage, setSubmissionMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<
@@ -292,6 +296,7 @@ export function BookingPlanner({
   const errorRef = useRef<HTMLDivElement>(null);
   const confirmationRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef("");
+  const touchedContactFields = useRef(new Set<string>());
 
   const selectedService =
     services.find((service) => service.id === selectedServiceId) ??
@@ -490,8 +495,11 @@ export function BookingPlanner({
   ]);
 
   useEffect(() => {
-    if (submissionState === "error") {
-      errorRef.current?.focus();
+    if (submissionState === "error" || submissionState === "invalid") {
+      const invalidField = formRef.current?.querySelector<HTMLElement>(
+        '[aria-invalid="true"]',
+      );
+      (invalidField ?? errorRef.current)?.focus();
     }
   }, [submissionState]);
 
@@ -518,6 +526,7 @@ export function BookingPlanner({
     setSubmissionState("idle");
     setSubmissionMessage("");
     setFieldErrors({});
+    touchedContactFields.current.clear();
     setConfirmation(null);
     idempotencyKeyRef.current = "";
   }
@@ -607,6 +616,25 @@ export function BookingPlanner({
     }, 50);
   }
 
+  function validateContactField(target: EventTarget, markTouched: boolean) {
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+    if (!bookingContactFields.some((field) => field === target.name) || !target.form) return;
+    if (markTouched || target.type === "checkbox") touchedContactFields.current.add(target.name);
+    if (!touchedContactFields.current.has(target.name) && !fieldErrors[target.name]) return;
+
+    const data = new FormData(target.form);
+    const errors = validateBookingContact({
+      ...Object.fromEntries(data),
+      privacyAccepted: data.get("privacyAccepted") === "on",
+    });
+    setFieldErrors((current) => {
+      const next = { ...current };
+      if (errors[target.name]) next[target.name] = errors[target.name];
+      else delete next[target.name];
+      return next;
+    });
+  }
+
   async function submitBooking(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -622,6 +650,19 @@ export function BookingPlanner({
 
     const form = event.currentTarget;
     const data = new FormData(form);
+    const errors = validateBookingContact({
+      ...Object.fromEntries(data),
+      privacyAccepted: data.get("privacyAccepted") === "on",
+    });
+    if (Object.keys(errors).length) {
+      bookingContactFields.forEach((field) => touchedContactFields.current.add(field));
+      setFieldErrors(errors);
+      setSubmissionState("invalid");
+      setSubmissionMessage("Please complete the required fields and correct the highlighted details.");
+      const firstInvalid = form.elements.namedItem(Object.keys(errors)[0]);
+      if (firstInvalid instanceof HTMLElement) firstInvalid.focus();
+      return;
+    }
     idempotencyKeyRef.current ||= createIdempotencyKey();
     setSubmissionState("submitting");
     setSubmissionMessage("Sending your request...");
@@ -711,6 +752,7 @@ export function BookingPlanner({
         aria-busy={submissionState === "submitting"}
         aria-label="Massage appointment booking"
         className={styles.plannerGrid}
+        noValidate
         onSubmit={submitBooking}
         ref={formRef}
       >
@@ -1091,18 +1133,21 @@ export function BookingPlanner({
                 </div>
               </fieldset>
 
-              {submissionState === "error" ? (
+              {submissionState === "error" ||
+              (submissionState === "invalid" && Object.keys(fieldErrors).length > 0) ? (
                 <div
                   className={styles.formError}
                   ref={errorRef}
                   role="alert"
                   tabIndex={-1}
                 >
-                  <strong>We could not send this request.</strong>
+                  <strong>{submissionState === "invalid" ? "Please check your booking details." : "We could not send this request."}</strong>
                   <p>{submissionMessage}</p>
-                  <Link href={contactPreferenceHref}>
-                    View current contact options
-                  </Link>
+                  {submissionState === "error" ? (
+                    <Link href={contactPreferenceHref}>
+                      View current contact options
+                    </Link>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1110,17 +1155,19 @@ export function BookingPlanner({
                 <fieldset
                   className={styles.fieldset}
                   disabled={submissionState === "submitting"}
+                  onBlurCapture={(event) => validateContactField(event.target, true)}
+                  onChange={(event) => validateContactField(event.target, false)}
                 >
                   <legend>
                     <span>
                       <strong>Your contact details</strong>
-                      <small>Used only for your booking.</small>
+                      <small>Name, phone, email and privacy acknowledgement are required. Notes are optional.</small>
                     </span>
                   </legend>
 
                   <div className={styles.customerGrid}>
                     <label className={styles.bookingField}>
-                      Name
+                      <span>Name <span className={styles.required}>(required)</span></span>
                       <input
                         aria-describedby={
                           fieldErrors.customerName
@@ -1146,7 +1193,7 @@ export function BookingPlanner({
                     </label>
 
                     <label className={styles.bookingField}>
-                      Phone
+                      <span>Phone <span className={styles.required}>(required)</span></span>
                       <input
                         aria-describedby={
                           fieldErrors.phone ? "customer-phone-error" : undefined
@@ -1171,17 +1218,21 @@ export function BookingPlanner({
                     </label>
 
                     <label className={styles.bookingField}>
-                      Email <span className={styles.optional}>(optional)</span>
+                      <span>Email <span className={styles.required}>(required)</span></span>
                       <input
                         aria-describedby={
-                          fieldErrors.email ? "customer-email-error" : undefined
+                          fieldErrors.email ? "customer-email-hint customer-email-error" : "customer-email-hint"
                         }
                         aria-invalid={Boolean(fieldErrors.email)}
                         autoComplete="email"
                         maxLength={254}
                         name="email"
+                        required
                         type="email"
                       />
+                      <span className={styles.fieldHint} id="customer-email-hint">
+                        We will send your confirmation and any booking updates here.
+                      </span>
                       {fieldErrors.email ? (
                         <span
                           className={styles.fieldError}
@@ -1197,23 +1248,39 @@ export function BookingPlanner({
                     >
                       Notes <span className={styles.optional}>(optional)</span>
                       <textarea
+                        aria-describedby={fieldErrors.notes ? "customer-notes-error" : undefined}
+                        aria-invalid={Boolean(fieldErrors.notes)}
                         maxLength={600}
                         name="notes"
                         placeholder="Comfort, accessibility or appointment notes"
                         rows={4}
                       />
+                      {fieldErrors.notes ? (
+                        <span className={styles.fieldError} id="customer-notes-error">
+                          {fieldErrors.notes}
+                        </span>
+                      ) : null}
                     </label>
                   </div>
 
-                  <label className={styles.privacyChoice}>
-                    <input name="privacyAccepted" required type="checkbox" />
+                  <label className={`${styles.privacyChoice} ${fieldErrors.privacyAccepted ? styles.privacyChoiceInvalid : ""}`}>
+                    <input
+                      aria-describedby={fieldErrors.privacyAccepted ? "customer-privacy-error" : undefined}
+                      aria-invalid={Boolean(fieldErrors.privacyAccepted)}
+                      name="privacyAccepted" required type="checkbox"
+                    />
                     <span>
                       I have read the{" "}
                        <Link href="/privacy">privacy notice</Link> and understand
                        that this pending request does not reserve the time until
-                       Siriranee confirms it.
+                       Siriranee confirms it. <span className={styles.required}>(required)</span>
                     </span>
                   </label>
+                  {fieldErrors.privacyAccepted ? (
+                    <p className={styles.fieldError} id="customer-privacy-error">
+                      {fieldErrors.privacyAccepted}
+                    </p>
+                  ) : null}
 
                   <label aria-hidden="true" className={styles.websiteField}>
                     Website

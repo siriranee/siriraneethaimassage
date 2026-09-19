@@ -1,6 +1,56 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { validateBookingContact } from "@/domain/booking/contact-validation";
+
+const validContact = {
+  customerName: "Demo Guest",
+  phone: "+353 89 123 4567",
+  email: "demo@example.invalid",
+  privacyAccepted: true,
+};
+
+test("public booking contact validation reports every missing required detail", () => {
+  assert.deepEqual(Object.keys(validateBookingContact({})), [
+    "customerName", "phone", "email", "privacyAccepted",
+  ]);
+  assert.deepEqual(validateBookingContact(validContact), {});
+  assert.deepEqual(validateBookingContact({
+    ...validContact, customerName: "  Demo Guest  ", email: " demo@example.invalid ", notes: "",
+  }), {});
+});
+
+test("public booking rejects whitespace, malformed details and unchecked privacy", () => {
+  for (const [field, invalidValues] of Object.entries({
+    customerName: [" ", "x", "x".repeat(101)],
+    phone: [" ", "-------", "123456", "1234567890123456", "phone12345", "+353 89 12+34567"],
+    email: [" ", "guest", "guest@example", "guest name@example.com", "x".repeat(255)],
+    notes: ["x".repeat(601)],
+    privacyAccepted: [false, undefined, "true"],
+  })) {
+    for (const value of invalidValues) {
+      assert.ok(validateBookingContact({ ...validContact, [field]: value })[field], `${field}: ${String(value)}`);
+    }
+  }
+  for (const phone of ["0899894916", "+353 (89) 123-4567", "1234567", "+123456789012345"]) {
+    assert.deepEqual(validateBookingContact({ ...validContact, phone }), {});
+  }
+  assert.deepEqual(validateBookingContact({ ...validContact, notes: "x".repeat(600) }), {});
+});
+
+test("public booking form shares server validation and makes email required", async () => {
+  const [planner, server] = await Promise.all([
+    source("src/components/booking/BookingPlanner.tsx"),
+    source("src/server/booking/public-booking.ts"),
+  ]);
+  assert.match(planner, /onBlurCapture=/);
+  assert.match(planner, /onChange=\{\(event\) => validateContactField/);
+  assert.match(planner, /name="email"\s+required/);
+  assert.match(planner, /customer-privacy-error/);
+  assert.match(planner, /firstInvalid\.focus\(\)/);
+  assert.ok(planner.indexOf("const errors = validateBookingContact", planner.indexOf("async function submitBooking")) < planner.indexOf('await fetch("/api/public/bookings"'));
+  assert.ok(server.indexOf("validateBookingContact(source)") < server.indexOf("const repository = getCmsRepository()", server.indexOf("export async function createPublicBooking")));
+});
 import { resolve } from "node:path";
 
 async function source(path: string) {

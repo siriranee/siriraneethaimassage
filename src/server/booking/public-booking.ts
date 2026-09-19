@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { getAvailabilitySlots } from "@/domain/booking/availability";
+import { validateBookingContact } from "@/domain/booking/contact-validation";
 import type { CmsBooking } from "@/domain/cms/types";
 import { bookingPrivacyNotice } from "@/domain/privacy";
 import { assertLivePublicBookingReady } from "@/server/booking/readiness";
@@ -120,23 +121,14 @@ export async function createPublicBooking(
   if (String(source.website ?? "").trim()) {
     throw new CmsValidationError("The booking request could not be accepted.");
   }
-  if (source.privacyAccepted !== true) {
-    throw new CmsValidationError("Accept the privacy notice to request a booking.");
+  const contactErrors = validateBookingContact(source);
+  if (Object.keys(contactErrors).length) {
+    throw new CmsValidationError("Please check the highlighted booking details.", contactErrors);
   }
 
   const customerName = text(source.customerName, "customerName", 2, 100);
   const phone = text(source.phone, "phone", 7, 30);
-  if (!/^\+?[\d\s().-]{7,30}$/.test(phone)) {
-    throw new CmsValidationError("Enter a valid phone number.", {
-      phone: "Enter a valid phone number.",
-    });
-  }
-  const email = optionalText(source.email, 254).toLowerCase();
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new CmsValidationError("Enter a valid email address.", {
-      email: "Enter a valid email address.",
-    });
-  }
+  const email = text(source.email, "email", 1, 254).toLowerCase();
 
   const notes = optionalText(source.notes, 600);
   const serviceId = text(source.serviceId, "serviceId", 2, 120);
