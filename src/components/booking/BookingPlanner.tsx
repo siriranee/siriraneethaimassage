@@ -18,6 +18,7 @@ import {
   getAcuityBookingOptions,
 } from "@/content/booking";
 import { buildContactPreferenceHref } from "@/lib/contact-links";
+import { trackBookingRequest } from "@/lib/analytics";
 import {
   bookingContactFields,
   validateBookingContact,
@@ -714,6 +715,11 @@ export function BookingPlanner({
         return;
       }
 
+      trackBookingRequest(
+        result.booking.reference,
+        selectedService.slug,
+        result.booking.durationMinutes,
+      );
       setConfirmation(result.booking);
       setSubmissionState("success");
       setSubmissionMessage(

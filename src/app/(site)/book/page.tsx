@@ -1,6 +1,5 @@
 import { SearchCheck } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { BookingPlanner } from "@/components/booking/BookingPlanner";
 import { PageHero } from "@/components/marketing/PageHero";
@@ -65,9 +64,9 @@ export default async function BookPage({ searchParams }: BookPageProps) {
             <p>Already sent a request?</p>
             <span>Use your booking ID or reference to see its current status.</span>
           </div>
-          <Link className={styles.statusAction} href="/book/status">
+          <a className={styles.statusAction} href="/book/status">
             <SearchCheck aria-hidden="true" /> Check booking status
-          </Link>
+          </a>
         </div>
         <BookingPlanner
           services={plannerData.services}

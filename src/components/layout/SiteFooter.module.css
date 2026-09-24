@@ -16,6 +16,7 @@
   border: 1px solid rgb(var(--color-gold-500-rgb) / 0.12);
   border-radius: 48% 52% 52% 48%;
   content: "";
+  pointer-events: none;
   transform: rotate(25deg);
 }
 
@@ -135,7 +136,8 @@
   text-align: center;
 }
 
-.bottomMeta a {
+.bottomMeta a,
+.preferencesButton {
   color: rgb(var(--color-surface-rgb) / 0.68);
   font-weight: 600;
   text-decoration: none;
@@ -143,7 +145,16 @@
   white-space: nowrap;
 }
 
-.bottomMeta a:hover {
+.preferencesButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.bottomMeta a:hover,
+.preferencesButton:hover {
   color: var(--color-gold-400);
   text-decoration: none;
 }

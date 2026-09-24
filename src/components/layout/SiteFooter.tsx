@@ -1,6 +1,7 @@
 import { AtSign, Clock3, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import Link from "next/link";
 
+import { AnalyticsPreferencesButton } from "@/components/analytics/AnalyticsPreferencesButton";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import type { PublicSiteData } from "@/domain/public-site";
@@ -88,6 +89,7 @@ export function SiteFooter({ site }: Readonly<{ site: PublicSiteData }>) {
           <span>© {new Date().getFullYear()} {site.name}</span>
           <div className={styles.bottomMeta}>
             <Link href="/privacy">Privacy policy</Link>
+            <AnalyticsPreferencesButton className={styles.preferencesButton} />
           </div>
         </div>
       </div>

@@ -128,10 +128,18 @@ export default async function PrivacyPage() {
             only after you choose to open them.
           </p>
           <p>
-            No advertising or analytics cookies are intentionally set by this
-            version of the website. Essential hosting and security infrastructure
-            may process request information such as IP address, browser details and
-            server logs.
+            If you accept analytics cookies, Google Analytics measures public
+            page visits and successful booking requests so we can understand
+            how the website is used. We send page paths without query strings
+            and a booking request event with the treatment and duration. We do
+            not send your name, contact details, booking reference, appointment
+            time or booking note as analytics event details. Google may set
+            analytics cookies and process technical information under its own
+            retention settings. Analytics is optional; choosing to reject it
+            does not affect booking. You can change your choice using
+            &ldquo;Analytics preferences&rdquo; in the footer. Essential hosting
+            and security infrastructure may still process request information
+            such as IP address, browser details and server logs.
           </p>
         </section>
 

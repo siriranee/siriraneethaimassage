@@ -166,7 +166,7 @@ export function CmsWorkSchedule({ date, bookings, therapists, closures, hours }:
         <strong>Appointments needing time review</strong>
         {invalidBookings.map((booking) => <Link href={`/cms/bookings/${booking.id}`} key={booking.id}>{booking.reference} · {booking.customerName}</Link>)}
       </div> : null}
-      <p className={styles.note}>Rows expand to fit booking details; use the time labels to read appointment times. Tap an appointment to view or manage it. Striped time applies to the whole shop, not individual therapist shifts.</p>
+      <p className={styles.note}>Tap an appointment to view or manage it. Striped time applies to the whole shop, not individual therapist shifts.</p>
     </div>
   );
 }
