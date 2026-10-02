@@ -1,26 +1,23 @@
 import { AdminBookingForm } from "@/components/cms/AdminBookingForm";
 import { CmsNotice, CmsPageHeader, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import {
+  calendarDateOnOrAfter,
   currentCalendarDate,
-  normalizeCalendarDate,
-  shiftCalendarDate,
 } from "@/domain/booking/calendar-month";
 import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsMode } from "@/server/cms/config";
 import { getCmsContent } from "@/server/cms/content-service";
 
-function nextDublinDate() {
-  return shiftCalendarDate(currentCalendarDate("Europe/Dublin"), 1);
-}
-
 type PageProps = { readonly searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function CmsNewBookingPage({ searchParams }: PageProps) {
   await requireCmsPageUser("bookings:write");
   const params = await searchParams;
-  const requestedDate = normalizeCalendarDate(
+  const todayInDublin = currentCalendarDate("Europe/Dublin");
+  const selectedDate = calendarDateOnOrAfter(
     typeof params.date === "string" ? params.date : "",
+    todayInDublin,
   );
   const [content, mode] = await Promise.all([
     getCmsContent(),
@@ -61,8 +58,9 @@ export default async function CmsNewBookingPage({ searchParams }: PageProps) {
         </CmsNotice>
       ) : null}
       <AdminBookingForm
-        defaultDate={requestedDate ?? nextDublinDate()}
+        defaultDate={selectedDate}
         isMock={mode === "mock"}
+        minimumDate={todayInDublin}
         therapists={therapists}
         variants={variants}
       />

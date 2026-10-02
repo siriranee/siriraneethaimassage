@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Temporal } from "@js-temporal/polyfill";
 
 import { classifyAvailabilityCalendarDay } from "@/domain/booking/calendar";
 import {
   buildCalendarMonthCells,
+  calendarDateOnOrAfter,
   calendarMonthRange,
   calendarWeekdayLabels,
+  currentCalendarDate,
   monthFromCalendarDate,
   normalizeCalendarDate,
   normalizeCalendarMonth,
@@ -62,6 +65,18 @@ test("calendar month helpers reject invalid dates and build a Sunday-first grid"
   assert.equal(cells[4], "2024-02-01");
   assert.equal(cells[32], "2024-02-29");
   assert.equal(cells[33], null);
+});
+
+test("CMS booking date starts on Dublin today and keeps valid calendar selections", () => {
+  const lateUtcInstant = Temporal.Instant.from("2026-10-01T23:30:00Z");
+  const todayInDublin = currentCalendarDate("Europe/Dublin", lateUtcInstant);
+  assert.equal(todayInDublin, "2026-10-02");
+  assert.equal(currentCalendarDate("UTC", lateUtcInstant), "2026-10-01");
+  assert.equal(calendarDateOnOrAfter("", todayInDublin), todayInDublin);
+  assert.equal(calendarDateOnOrAfter("2026-10-02", todayInDublin), todayInDublin);
+  assert.equal(calendarDateOnOrAfter("2026-10-03", todayInDublin), "2026-10-03");
+  assert.equal(calendarDateOnOrAfter("2026-10-01", todayInDublin), todayInDublin);
+  assert.equal(calendarDateOnOrAfter("2026-02-30", todayInDublin), todayInDublin);
 });
 
 function settings(

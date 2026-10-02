@@ -588,11 +588,18 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
     closuresPage,
     /defaultDate=\{requestedDate \?\? tomorrowInDublin\(\)\}/,
   );
-  assert.match(newBookingPage, /normalizeCalendarDate/);
+  assert.match(newBookingPage, /currentCalendarDate\("Europe\/Dublin"\)/);
+  assert.match(newBookingPage, /calendarDateOnOrAfter\(/);
+  assert.match(newBookingPage, /typeof params\.date === "string" \? params\.date : ""/);
   assert.match(
     newBookingPage,
-    /defaultDate=\{requestedDate \?\? nextDublinDate\(\)\}/,
+    /defaultDate=\{selectedDate\}/,
   );
+  assert.match(newBookingPage, /minimumDate=\{todayInDublin\}/);
+  assert.doesNotMatch(newBookingPage, /nextDublinDate/);
+  const newBookingForm = await source("src/components/cms/AdminBookingForm.tsx");
+  assert.match(newBookingForm, /min=\{minimumDate\}/);
+  assert.doesNotMatch(newBookingForm, /min=\{defaultDate\}/);
 });
 
 test("booking page uses static copy and keeps customer instructions concise", async () => {

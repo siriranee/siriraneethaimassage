@@ -46,6 +46,13 @@ export function normalizeCalendarDate(value: string) {
     : null;
 }
 
+export function calendarDateOnOrAfter(value: string, minimumDate: string) {
+  const requestedDate = normalizeCalendarDate(value);
+  return requestedDate && requestedDate >= minimumDate
+    ? requestedDate
+    : minimumDate;
+}
+
 export function normalizeCalendarMonth(value: string) {
   return firstDateOfMonth(value)?.toString().slice(0, 7) ?? null;
 }
@@ -106,6 +113,6 @@ export function calendarMonthRange(value: string) {
   } as const;
 }
 
-export function currentCalendarDate(timezone: string) {
-  return Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDate().toString();
+export function currentCalendarDate(timezone: string, now = Temporal.Now.instant()) {
+  return now.toZonedDateTimeISO(timezone).toPlainDate().toString();
 }

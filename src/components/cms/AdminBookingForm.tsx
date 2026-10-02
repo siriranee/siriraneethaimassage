@@ -36,11 +36,13 @@ function createIdempotencyKey() {
 export function AdminBookingForm({
   defaultDate,
   isMock,
+  minimumDate,
   therapists,
   variants,
 }: Readonly<{
   defaultDate: string;
   isMock: boolean;
+  minimumDate: string;
   therapists: readonly TherapistOption[];
   variants: readonly Variant[];
 }>) {
@@ -241,7 +243,7 @@ export function AdminBookingForm({
             </select>
             <small>Availability is checked for the selected therapist. Confirmed bookings require an assignment. {isMock ? "Demo mode does not send emails." : "The assigned therapist receives a separate appointment email."}</small>
           </label>
-          <label className={styles.field}>Date<input min={defaultDate} name="localDate" onChange={(event) => changeDate(event.target.value)} required type="date" value={localDate} /></label>
+          <label className={styles.field}>Date<input min={minimumDate} name="localDate" onChange={(event) => changeDate(event.target.value)} required type="date" value={localDate} /></label>
           <label className={styles.field}>Available time
             <select data-cms-field="localTime" disabled={availabilityState === "loading" || !slots.length} name="localTime" onChange={(event) => setLocalTime(event.target.value)} required value={localTime}>
               <option value="">{availabilityState === "loading" ? "Checking times..." : slots.length ? "Choose a time" : "No available times"}</option>
