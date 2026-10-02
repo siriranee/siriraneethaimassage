@@ -151,6 +151,7 @@ export type CmsBookingSettings = {
   readonly rulesConfirmed: boolean;
   readonly slotIntervalMinutes: number;
   readonly maxConcurrentBookings: number;
+  /** Legacy persisted field; availability no longer applies advance notice. */
   readonly minimumNoticeMinutes: number;
   readonly bookingHorizonDays: number;
   readonly bufferBeforeMinutes: number;

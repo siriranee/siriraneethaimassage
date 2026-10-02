@@ -69,7 +69,7 @@ export async function assignUnassignedTherapist(
         localDate: date,
         durationMinutes: booking.durationMinutes,
         therapistId: therapist.id,
-        settings: { ...content.bookingSettings, minimumNoticeMinutes: 0 },
+        settings: content.bookingSettings,
         weeklyHours: content.site.weeklyHours,
         bookings: occupancy.filter((candidate) => candidate.id !== booking.id),
         closures, now,

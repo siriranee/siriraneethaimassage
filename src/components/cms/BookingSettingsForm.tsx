@@ -50,7 +50,6 @@ export function BookingSettingsForm({
       rulesConfirmed,
       slotIntervalMinutes: Number(data.get("slotIntervalMinutes")),
       maxConcurrentBookings: Number(data.get("maxConcurrentBookings")),
-      minimumNoticeMinutes: Number(data.get("minimumNoticeMinutes")),
       bookingHorizonDays: Number(data.get("bookingHorizonDays")),
       bufferBeforeMinutes: Number(data.get("bufferBeforeMinutes")),
       bufferAfterMinutes: Number(data.get("bufferAfterMinutes")),
@@ -106,9 +105,8 @@ export function BookingSettingsForm({
       </section>
 
       <section className={styles.section}>
-        <header className={styles.sectionHeader}><h2>Booking policy</h2><p>These values affect which time slots can be offered.</p></header>
-        <div className={styles.threeGrid}>
-          <label className={styles.field}>Minimum notice, minutes<input defaultValue={settings.minimumNoticeMinutes} max={10080} min={0} name="minimumNoticeMinutes" required type="number" /></label>
+        <header className={styles.sectionHeader}><h2>Booking policy</h2><p>Future times can be booked without advance notice; past times remain unavailable.</p></header>
+        <div className={styles.grid}>
           <label className={styles.field}>Booking horizon, days<input defaultValue={settings.bookingHorizonDays} max={365} min={1} name="bookingHorizonDays" required type="number" /></label>
           <label className={styles.field}>Buffer before, minutes<input defaultValue={settings.bufferBeforeMinutes} max={120} min={0} name="bufferBeforeMinutes" required type="number" /></label>
           <label className={styles.field}>Buffer after, minutes<input defaultValue={settings.bufferAfterMinutes} max={120} min={0} name="bufferAfterMinutes" required type="number" /></label>
@@ -126,7 +124,7 @@ export function BookingSettingsForm({
               onChange={(event) => changeRulesConfirmed(event.target.checked)}
               type="checkbox"
             />
-            <span>I confirm capacity, notice, horizon and buffers<small>Opening hours are currently {openingHoursConfirmed ? "confirmed" : "not confirmed"}.</small></span>
+            <span>I confirm capacity, horizon and buffers<small>Opening hours are currently {openingHoursConfirmed ? "confirmed" : "not confirmed"}.</small></span>
           </label>
           <label className={styles.checkbox}>
             <input

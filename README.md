@@ -14,7 +14,7 @@ Howth, Dublin, Ireland.
 - Source-controlled public page headings, SEO, home-hero slides and site gallery.
 - Customer booking flow with service, therapist, date and time selection.
   Customers choose an eligible public therapist before viewing dates and times.
-- Dublin-time availability with capacity, closures, notice period, booking
+- Dublin-time availability with capacity, closures, booking
   horizon, treatment buffers and daylight-saving handling.
 - Secure CMS for bookings, the operational month calendar, bounded recurring
   closures, services and their image galleries, therapist records and

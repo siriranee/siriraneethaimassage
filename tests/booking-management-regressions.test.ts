@@ -65,19 +65,29 @@ test("notes-only changes preserve legacy unassigned appointments even when sched
   assert.equal(updated.internalNotes, "Staff can update an existing record.");
 });
 
-test("existing future requests confirm inside the notice window, but a reschedule and a new request still obey it", async () => {
+test("stored notice does not block future CMS availability, creation or rescheduling", async () => {
   const fixture = await setup();
-  const { createAdminBooking, updateAdminBooking } = await import("@/server/cms/booking-service");
+  const { createAdminBooking, getAdminAvailability, updateAdminBooking } = await import("@/server/cms/booking-service");
   const booking = await createAdminBooking(fixture.input, fixture.context);
   const content = await fixture.repository.getContent();
   await fixture.repository.saveContent({ ...content, revision: content.revision + 1, bookingSettings: { ...content.bookingSettings, minimumNoticeMinutes: 48 * 60 } }, content.revision);
+  const available = await getAdminAvailability({
+    serviceId: fixture.service.id,
+    therapistId: fixture.therapist.id,
+    durationMinutes: 60,
+    localDate: fixture.localDate,
+  });
+  assert.ok(available.some((slot) => slot.localTime === "14:00"));
   const confirmed = await updateAdminBooking(booking.id, { status: "confirmed", changeReason: "customer-request" }, booking.version, fixture.context);
   assert.equal(confirmed.status, "confirmed");
+  const rescheduled = await updateAdminBooking(booking.id, { localTime: "14:00", changeReason: "customer-request" }, confirmed.version, fixture.context);
+  assert.equal(rescheduled.localTime, "14:00");
+  const second = await createAdminBooking({ ...fixture.input, customerName: "Demo Second Safety Guest", localTime: "15:00" }, fixture.context);
+  assert.equal(second.localTime, "15:00");
   await assert.rejects(
-    updateAdminBooking(booking.id, { localTime: "14:00", changeReason: "customer-request" }, confirmed.version, fixture.context),
+    createAdminBooking({ ...fixture.input, localDate: "2000-01-01" }, fixture.context),
     /outside opening hours, blocked or fully booked/,
   );
-  await assert.rejects(createAdminBooking({ ...fixture.input, localTime: "14:00" }, fixture.context), /outside opening hours, blocked or fully booked/);
 });
 
 test("overlapping pending requests can both be confirmed for their original time", async () => {

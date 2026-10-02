@@ -244,10 +244,10 @@ export function getAvailabilitySlots(input: AvailabilityInput): readonly Availab
       occupiedStart < openingStart.epochMilliseconds ||
       occupiedEnd > openingEnd.epochMilliseconds
     ) continue;
+    // Customers and staff may book any future start, even at short notice.
     if (
       input.enforceWindow !== false &&
-      startsAt.epochMilliseconds <
-        now.epochMilliseconds + input.settings.minimumNoticeMinutes * 60_000
+      startsAt.epochMilliseconds < now.epochMilliseconds
     ) {
       continue;
     }

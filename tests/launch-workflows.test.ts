@@ -235,7 +235,8 @@ test("isolated launch verification covers services, ten bookings and administrat
         ...current.bookingSettings,
         publicBookingEnabled: true,
         rulesConfirmed: true,
-        minimumNoticeMinutes: 0,
+        // A legacy persisted notice value must not delay public or CMS slots.
+        minimumNoticeMinutes: 48 * 60,
         bookingHorizonDays: 365,
         bufferBeforeMinutes: 0,
         bufferAfterMinutes: 0,
@@ -558,7 +559,12 @@ test("isolated launch verification covers services, ten bookings and administrat
   process.env.RESEND_FROM_EMAIL = "Siriranee Bookings <bookings@siriranee.example>";
   process.env.RESEND_BOOKING_TO_EMAIL = "owner@siriranee.example";
 
-  const publicDate = Temporal.PlainDate.from(localDate).add({ days: 1 }).toString();
+  // Tomorrow is always inside the legacy 48-hour window, so the availability
+  // lookup and successful submission below verify that it is ignored.
+  const publicDate = Temporal.Now.zonedDateTimeISO("Europe/Dublin")
+    .toPlainDate()
+    .add({ days: 1 })
+    .toString();
   const publicRequest = {
     customerName: "Demo Public Guest",
     phone: "+353 85 111 2222",

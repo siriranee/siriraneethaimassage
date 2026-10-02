@@ -52,7 +52,7 @@ Updated: 3 September 2026
   JSON, validation, rate limiting, idempotency and encrypted customer details.
 - Privacy-preserving booking-status lookup by booking ID or reference; it
   exposes status copy only and keeps identifiers out of page URLs.
-- Confirmed-booking capacity checks with closures, buffers, notice period,
+- Confirmed-booking capacity checks with closures, buffers,
   booking horizon and Europe/Dublin daylight-saving handling. Pending requests
   remain available for staff review without reserving a public time slot.
 - Customers never see, submit or select a therapist, and booking management has

@@ -190,7 +190,6 @@ async function findSlot(
   input: Pick<BookingInput, "serviceId" | "therapistId" | "durationMinutes" | "localDate" | "localTime">,
   options: {
     readonly excludedBookingId?: string;
-    readonly existingAppointment?: boolean;
     readonly ignoreBookingOccupancy?: boolean;
   } = {},
 ) {
@@ -239,12 +238,7 @@ async function findSlot(
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
     therapistId: therapist?.id,
-    // Existing requests can be handled near their start time. Opening hours,
-    // closures, therapist eligibility and the prohibition on past slots still
-    // apply; a pure confirmation can separately bypass booking occupancy below.
-    settings: options.existingAppointment
-      ? { ...content.bookingSettings, minimumNoticeMinutes: 0 }
-      : content.bookingSettings,
+    settings: content.bookingSettings,
     now,
     weeklyHours: content.site.weeklyHours,
     closures,
@@ -568,7 +562,6 @@ export async function updateAdminBooking(
         },
         {
           excludedBookingId: current.id,
-          existingAppointment: !timeChanged,
           // Pending requests do not reserve capacity. Staff can therefore
           // approve multiple already-received requests for the same time.
           // Hours, closures, therapist eligibility and past dates still apply.

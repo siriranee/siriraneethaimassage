@@ -591,12 +591,8 @@ export function parseBookingSettingsUpdate(
       1,
       20,
     ),
-    minimumNoticeMinutes: integer(
-      source.minimumNoticeMinutes,
-      "minimumNoticeMinutes",
-      0,
-      10080,
-    ),
+    // Retain the legacy persisted field but no longer offer a notice rule.
+    minimumNoticeMinutes: 0,
     bookingHorizonDays: integer(
       source.bookingHorizonDays,
       "bookingHorizonDays",

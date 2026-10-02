@@ -354,7 +354,7 @@ test("only confirmed bookings reserve appointment capacity", () => {
   assert.ok(!confirmedBooking.some((slot) => slot.localTime === "10:00"));
 });
 
-test("buffers, notice windows and booking horizon are enforced", () => {
+test("buffers and booking horizon are enforced without a minimum notice window", () => {
   const buffered = slots({
     settings: settings({ bufferAfterMinutes: 30 }),
     bookings: [
@@ -367,13 +367,28 @@ test("buffers, notice windows and booking horizon are enforced", () => {
   });
   assert.ok(!buffered.some((slot) => slot.localTime === "10:00"));
 
-  const notice = slots({
+  const noNotice = slots({
+    now: "2026-06-01T09:15:00Z",
+    enforceWindow: true,
+    settings: settings({ minimumNoticeMinutes: 48 * 60, bookingHorizonDays: 2 }),
+  });
+  assert.ok(!noNotice.some((slot) => slot.localTime === "10:00"));
+  assert.ok(noNotice.some((slot) => slot.localTime === "10:30"));
+  assert.ok(noNotice.some((slot) => slot.localTime === "11:30"));
+
+  const beforeOpening = slots({
+    now: "2026-06-01T08:45:00Z",
+    enforceWindow: true,
+    settings: settings({ minimumNoticeMinutes: 48 * 60 }),
+  });
+  assert.ok(beforeOpening.some((slot) => slot.localTime === "10:00"));
+
+  const atStart = slots({
     now: "2026-06-01T09:00:00Z",
     enforceWindow: true,
-    settings: settings({ minimumNoticeMinutes: 120, bookingHorizonDays: 2 }),
+    settings: settings({ minimumNoticeMinutes: 48 * 60 }),
   });
-  assert.ok(!notice.some((slot) => slot.localTime === "11:30"));
-  assert.ok(notice.some((slot) => slot.localTime === "12:00"));
+  assert.ok(atStart.some((slot) => slot.localTime === "10:00"));
 
   assert.equal(
     slots({
@@ -502,6 +517,17 @@ test("calendar keeps partially open days available and labels no-slot days unava
       settings: settings({ minimumNoticeMinutes: 240 }),
       weeklyHours: weeklyHours("10:00", "11:00"),
       now: "2026-06-01T09:30:00Z",
+      minimumDate: "2026-06-01",
+    }).state,
+    "available",
+  );
+  assert.equal(
+    classifyAvailabilityCalendarDay({
+      ...base,
+      closures: [],
+      settings: settings({ minimumNoticeMinutes: 240 }),
+      weeklyHours: weeklyHours("10:00", "11:00"),
+      now: "2026-06-01T11:05:00Z",
       minimumDate: "2026-06-01",
     }).state,
     "unavailable",
