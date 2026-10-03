@@ -80,6 +80,80 @@ const customerEmailBusiness = {
   directionsUrl: "https://maps.example/directions",
 };
 
+test("customer email projection and fingerprints include public therapist contacts", async () => {
+  const { createSafePublicContentState } = await import("@/server/cms/default-content");
+  const {
+    createCustomerBookingEmailBusiness,
+    getCustomerBookingEmailDeliveryFingerprint,
+  } = await import("@/server/booking/resend-booking-email");
+  const contacts = [{
+    id: "waen", name: "Waen",
+    phone: { display: "087 123 4567", internationalDisplay: "+353 87 123 4567", e164: "+353871234567", href: "tel:+353871234567" },
+  }];
+  const site = createSafePublicContentState().site;
+  const business = createCustomerBookingEmailBusiness(site, contacts);
+  assert.deepEqual(business.therapistPhones, contacts);
+  assert.equal("therapistPhones" in createCustomerBookingEmailBusiness(site), false);
+  const confirmed = { ...booking(), status: "confirmed" as const };
+  const options = { configuration, fingerprintSecret: "test-only-public-phones-secret" };
+  const fingerprint = getCustomerBookingEmailDeliveryFingerprint(confirmed, business, options);
+  assert.ok(fingerprint);
+  assert.notEqual(fingerprint, getCustomerBookingEmailDeliveryFingerprint(confirmed, {
+    ...business,
+    therapistPhones: [{ ...contacts[0], name: "Nok" }],
+  }, options));
+  assert.doesNotMatch(String(fingerprint), /Waen|\+353871234567/);
+});
+
+test("customer email delivery resolves public therapist phones without notification addresses", async () => {
+  const { MockCmsRepository } = await import("@/server/cms/repositories/mock-repository");
+  const {
+    deliverCustomerBookingConfirmationEmail,
+    recordBookingNotificationPlan,
+  } = await import("@/server/cms/notification-service");
+  const { renderCustomerBookingConfirmedEmail } = await import("@/server/booking/booking-email");
+  const baseRepository = new MockCmsRepository();
+  const content = await baseRepository.getContent();
+  const snapshot = { ...content, team: content.team.map((member) => ({ ...member, operationalActive: true })) };
+  const publicTeam = snapshot.team.filter((member) => member.publicProfile && member.operationalActive && !member.archived);
+  assert.ok(publicTeam.length >= 2);
+  const repository = new Proxy(baseRepository, {
+    get(target, property, receiver) {
+      if (property === "getPublishedContent") {
+        return async () => ({
+          id: "public-phone-publication", revision: snapshot.revision,
+          publishedAt: "2026-10-03T00:00:00Z", publishedBy: "test", snapshot,
+        });
+      }
+      if (property === "getTherapistContact") {
+        return async (id: string) => ({
+          id, contactPhone: "+353 87 123 4567", notificationEmail: "private-notification@example.test",
+          version: 1, updatedAt: "2026-10-03T00:00:00Z", updatedBy: "test",
+        });
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const confirmed = { ...booking(), id: "public-phone-confirmation", status: "confirmed" as const };
+  await repository.saveBooking(confirmed);
+  await recordBookingNotificationPlan(repository, confirmed, "booking-confirmed");
+  let rendered = "";
+  const result = await deliverCustomerBookingConfirmationEmail(repository, confirmed, {
+    sender: async (current, business) => {
+      const message = renderCustomerBookingConfirmedEmail(current, business);
+      rendered = `${message.html}\n${message.text}`;
+      assert.equal(business.therapistPhones?.length, publicTeam.length);
+      return { status: "sent", attempted: true, providerMessageId: "mock-public-phone-email" };
+    },
+    fingerprinter: () => "mock-public-phone-fingerprint",
+  });
+  assert.equal(result?.status, "sent");
+  for (const member of publicTeam) assert.ok(rendered.includes(member.name));
+  assert.match(rendered, /tel:\+353871234567/);
+  assert.doesNotMatch(rendered, /private-notification@example\.test/);
+});
+
 test("Resend owner booking email uses the owner address, reply-to and stable idempotency key", async () => {
   const {
     getOwnerBookingEmailDeliveryFingerprint,

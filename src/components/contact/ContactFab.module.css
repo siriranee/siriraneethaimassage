@@ -11,6 +11,7 @@
 .items {
   order: 1;
   display: grid;
+  width: min(24rem, calc(100vw - 2.3rem));
   max-height: calc(100dvh - 7rem - env(safe-area-inset-bottom));
   gap: 0.6rem;
   justify-items: end;
@@ -43,6 +44,8 @@
 .item {
   --item-index: 0;
   display: inline-flex;
+  min-width: 0;
+  width: 100%;
   align-items: center;
   justify-content: flex-end;
   gap: 0.6rem;
@@ -60,6 +63,7 @@
 
 .itemCopy {
   display: grid;
+  min-width: 0;
   gap: 0.08rem;
   padding: 0.58rem 0.8rem;
   border: 1px solid rgb(var(--color-gold-500-rgb) / 0.28);
@@ -76,18 +80,20 @@
   color: inherit;
   font-size: var(--fs-sm);
   line-height: 1.25;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .itemCopy small {
   color: var(--color-muted);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .itemIcon {
   display: grid;
   width: 3.9rem;
   height: 3.9rem;
+  flex: 0 0 auto;
   place-items: center;
   overflow: hidden;
   border: 1px solid rgb(var(--color-gold-500-rgb) / 0.42);
@@ -191,12 +197,6 @@
   .mainIcon {
     width: 4rem;
     height: 4rem;
-  }
-}
-
-@media (max-width: 420px) {
-  .itemCopy small {
-    display: none;
   }
 }
 

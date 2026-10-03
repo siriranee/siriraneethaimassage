@@ -351,7 +351,7 @@
   margin-top: auto;
 }
 
-.drawerContact a {
+.drawerContact > a {
   display: flex;
   min-height: 3rem;
   align-items: center;

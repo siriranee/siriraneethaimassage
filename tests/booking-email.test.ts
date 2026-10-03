@@ -295,6 +295,64 @@ test("customer cancellation email clearly closes the appointment without exposin
   }
 });
 
+test("customer booking emails list each therapist with a safe phone link", async () => {
+  const {
+    renderCustomerBookingConfirmedEmail,
+    renderCustomerBookingRescheduledEmail,
+    renderCustomerBookingCancelledEmail,
+  } = await import("@/server/booking/booking-email");
+  const business = {
+    name: "Siriranee Thai Massage",
+    address: "Howth, Dublin",
+    phone: "+353899999999",
+    therapistPhones: [
+      {
+        id: "waen", name: "Waen <Therapist>\u202E",
+        phone: {
+          display: "089 948 4585", internationalDisplay: "+353 89 948 4585",
+          e164: "+353899484585", href: "javascript:alert(1)",
+        },
+      },
+      {
+        id: "nok", name: "Nok",
+        phone: {
+          display: "087 123 4567", internationalDisplay: "+353 87 123 4567",
+          e164: "+353871234567", href: "tel:+353871234567",
+        },
+      },
+    ],
+  };
+  for (const render of [
+    renderCustomerBookingConfirmedEmail,
+    renderCustomerBookingRescheduledEmail,
+    renderCustomerBookingCancelledEmail,
+  ]) {
+    const message = render(booking(), business);
+    assert.match(message.html, /Phone \(Waen &lt;Therapist&gt;\):/);
+    assert.match(message.text, /Phone \(Waen <Therapist>\): \+353 89 948 4585/);
+    assert.match(message.text, /Phone \(Nok\): \+353 87 123 4567/);
+    assert.match(message.html, /href="tel:\+353899484585"/);
+    assert.match(message.html, /href="tel:\+353871234567"/);
+    assert.doesNotMatch(message.html, /javascript:|\u202E|<Therapist>/);
+    assert.doesNotMatch(`${message.html}\n${message.text}`, /\+353899999999/);
+  }
+});
+
+test("customer booking emails retain the business contact when therapist phones are unavailable", async () => {
+  const { renderCustomerBookingConfirmedEmail } = await import("@/server/booking/booking-email");
+  const business = {
+    name: "Siriranee Thai Massage", address: "Howth, Dublin", phone: "+353899484585",
+    therapistPhones: [{
+      id: "waen", name: "Waen",
+      phone: { display: "invalid", internationalDisplay: "invalid", e164: "invalid", href: "javascript:alert(1)" },
+    }],
+  };
+  const message = renderCustomerBookingConfirmedEmail(booking(), business);
+  assert.match(message.html, /Phone: \+353899484585/);
+  assert.match(message.text, /Phone: \+353899484585/);
+  assert.doesNotMatch(message.html, /javascript:|Phone \(Waen\)/);
+});
+
 test("therapist schedule emails render Thai first and English second with customer details", async () => {
   const { renderTherapistBookingEmail } = await import(
     "@/server/booking/booking-email"

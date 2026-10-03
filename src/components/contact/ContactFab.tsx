@@ -6,10 +6,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 
 import type { PublicSiteData } from "@/domain/public-site";
+import { buildTherapistWhatsAppUrl, getContactPhones } from "@/lib/therapist-contact";
 
 import styles from "./ContactFab.module.css";
 
 type ContactAction = {
+  readonly id: string;
   readonly detail: string;
   readonly external?: boolean;
   readonly href: string;
@@ -24,41 +26,30 @@ export function ContactFab({ site }: Readonly<{ site: PublicSiteData }>) {
   const actionsId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const phone = site.contact.phone;
-  const whatsappNumber = phone?.e164.replace(/\D/g, "") ?? "";
-  const whatsappUrl = whatsappNumber
-    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-        `Hello ${site.alternateName}, I have a question about booking a massage.`,
-      )}`
-    : null;
+  const contacts = getContactPhones(site);
   const email = site.contact.email;
   const instagram = site.social.instagram;
 
   const actions: readonly ContactAction[] = [
-    ...(phone
-      ? ([
-          {
-            detail: phone.internationalDisplay,
-            href: phone.href,
-            iconSrc: "/icons/Phone-2.png",
-            label: "Call Siriranee",
-          },
-        ] satisfies readonly ContactAction[])
-      : []),
-    ...(whatsappUrl
-      ? ([
-          {
-            detail: phone?.internationalDisplay ?? "Message the team",
-            external: true,
-            href: whatsappUrl,
-            iconSrc: "/icons/Whatsapp.svg",
-            label: "WhatsApp",
-          },
-        ] satisfies readonly ContactAction[])
-      : []),
+    ...contacts.map((contact) => ({
+      id: `call-${contact.id}`,
+      detail: contact.phone.internationalDisplay,
+      href: contact.phone.href,
+      iconSrc: "/icons/Phone-2.png",
+      label: `Call ${contact.name}`,
+    })),
+    ...contacts.map((contact) => ({
+      id: `whatsapp-${contact.id}`,
+      detail: contact.phone.internationalDisplay,
+      external: true,
+      href: buildTherapistWhatsAppUrl(contact, site.alternateName),
+      iconSrc: "/icons/Whatsapp.svg",
+      label: `WhatsApp ${contact.name}`,
+    })),
     ...(email
       ? ([
           {
+            id: "email",
             detail: email.address,
             href: email.href,
             iconSrc: "/icons/Email.png",
@@ -69,6 +60,7 @@ export function ContactFab({ site }: Readonly<{ site: PublicSiteData }>) {
     ...(instagram
       ? ([
           {
+            id: "instagram",
             detail: instagram.handle,
             external: true,
             href: instagram.url,
@@ -78,6 +70,7 @@ export function ContactFab({ site }: Readonly<{ site: PublicSiteData }>) {
         ] satisfies readonly ContactAction[])
       : []),
     {
+      id: "directions",
       detail: "Harbour House, Howth",
       external: true,
       href: site.address.directionsUrl,
@@ -189,7 +182,7 @@ export function ContactFab({ site }: Readonly<{ site: PublicSiteData }>) {
           return (
             <a
               href={action.href}
-              key={action.label}
+              key={action.id}
               rel={action.external ? "noopener noreferrer" : undefined}
               target={action.external ? "_blank" : undefined}
               {...actionProps}

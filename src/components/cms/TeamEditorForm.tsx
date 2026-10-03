@@ -16,6 +16,7 @@ import type {
   CmsTherapistDeletionImpact,
 } from "@/domain/cms/types";
 import type { PreparedClientImage } from "@/lib/media/client-image";
+import { normalizeTherapistPhone } from "@/lib/therapist-contact";
 import {
   isApprovedImageUrlForOwnership,
   type CloudinaryDeliveryOwnership,
@@ -78,7 +79,7 @@ const teamFieldLabels: Readonly<Record<string, string>> = {
   imageAlt: "Portrait description",
   serviceIds: "Treatments offered",
   notificationEmail: "Therapist notification email",
-  contactPhone: "Private therapist phone",
+  contactPhone: "Therapist contact phone",
 };
 
 function normaliseTeamFieldName(name: string) {
@@ -144,8 +145,8 @@ function clientFieldError(form: HTMLFormElement, field: string) {
   if (field === "slug" && control.validity.patternMismatch) {
     return "Use lowercase letters, numbers and single hyphens.";
   }
-  if (field === "contactPhone" && control.validity.patternMismatch) {
-    return "Enter at least 7 digits using only spaces, brackets, dots or hyphens between them.";
+  if (field === "contactPhone" && !normalizeTherapistPhone(value)) {
+    return "Use an Irish number starting with 0 or an international number starting with + or 00.";
   }
   return control.validity.valid ? "" : control.validationMessage;
 }
@@ -648,9 +649,9 @@ export function TeamEditorForm({
               <small id="therapist-email-hint">Private recipient address used for this therapist&apos;s assigned-booking notifications when delivery is enabled.</small>
               {fieldError("notificationEmail") ? <small className={teamStyles.fieldError} id="notificationEmail-error">{fieldError("notificationEmail")}</small> : null}
             </label>
-            <label className={styles.fullField}>Private therapist phone
+            <label className={styles.fullField}>Therapist contact phone
               <input aria-describedby={describedBy("contactPhone", "therapist-phone-hint")} aria-invalid={Boolean(fieldError("contactPhone"))} autoComplete="off" defaultValue={member.contactPhone} id="therapist-contact-phone" inputMode="tel" maxLength={30} name="contactPhone" pattern="(?=(?:[^0-9]*[0-9]){7})\+?[0-9\s().\-]{7,30}" type="tel" />
-              <small id="therapist-phone-hint">Optional private CMS contact number. It is never published on the website.</small>
+              <small id="therapist-phone-hint">Shown with the therapist&apos;s name in website contact areas while available for booking and shown online. Use an Irish local number or include the international country code. Archived therapists are hidden.</small>
               {fieldError("contactPhone") ? <small className={teamStyles.fieldError} id="contactPhone-error">{fieldError("contactPhone")}</small> : null}
             </label>
             <label className={styles.checkbox}>

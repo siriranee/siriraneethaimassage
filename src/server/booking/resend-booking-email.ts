@@ -11,6 +11,7 @@ import {
 
 import { googleMapsDirectionsUrl } from "@/content/site";
 import type { CmsBooking, CmsSiteSettings } from "@/domain/cms/types";
+import type { PublicTherapistContact } from "@/domain/public-site";
 import {
   createBookingConfirmationUrl,
   createTherapistBookingConfirmationUrl,
@@ -169,6 +170,7 @@ function cleanPhone(value: string) {
 
 export function createCustomerBookingEmailBusiness(
   site: CmsSiteSettings,
+  therapistPhones: readonly PublicTherapistContact[] = [],
 ): CustomerBookingEmailBusiness {
   const address = [
     site.streetAddress,
@@ -188,6 +190,7 @@ export function createCustomerBookingEmailBusiness(
     name: site.name.trim() || "Siriranee Thai Massage",
     address,
     ...(phone ? { phone } : {}),
+    ...(therapistPhones.length ? { therapistPhones } : {}),
     ...(email ? { email } : {}),
     ...(site.arrivalGuidance.trim()
       ? { arrivalGuidance: site.arrivalGuidance.trim() }

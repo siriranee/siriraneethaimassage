@@ -47,10 +47,10 @@ export default async function CmsNewTeamMemberPage() {
         eyebrow="Therapist editor"
         title="Add therapist"
       />
-      <CmsNotice title="Private contact stays private">
-        The notification email and optional phone number are available only
-        inside the protected CMS. They are never sent to the public therapist
-        profile.
+      <CmsNotice title="Therapist contact details">
+        The contact phone appears with the therapist&apos;s name in website contact
+        areas when available for booking and shown online. The notification email
+        is private and used only for booking notifications.
       </CmsNotice>
       <TeamEditorForm
         cloudinaryOwnership={cloudinaryOwnership}

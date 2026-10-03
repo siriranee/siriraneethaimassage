@@ -20,8 +20,10 @@ import type { Service } from "@/domain/service";
 import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
 import { isLivePublicBookingReady } from "@/server/booking/readiness";
 import { getPublishedCmsContent } from "@/server/cms/content-service";
+import { getPublicTherapistContacts } from "@/server/cms/public-therapist-contacts";
 
 const getPublicContent = cache(getPublishedCmsContent);
+const getPublicContactTherapists = cache(getPublicTherapistContacts);
 
 export type PublicService = Service & {
   readonly hero: CmsServiceHero;
@@ -208,6 +210,7 @@ export const getPublicSiteData = cache(async (): Promise<PublicSiteData> => {
     getPublicServicesSnapshot(),
   ]);
   const source = content.site;
+  const therapists = await getPublicContactTherapists(content);
   const address = formatAddress([
     source.streetAddress,
     source.locality,
@@ -281,6 +284,7 @@ export const getPublicSiteData = cache(async (): Promise<PublicSiteData> => {
     },
     contact: {
       phone,
+      therapists,
       email: emailAddress
         ? { address: emailAddress, href: `mailto:${emailAddress}` }
         : null,

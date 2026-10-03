@@ -104,13 +104,13 @@ export function SiteBusinessForm({ site }: Readonly<{ site: CmsSiteSettings }>) 
       </section>
 
       <section className={styles.section}>
-        <header className={styles.sectionHeader}><h2>Contact channels</h2><p>These values are reused by the header, footer, contact page and structured data.</p></header>
+        <header className={styles.sectionHeader}><h2>Contact channels</h2><p>Manage the main business contact details here. Manage each therapist&apos;s public phone in the therapist editor.</p></header>
         <div className={styles.grid}>
           <label className={styles.field}>Phone shown to visitors<input data-cms-revalidate-when="phoneConfirmed" defaultValue={site.phoneDisplay} maxLength={40} minLength={phoneConfirmed ? 5 : undefined} name="phoneDisplay" required={phoneConfirmed} /></label>
           <label className={styles.field}>Phone in E.164 format<input data-cms-revalidate-when="phoneConfirmed" defaultValue={site.phoneE164} inputMode="tel" maxLength={25} name="phoneE164" pattern="\+[1-9]\d{7,14}" placeholder="+353123456789" required={phoneConfirmed} title="Start with + and the country code, followed by 8–15 digits." type="tel" /></label>
           <label className={styles.checkbox}>
             <input checked={phoneConfirmed} name="phoneConfirmed" onChange={(event) => setPhoneConfirmed(event.target.checked)} type="checkbox" />
-            <span>I confirm this public phone number<small>Until confirmed and saved, no phone number or call button appears on the website or in search data.</small></span>
+            <span>I confirm this public phone number<small>This confirms the main business number used as a fallback and in search data. Active therapists shown online display their own saved contact numbers.</small></span>
           </label>
           <label className={styles.field}>Email address<input defaultValue={site.email} maxLength={254} name="email" type="email" /></label>
           <label className={styles.field}>WhatsApp number<input defaultValue={site.whatsappNumber} inputMode="tel" maxLength={25} name="whatsappNumber" pattern="(?=(?:\D*\d){8,15}\D*$)\+?[\d\s().-]{8,25}" title="Enter an international number containing 8–15 digits." type="tel" /></label>

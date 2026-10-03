@@ -34,6 +34,19 @@ export type PublicVoucher = {
   readonly imageAlt: string;
 };
 
+export type PublicPhoneContact = {
+  readonly display: string;
+  readonly internationalDisplay: string;
+  readonly e164: string;
+  readonly href: string;
+};
+
+export type PublicTherapistContact = {
+  readonly id: string;
+  readonly name: string;
+  readonly phone: PublicPhoneContact;
+};
+
 export type PublicSiteData = {
   readonly name: string;
   readonly alternateName: string;
@@ -60,12 +73,8 @@ export type PublicSiteData = {
     readonly assistance: string;
   };
   readonly contact: {
-    readonly phone: {
-      readonly display: string;
-      readonly internationalDisplay: string;
-      readonly e164: string;
-      readonly href: string;
-    } | null;
+    readonly phone: PublicPhoneContact | null;
+    readonly therapists: readonly PublicTherapistContact[];
     readonly email: {
       readonly address: string;
       readonly href: string;

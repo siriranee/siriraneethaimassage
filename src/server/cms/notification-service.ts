@@ -32,6 +32,7 @@ import type {
 import type { CustomerBookingEmailBusiness } from "@/server/booking/booking-email";
 import type { TherapistBookingEmailEvent } from "@/server/booking/booking-email";
 import { createSafePublicContentState } from "@/server/cms/default-content";
+import { getPublicTherapistContacts } from "@/server/cms/public-therapist-contacts";
 import type { CmsRepository } from "@/server/cms/repositories";
 import {
   createCustomerBookingEmailBusiness,
@@ -232,7 +233,8 @@ async function getCustomerBookingEmailBusiness(
 ): Promise<CustomerBookingEmailBusiness> {
   const publication = await repository.getPublishedContent();
   const content = publication?.snapshot ?? createSafePublicContentState();
-  return createCustomerBookingEmailBusiness(content.site);
+  const therapistPhones = await getPublicTherapistContacts(content, repository);
+  return createCustomerBookingEmailBusiness(content.site, therapistPhones);
 }
 
 async function getTherapistBookingEmailRecipient(

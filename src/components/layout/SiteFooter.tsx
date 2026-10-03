@@ -1,15 +1,15 @@
-import { AtSign, Clock3, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { AtSign, Clock3, Mail, MapPin, MessageCircle } from "lucide-react";
 import Link from "next/link";
 
 import { AnalyticsPreferencesButton } from "@/components/analytics/AnalyticsPreferencesButton";
 import { BrandMark } from "@/components/ui/BrandMark";
+import { TherapistPhoneList } from "@/components/contact/TherapistPhoneList";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import type { PublicSiteData } from "@/domain/public-site";
 
 import styles from "./SiteFooter.module.css";
 
 export function SiteFooter({ site }: Readonly<{ site: PublicSiteData }>) {
-  const phone = site.contact.phone;
   const email = site.contact.email;
   const instagram = site.social.instagram;
   const whatsappUrl = site.contact.whatsapp.url;
@@ -36,12 +36,7 @@ export function SiteFooter({ site }: Readonly<{ site: PublicSiteData }>) {
               <span>{site.address.formatted}</span>
               <span className="sr-only"> (opens in a new tab)</span>
             </a>
-            {phone ? (
-              <a href={phone.href}>
-                <Phone aria-hidden="true" />
-                <span>{phone.internationalDisplay}</span>
-              </a>
-            ) : null}
+            <TherapistPhoneList site={site} onBrand />
             {email ? (
               <a href={email.href}>
                 <Mail aria-hidden="true" />

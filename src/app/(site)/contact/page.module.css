@@ -211,6 +211,13 @@
   background: var(--color-purple-50);
 }
 
+.requestActions a small {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
 .requestTertiary:hover,
 .requestTertiary:focus-visible {
   color: var(--color-purple-700);

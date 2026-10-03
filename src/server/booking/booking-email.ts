@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { CmsBooking } from "@/domain/cms/types";
+import type { PublicTherapistContact } from "@/domain/public-site";
 
 const unsafeDisplayCharacters =
   /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g;
@@ -67,6 +68,7 @@ export type CustomerBookingEmailBusiness = {
   readonly name: string;
   readonly address: string;
   readonly phone?: string;
+  readonly therapistPhones?: readonly PublicTherapistContact[];
   readonly email?: string;
   readonly arrivalGuidance?: string;
   readonly directionsUrl?: string;
@@ -92,6 +94,32 @@ function cleanDisplayText(value: string, multiline = false) {
         .join("\n")
         .trim()
     : normalized.replace(/\s+/g, " ").trim();
+}
+
+function customerEmailContactDetails(business: CustomerBookingEmailBusiness) {
+  const therapistPhones = (business.therapistPhones ?? []).flatMap((contact) => {
+    const name = cleanDisplayText(contact.name);
+    const phone = cleanDisplayText(contact.phone.internationalDisplay);
+    const e164 = contact.phone.e164.trim();
+    return name && phone && /^\+[1-9]\d{6,14}$/.test(e164)
+      ? [{ name, phone, href: `tel:${e164}` }]
+      : [];
+  });
+  const phone = cleanDisplayText(business.phone ?? "");
+  const email = cleanDisplayText(business.email ?? "");
+  const textLines = [
+    ...(therapistPhones.length
+      ? therapistPhones.map((contact) => `Phone (${contact.name}): ${contact.phone}`)
+      : phone ? [`Phone: ${phone}`] : []),
+    ...(email ? [`Email: ${email}`] : []),
+  ];
+  const htmlLines = [
+    ...(therapistPhones.length
+      ? therapistPhones.map((contact) => `Phone (${escapeHtml(contact.name)}): <a href="${escapeHtml(contact.href)}" style="color:#5c2288;text-decoration:underline;">${escapeHtml(contact.phone)}</a>`)
+      : phone ? [escapeHtml(`Phone: ${phone}`)] : []),
+    ...(email ? [escapeHtml(`Email: ${email}`)] : []),
+  ];
+  return { textLines, html: htmlLines.join("<br>") };
 }
 
 function escapeHtml(value: string) {
@@ -455,8 +483,6 @@ function renderCustomerBookingAppointmentEmail(
   const localTime = cleanDisplayText(booking.localTime);
   const businessName = cleanDisplayText(business.name) || "Siriranee Thai Massage";
   const address = cleanDisplayText(business.address);
-  const phone = cleanDisplayText(business.phone ?? "");
-  const email = cleanDisplayText(business.email ?? "");
   const arrivalGuidance = cleanDisplayText(business.arrivalGuidance ?? "", true);
   const therapistName = cleanDisplayText(booking.assignedStaffName ?? "");
   const formattedDate = formatBookingDate(booking.localDate, "en-IE");
@@ -479,10 +505,8 @@ function renderCustomerBookingAppointmentEmail(
   const introduction = updated
     ? `your confirmed appointment with ${businessName} has been updated. Please use the appointment details below, which replace the details in any earlier email.`
     : `your appointment with ${businessName} is confirmed. We look forward to welcoming you.`;
-  const contactLines = [
-    phone ? `Phone: ${phone}` : "",
-    email ? `Email: ${email}` : "",
-  ].filter(Boolean);
+  const contactDetails = customerEmailContactDetails(business);
+  const contactLines = contactDetails.textLines;
 
   const locationSection = address
     ? `<h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">Where to go</h2>
@@ -538,7 +562,7 @@ function renderCustomerBookingAppointmentEmail(
               </table>
               ${locationSection}
               <h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">Need to change or cancel?</h2>
-              <p style="margin:0;color:#3c3340;font-size:15px;line-height:1.65;">Please contact us as soon as possible.${contactLines.length ? `<br>${contactLines.map(escapeHtml).join("<br>")}` : ""}</p>
+              <p style="margin:0;color:#3c3340;font-size:15px;line-height:1.65;">Please contact us as soon as possible.${contactDetails.html ? `<br>${contactDetails.html}` : ""}</p>
               ${contactUrl ? `<p style="margin:18px 0 0;">${customerEmailLink("Contact Siriranee", contactUrl)}</p>` : ""}
               ${statusSection}
             </td></tr>
@@ -582,8 +606,6 @@ export function renderCustomerBookingCancelledEmail(
   const serviceName = cleanDisplayText(booking.serviceName);
   const localTime = cleanDisplayText(booking.localTime);
   const businessName = cleanDisplayText(business.name) || "Siriranee Thai Massage";
-  const phone = cleanDisplayText(business.phone ?? "");
-  const email = cleanDisplayText(business.email ?? "");
   const formattedDate = formatBookingDate(booking.localDate, "en-IE");
   const formattedPrice = formatPrice(
     booking.priceCents,
@@ -598,10 +620,8 @@ export function renderCustomerBookingCancelledEmail(
     : undefined;
   const subject = `Booking cancelled · ${reference} · ${businessName}`;
   const preheader = `Your booking for ${formattedDate} at ${localTime} has been cancelled.`;
-  const contactLines = [
-    phone ? `Phone: ${phone}` : "",
-    email ? `Email: ${email}` : "",
-  ].filter(Boolean);
+  const contactDetails = customerEmailContactDetails(business);
+  const contactLines = contactDetails.textLines;
 
   const html = `<!doctype html>
 <html lang="en-IE">
@@ -641,7 +661,7 @@ export function renderCustomerBookingCancelledEmail(
               <p style="margin:0 0 18px;color:#3c3340;font-size:15px;line-height:1.65;">You can send a new booking request whenever you are ready.</p>
               <p style="margin:0;">${customerEmailLink("Make a new booking", newBookingUrl)}</p>` : ""}
               <h2 style="margin:26px 0 5px;color:#5c2288;font-size:18px;line-height:1.4;">Questions?</h2>
-              <p style="margin:0;color:#3c3340;font-size:15px;line-height:1.65;">Please contact us if you believe this cancellation was made in error.${contactLines.length ? `<br>${contactLines.map(escapeHtml).join("<br>")}` : ""}</p>
+              <p style="margin:0;color:#3c3340;font-size:15px;line-height:1.65;">Please contact us if you believe this cancellation was made in error.${contactDetails.html ? `<br>${contactDetails.html}` : ""}</p>
               ${contactUrl ? `<p style="margin:18px 0 0;">${customerEmailLink("Contact Siriranee", contactUrl)}</p>` : ""}
               ${statusUrl ? `<div style="margin:26px 0 0;padding:18px;border:1px solid #d8c7d7;border-radius:14px;background:#f7f0fa;">
                 <h2 style="margin:0 0 8px;color:#5c2288;font-size:18px;line-height:1.4;">Check your booking status</h2>

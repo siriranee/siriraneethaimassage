@@ -15,13 +15,12 @@ test("contact FAB uses live site channels and accessible disclosure behavior", a
 
   assert.match(shell, /<ContactFab site=\{site\} \/>/);
   assert.doesNotMatch(shell, /MobileBookingBar/);
-  assert.match(component, /const phone = site\.contact\.phone/);
-  assert.match(component, /phone\s*\?[\s\S]*?phone\.href/);
-  assert.match(component, /phone\?\.e164\.replace\(\/\\D\/g, ""\)/);
-  assert.match(component, /https:\/\/wa\.me\/\$\{whatsappNumber\}/);
-  assert.match(component, /phone\?\.internationalDisplay/);
-  assert.match(component, /label: "Call Siriranee"/);
-  assert.match(component, /label: "WhatsApp"/);
+  assert.match(component, /const contacts = getContactPhones\(site\)/);
+  assert.match(component, /contacts\.map[\s\S]*?href: contact\.phone\.href/);
+  assert.match(component, /buildTherapistWhatsAppUrl\(contact, site\.alternateName\)/);
+  assert.match(component, /detail: contact\.phone\.internationalDisplay/);
+  assert.match(component, /label: `Call \$\{contact\.name\}`/);
+  assert.match(component, /label: `WhatsApp \$\{contact\.name\}`/);
   assert.match(component, /site\.address\.directionsUrl/);
   assert.match(component, /aria-expanded=\{isOpen\}/);
   assert.match(component, /aria-controls=\{actionsId\}/);

@@ -1,4 +1,5 @@
 import "server-only";
+import { normalizeTherapistPhone } from "@/lib/therapist-contact";
 
 import {
   CmsServiceGalleryValidationError,
@@ -246,13 +247,9 @@ export function parseTherapistNotificationEmail(
 export function parseTherapistContactPhone(value: unknown, current = "") {
   if (value === undefined) return current.trim();
   const phone = optionalText(value, 30, "contactPhone");
-  if (
-    phone &&
-    (!/^\+?[\d\s().-]{7,30}$/.test(phone) ||
-      phone.replace(/\D/g, "").length < 7)
-  ) {
+  if (phone && !normalizeTherapistPhone(phone)) {
     throw new CmsValidationError("Please check the highlighted fields.", {
-      contactPhone: "Enter a valid private therapist phone number.",
+      contactPhone: "Use an Irish number starting with 0 or an international number starting with + or 00.",
     });
   }
   return phone;

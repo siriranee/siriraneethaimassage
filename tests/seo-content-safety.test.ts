@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 import { siteConfig } from "@/content/site";
+import type { PublicSiteData } from "@/domain/public-site";
 import robots from "@/app/robots";
 import {
   buildDaySpaJsonLd,
@@ -50,6 +51,26 @@ test("DaySpa price range comes from the published service list", () => {
   const schema = buildDaySpaJsonLd(siteConfig, publishedServicePricing);
   assert.equal(schema.priceRange, "€40–€95");
   assert.equal("priceRange" in buildDaySpaJsonLd(siteConfig, []), false);
+});
+
+test("DaySpa structured data identifies every published therapist phone", () => {
+  const therapists = [
+    { id: "waen", name: "Waen", phone: { display: "089 948 4585", internationalDisplay: "+353 89 948 4585", e164: "+353899484585", href: "tel:+353899484585" } },
+    { id: "nok", name: "Nok", phone: { display: "087 123 4567", internationalDisplay: "+353 87 123 4567", e164: "+353871234567", href: "tel:+353871234567" } },
+  ];
+  const site = {
+    ...siteConfig,
+    contact: { ...siteConfig.contact, therapists },
+  } as unknown as PublicSiteData;
+  const schema = buildDaySpaJsonLd(site);
+  assert.equal(schema.telephone, siteConfig.contact.phone.e164);
+  assert.deepEqual(schema.contactPoint, [
+    { "@type": "ContactPoint", name: "Waen", contactType: "Massage therapist", telephone: "+353899484585" },
+    { "@type": "ContactPoint", name: "Nok", contactType: "Massage therapist", telephone: "+353871234567" },
+  ]);
+  const fallbackSchema = buildDaySpaJsonLd(siteConfig);
+  assert.equal(fallbackSchema.telephone, siteConfig.contact.phone.e164);
+  assert.equal("contactPoint" in fallbackSchema, false);
 });
 
 test("contact map remains click-to-load", async () => {

@@ -12,6 +12,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { MapEmbed } from "@/components/contact/MapEmbed";
+import { TherapistPhoneList } from "@/components/contact/TherapistPhoneList";
 import { PageHero } from "@/components/marketing/PageHero";
 import { SectionHeading } from "@/components/marketing/SectionHeading";
 import { getPageCopy } from "@/content/page-copy";
@@ -25,6 +26,7 @@ import {
   type AppointmentSearchParams,
 } from "@/lib/contact-links";
 import { createMetadata } from "@/lib/metadata";
+import { getContactPhones } from "@/lib/therapist-contact";
 import { resolvePublishedAppointmentPreference } from "@/server/booking/contact-preference";
 import { getPublicSiteData } from "@/server/cms/public-adapter";
 
@@ -46,6 +48,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
     getPublicSiteData(),
   ]);
   const appointmentPreference = await resolvePublishedAppointmentPreference(query);
+  const contacts = getContactPhones(site);
   const whatsappNumber =
     site.contact.whatsapp.number ?? siteConfig.contact.whatsapp.number;
   const whatsappUrl =
@@ -56,14 +59,22 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
         whatsappNumber,
       })
     : null;
+  const appointmentWhatsappContacts = appointmentPreference
+    ? contacts.map((contact) => ({
+        contact,
+        url: buildAppointmentWhatsAppUrl(appointmentPreference, {
+          businessName: site.name,
+          whatsappNumber: contact.phone.e164.replace(/\D/g, ""),
+        }),
+      }))
+    : [];
   const changePreferencesHref = appointmentPreference
     ? buildPlannerPreferenceHref(appointmentPreference)
     : "/book";
-  const phone = site.contact.phone;
   const email = site.contact.email;
   const instagram = site.social.instagram;
   const contactCardCount =
-    1 + (phone ? 1 : 0) + (email ? 1 : 0) + (whatsappUrl ? 1 : 0);
+    1 + (contacts.length ? 1 : 0) + (email ? 1 : 0) + (contacts.length || whatsappUrl ? 1 : 0);
   const gridClass =
     contactCardCount >= 4
       ? styles.contactGridFour
@@ -149,7 +160,20 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
                 </p>
 
                 <div className={styles.requestActions}>
-                  {appointmentWhatsappUrl ? (
+                  {appointmentWhatsappContacts.map(({ contact, url }) => url ? (
+                    <a
+                      key={contact.id}
+                      className={styles.requestPrimary}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <MessageCircle aria-hidden="true" size={18} />
+                      <span>Send via WhatsApp to {contact.name}<small>{contact.phone.internationalDisplay}</small></span>
+                      <span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                  ) : null)}
+                  {!appointmentWhatsappContacts.length && appointmentWhatsappUrl ? (
                     <a
                       className={styles.requestPrimary}
                       href={appointmentWhatsappUrl}
@@ -161,19 +185,20 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
                       <span className="sr-only"> (opens in a new tab)</span>
                     </a>
                   ) : null}
-                  {phone ? (
+                  {contacts.map((contact) => (
                     <a
+                      key={contact.id}
                       className={
                         appointmentWhatsappUrl
                           ? styles.requestSecondary
                           : styles.requestPrimary
                       }
-                      href={phone.href}
+                      href={contact.phone.href}
                     >
                       <Phone aria-hidden="true" size={18} />
-                      Call the team
+                      <span>Call {contact.name}<small>{contact.phone.internationalDisplay}</small></span>
                     </a>
-                  ) : null}
+                  ))}
                   <Link
                     className={styles.requestTertiary}
                     href={changePreferencesHref}
@@ -205,20 +230,15 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
               </a>
             </article>
 
-            {phone ? (
+            {contacts.length ? (
               <article className={styles.contactCard}>
                 <span className={styles.iconWrap}>
                   <Phone aria-hidden="true" size={23} strokeWidth={1.65} />
                 </span>
                 <p className={styles.cardLabel}>Call us</p>
-                <h3>
-                  <a href={phone.href}>{phone.display}</a>
-                </h3>
-                <p>Call directly if you have a question about your visit.</p>
-                <a href={phone.href}>
-                  Call Siriranee
-                  <ArrowUpRight aria-hidden="true" size={16} />
-                </a>
+                <h3>Speak to a therapist</h3>
+                <p>Choose who to call about a treatment, booking or your visit.</p>
+                <TherapistPhoneList site={site} />
               </article>
             ) : null}
 
@@ -239,24 +259,21 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
               </article>
             ) : null}
 
-            {whatsappUrl && whatsappNumber ? (
+            {contacts.length || (whatsappUrl && whatsappNumber) ? (
               <article className={styles.contactCard}>
                 <span className={styles.iconWrap}>
                   <MessageCircle aria-hidden="true" size={23} strokeWidth={1.65} />
                 </span>
                 <p className={styles.cardLabel}>Message us</p>
-                <h3>
+                <h3>Message on WhatsApp</h3>
+                <p>Send us a WhatsApp message about a booking or your visit.</p>
+                {contacts.length ? <TherapistPhoneList site={site} channel="whatsapp" /> : whatsappUrl ? (
                   <a href={whatsappUrl} target="_blank" rel="noreferrer">
                     WhatsApp +{whatsappNumber}
+                    <ArrowUpRight aria-hidden="true" size={16} />
                     <span className="sr-only"> (opens in a new tab)</span>
                   </a>
-                </h3>
-                <p>Send us a WhatsApp message about a booking or your visit.</p>
-                <a href={whatsappUrl} target="_blank" rel="noreferrer">
-                  Message on WhatsApp
-                  <ArrowUpRight aria-hidden="true" size={16} />
-                  <span className="sr-only"> (opens in a new tab)</span>
-                </a>
+                ) : null}
               </article>
             ) : null}
           </div>

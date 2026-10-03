@@ -2,6 +2,7 @@ import { siteConfig } from "@/content/site";
 import type { PublicSiteData } from "@/domain/public-site";
 import type { Service } from "@/domain/service";
 import { absoluteUrl } from "@/lib/metadata";
+import { getContactPhones } from "@/lib/therapist-contact";
 
 type PostalAddressJsonLd = {
   readonly "@type": "PostalAddress";
@@ -24,6 +25,13 @@ type OpeningHoursJsonLd = {
   readonly closes: string;
 };
 
+type ContactPointJsonLd = {
+  readonly "@type": "ContactPoint";
+  readonly name: string;
+  readonly contactType: "Massage therapist";
+  readonly telephone: string;
+};
+
 export type DaySpaJsonLd = {
   readonly "@context": "https://schema.org";
   readonly "@type": "DaySpa";
@@ -37,6 +45,7 @@ export type DaySpaJsonLd = {
   readonly priceRange?: string;
   readonly hasMap: string;
   readonly telephone?: string;
+  readonly contactPoint?: readonly ContactPointJsonLd[];
   readonly email?: string;
   readonly address: PostalAddressJsonLd;
   readonly openingHoursSpecification?: readonly OpeningHoursJsonLd[];
@@ -154,6 +163,17 @@ export function buildDaySpaJsonLd(
   ].filter((url): url is string => Boolean(url));
   const priceRange = buildServicePriceRange(services);
   const phone = site.contact.phone;
+  const therapistContacts = "therapists" in site.contact
+    ? site.contact.therapists ?? []
+    : [];
+  const contactPoints = therapistContacts.length
+    ? getContactPhones(site).map((contact) => ({
+        "@type": "ContactPoint" as const,
+        name: contact.name,
+        contactType: "Massage therapist" as const,
+        telephone: contact.phone.e164,
+      }))
+    : [];
 
   return {
     "@context": "https://schema.org",
@@ -170,6 +190,7 @@ export function buildDaySpaJsonLd(
     ...(phone
       ? { telephone: phone.e164 }
       : {}),
+    ...(contactPoints.length ? { contactPoint: contactPoints } : {}),
     ...(site.contact.email
       ? { email: site.contact.email.address }
       : {}),

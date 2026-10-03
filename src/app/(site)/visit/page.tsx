@@ -6,16 +6,17 @@ import {
   Info,
   MapPin,
   Navigation,
-  Phone,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { MapEmbed } from "@/components/contact/MapEmbed";
+import { TherapistPhoneList } from "@/components/contact/TherapistPhoneList";
 import { PageHero } from "@/components/marketing/PageHero";
 import { getPageCopy } from "@/content/page-copy";
 import { pageHeroImages } from "@/content/page-heroes";
 import { createMetadata } from "@/lib/metadata";
+import { getContactPhones } from "@/lib/therapist-contact";
 import {
   buildBreadcrumbJsonLd,
   jsonLdScriptProps,
@@ -37,7 +38,7 @@ const breadcrumbJsonLd = buildBreadcrumbJsonLd([
 export default async function VisitPage() {
   const pageCopy = getPageCopy("visit");
   const site = await getPublicSiteData();
-  const phone = site.contact.phone;
+  const contacts = getContactPhones(site);
 
   return (
     <div>
@@ -74,17 +75,17 @@ export default async function VisitPage() {
                 <ArrowUpRight aria-hidden="true" className={styles.actionArrow} />
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>
-              {phone ? (
-                <a className={styles.action} href={phone.href}>
-                  <Phone aria-hidden="true" />
-                  <span>Call the team</span>
-                </a>
-              ) : null}
               <Link className={styles.action} href="/book">
                 <CalendarDays aria-hidden="true" />
                 <span>Book Now</span>
               </Link>
             </div>
+            {contacts.length ? (
+              <div className={styles.therapistContacts}>
+                <p className={styles.eyebrow}>Call a therapist</p>
+                <TherapistPhoneList site={site} />
+              </div>
+            ) : null}
           </article>
 
           <div className={styles.mapPanel}>
@@ -131,7 +132,7 @@ export default async function VisitPage() {
             <p className={styles.eyebrow}>Before you travel</p>
             <h2 id="arrival-heading">A simple arrival guide</h2>
             <p className={styles.intro}>
-              {phone
+              {contacts.length
                 ? "Keep the address and phone number close to hand, especially for your first appointment at Harbour House."
                 : "Keep the confirmed address close to hand for your first appointment at Harbour House."}
             </p>
@@ -209,12 +210,7 @@ export default async function VisitPage() {
               Book Now
               <CalendarDays aria-hidden="true" />
             </Link>
-            {phone ? (
-              <a className={styles.ctaSecondary} href={phone.href}>
-                Call {phone.display}
-                <Phone aria-hidden="true" />
-              </a>
-            ) : null}
+            <TherapistPhoneList site={site} onBrand />
           </div>
         </div>
       </section>

@@ -67,6 +67,51 @@ function visibleMarkup(html) {
   return html.replace(/<script\b[\s\S]*?<\/script>/gi, "");
 }
 
+function jsonLdSchemas(html, context) {
+  return [...html.matchAll(
+    /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi,
+  )].flatMap((match) => {
+    try {
+      const value = JSON.parse(match[1]);
+      return Array.isArray(value) ? value : [value];
+    } catch {
+      failures.push(`${context} contains invalid JSON-LD`);
+      return [];
+    }
+  });
+}
+
+function serviceOfferPriceRange(schemas) {
+  const prices = schemas
+    .filter((schema) => schema?.["@type"] === "Service")
+    .flatMap((schema) => Array.isArray(schema.offers) ? schema.offers : [])
+    .filter((offer) => offer?.priceCurrency === "EUR" && String(offer.price ?? "").trim())
+    .map((offer) => Number(offer.price))
+    .filter((price) => Number.isFinite(price) && price >= 0);
+  if (!prices.length) return undefined;
+
+  const formatEuro = (price) => "€" + (Number.isInteger(price)
+    ? price.toString()
+    : price.toFixed(2).replace(/0+$/, "").replace(/\.$/, ""));
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+  return minimum === maximum
+    ? formatEuro(minimum)
+    : `${formatEuro(minimum)}–${formatEuro(maximum)}`;
+}
+
+function checkTherapistPhoneLinks(markup, contacts, context) {
+  const links = [...markup.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/gi)].map((match) => match[0]);
+  for (const contact of contacts) {
+    check(links.some((link) => {
+      const href = decodeAttribute(capture(link, /\shref="([^"]+)"/i));
+      const text = decodeAttribute(link.replace(/<[^>]*>/g, ""))
+        .replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&#39;", "'");
+      return href === `tel:${contact.telephone}` && text.includes(contact.name);
+    }), `${context} is missing the named phone link for ${contact.name}`);
+  }
+}
+
 function checkAppointmentHandoff(html, targetPath, context) {
   const link = [...visibleMarkup(html).matchAll(/href="([^"]+)"/gi)]
     .map((match) => new URL(decodeAttribute(match[1]), baseUrl))
@@ -366,18 +411,10 @@ for (const obsolete of [
   check(!renderedSource.includes(obsolete), `Rendered HTML contains obsolete value: ${obsolete}`);
 }
 
-const homeSchemas = [
-  ...(pages.get("/")?.matchAll(
-    /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi,
-  ) ?? []),
-].map((match) => {
-  try {
-    return JSON.parse(match[1]);
-  } catch {
-    failures.push("Homepage contains invalid JSON-LD");
-    return null;
-  }
-});
+const homeSchemas = jsonLdSchemas(pages.get("/") ?? "", "Homepage");
+const serviceSchemas = [...pages]
+  .filter(([route]) => route.startsWith("/services/"))
+  .flatMap(([route, html]) => jsonLdSchemas(html, route));
 
 const daySpa = homeSchemas
   .flatMap((value) => (Array.isArray(value) ? value : [value]))
@@ -433,9 +470,29 @@ if (daySpa) {
   );
   check(daySpa.currenciesAccepted === "EUR", "DaySpa currency is incorrect");
   check(
-    daySpa.priceRange === "€40–€95",
+    daySpa.priceRange === serviceOfferPriceRange(serviceSchemas),
     "DaySpa price range does not match the published service prices",
   );
+
+  const therapistContacts = Array.isArray(daySpa.contactPoint) ? daySpa.contactPoint : [];
+  const validTherapistContacts = therapistContacts.filter((contact) =>
+    contact?.["@type"] === "ContactPoint" &&
+    typeof contact.name === "string" && Boolean(contact.name.trim()) &&
+    /^\+[1-9]\d{6,14}$/.test(contact.telephone ?? ""));
+  check(validTherapistContacts.length === therapistContacts.length, "DaySpa contains an invalid therapist phone contact");
+  for (const route of ["/contact", "/visit", "/privacy"]) {
+    const markup = visibleMarkup(pages.get(route) ?? "");
+    // Streamed route content can arrive outside the initial main placeholder.
+    checkTherapistPhoneLinks(markup, validTherapistContacts, `${route} rendered page`);
+    const phoneLists = [...markup.matchAll(/<ul\b[^>]*data-therapist-phones="phone"[^>]*>[\s\S]*?<\/ul>/gi)];
+    for (const [index, list] of phoneLists.entries()) {
+      checkTherapistPhoneLinks(list[0], validTherapistContacts, `${route} phone list ${index + 1}`);
+    }
+  }
+  for (const [route, html] of pages) {
+    const footer = capture(visibleMarkup(html), /<footer\b[^>]*>([\s\S]*?)<\/footer>/i);
+    checkTherapistPhoneLinks(footer, validTherapistContacts, `${route} footer`);
+  }
 }
 
 const validContact = await request(

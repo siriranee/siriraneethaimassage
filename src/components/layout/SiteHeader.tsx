@@ -6,7 +6,6 @@ import {
   MapPin,
   Menu,
   MessageCircle,
-  Phone,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { BrandMark } from "@/components/ui/BrandMark";
+import { TherapistPhoneList } from "@/components/contact/TherapistPhoneList";
 import type { PublicSiteData } from "@/domain/public-site";
 
 import { headerNavigation } from "./navigation";
@@ -32,7 +32,6 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
   const treatmentsMenuRef = useRef<HTMLDivElement>(null);
   const treatmentsButtonRef = useRef<HTMLButtonElement>(null);
   const whatsappUrl = site.contact.whatsapp.url;
-  const phone = site.contact.phone;
   const treatmentNavigation = site.treatments;
 
   useEffect(() => {
@@ -337,11 +336,7 @@ export function SiteHeader({ site }: Readonly<{ site: PublicSiteData }>) {
           <Link className={styles.drawerBook} href="/book" onClick={closeMenu}>
             <CalendarDays aria-hidden="true" /> Book Now
           </Link>
-          {phone ? (
-            <a href={phone.href}>
-              <Phone aria-hidden="true" /> {phone.display}
-            </a>
-          ) : null}
+          <TherapistPhoneList site={site} onContact={closeMenu} onBrand />
           {whatsappUrl ? (
             <a href={whatsappUrl} target="_blank" rel="noreferrer">
               <MessageCircle aria-hidden="true" /> WhatsApp<span className="sr-only"> (opens in a new tab)</span>

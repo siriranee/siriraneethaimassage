@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { TherapistPhoneList } from "@/components/contact/TherapistPhoneList";
+import { getContactPhones } from "@/lib/therapist-contact";
 
 import { PageHero } from "@/components/marketing/PageHero";
 import { getPageCopy } from "@/content/page-copy";
@@ -17,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PrivacyPage() {
   const pageCopy = getPageCopy("privacy");
   const site = await getPublicSiteData();
-  const phone = site.contact.phone;
+  const contacts = getContactPhones(site);
   const email = site.contact.email;
 
   return (
@@ -84,8 +86,11 @@ export default async function PrivacyPage() {
             does not confirm it, and its review page does not display your contact
             details or booking note. Internal CMS notes are not included in
             therapist emails or review pages. Therapist
-            notification addresses and private phone numbers are stored separately
-            from public profile content and encrypted in production. The customer
+            notification addresses and contact phone numbers are stored separately
+            from public profile content and encrypted in production. Contact phone
+            numbers for active therapists shown online are published with their
+            display names so visitors can call or message them. Notification email
+            addresses remain private. The customer
             confirmation does not include your notes or internal CMS notes.
             Hosting and support providers may process limited information
             only when configured for this service.
@@ -145,21 +150,14 @@ export default async function PrivacyPage() {
         <section>
           <h2>Questions or requests</h2>
           <p>
-            {email && phone ? (
-              <>
-                For a privacy question or request, email{" "}
-                <a href={email.href}>{email.address}</a> or call{" "}
-                <a href={phone.href}>{phone.internationalDisplay}</a>.
-              </>
-            ) : email ? (
+            {email ? (
               <>
                 For a privacy question or request, email{" "}
                 <a href={email.href}>{email.address}</a>.
               </>
-            ) : phone ? (
+            ) : contacts.length ? (
               <>
-                For a privacy question or request, call{" "}
-                <a href={phone.href}>{phone.internationalDisplay}</a>.
+                For a privacy question or request, call one of our therapists.
               </>
             ) : (
               <>
@@ -168,6 +166,7 @@ export default async function PrivacyPage() {
               </>
             )}
           </p>
+          <TherapistPhoneList site={site} />
           <p>
             This notice should be reviewed and kept up to date as the booking
             process and service providers change.
