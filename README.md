@@ -372,6 +372,44 @@ workflow. If a browser or network session ends before that save can run, retain
 the registry evidence and reconcile the incomplete upload with Cloudinary as an
 operator recovery task.
 
+### Data retention and guarded recovery
+
+MongoDB TTL indexes remove bookings 730 days after the later of the appointment
+or its creation, booking notifications after 365 days, audit events after 365
+days, email-delivery events after 30 days, day locks after their 30-day window,
+and sessions/login attempts at their configured expiry. TTL deletion is
+asynchronous. Run `npm.cmd run cms:indexes` after provisioning or changing
+indexes; it does not silently repair legacy notification records.
+
+For a legacy-data audit, run the following commands with the intended database
+configuration. They default to read-only dry runs and print aggregate counts
+and an opaque plan hash, not customer, therapist, or media identifiers:
+
+~~~powershell
+npm.cmd run cms:backfill-notification-retention
+npm.cmd run cms:reconcile-orphan-therapists
+npm.cmd run cms:reconcile-media
+~~~
+
+Review the database, counts and, for notifications, `alreadyDueCount` before
+applying a freshly generated plan with `--apply --expected-plan=<plan-hash>`.
+An already-due notification can be removed soon after its expiry date is
+repaired. The commands recheck the plan and abort if the source state changes.
+The therapist command removes only orphan private contacts and locks with no
+live therapist or linked booking; it does not remove bookings. The media
+command only marks proven-absent, long-expired `deleting` metadata as
+`deleted`; it never deletes a Cloudinary image or metadata row. Re-run each
+dry run afterward and keep a database backup before production maintenance.
+
+Current CMS content, administrator accounts, settings and up to 50 retained
+publication snapshots are intentionally persistent. Calendar closures and
+committed media also have no blanket TTL: closures are business history, and
+committed images can still be referenced by retained publications. Review
+their counts periodically and set a separate owner-approved archival policy
+before deleting either. Never add a TTL index to `cmsMediaAssets.expiresAt`:
+that timestamp only limits upload authorization, including on committed
+images.
+
 The approved initial voucher artwork can be checked with
 `npm.cmd run cms:migrate-vouchers` and applied once with
 `npm.cmd run cms:migrate-vouchers -- --apply`. The command is deterministic and

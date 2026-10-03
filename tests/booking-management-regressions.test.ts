@@ -222,6 +222,15 @@ test("therapist deletion removes every assigned booking atomically and preserves
     team: [...initialContent.team, otherTherapist],
   };
   await fixture.repository.saveContent(contentWithOther, initialContent.revision);
+  const otherContactEmail = "unrelated.therapist@example.invalid";
+  await fixture.repository.saveTherapistContact({
+    id: otherTherapist.id,
+    notificationEmail: otherContactEmail,
+    contactPhone: "",
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    updatedBy: fixture.actor.id,
+  });
   await fixture.repository.savePublication({
     id: "deletion-test-publication",
     revision: contentWithOther.revision,
@@ -253,6 +262,16 @@ test("therapist deletion removes every assigned booking atomically and preserves
   };
   await fixture.repository.saveBooking(historical);
   await fixture.repository.saveBooking(unrelated);
+  await fixture.repository.transaction(async (transaction) => {
+    await transaction.lockTherapist(otherTherapist.id);
+  });
+  const mockTherapistLocks = () => (
+    Reflect.get(globalThis, "__siriraneeCmsMockState") as {
+      therapistLocks: string[];
+    }
+  ).therapistLocks;
+  assert.ok(mockTherapistLocks().includes(fixture.therapist.id));
+  assert.ok(mockTherapistLocks().includes(otherTherapist.id));
 
   const notificationBase = {
     channel: "email" as const,
@@ -296,6 +315,8 @@ test("therapist deletion removes every assigned booking atomically and preserves
     /changed by another request/,
   );
   assert.ok(await fixture.repository.getBooking(assigned.id));
+  assert.ok(await fixture.repository.getTherapistContact(fixture.therapist.id));
+  assert.ok(mockTherapistLocks().includes(fixture.therapist.id));
 
   const deleted = await deleteCmsTeamMember(
     fixture.therapist.id,
@@ -319,13 +340,12 @@ test("therapist deletion removes every assigned booking atomically and preserves
   assert.equal((await fixture.repository.getBooking(unrelated.id))?.assignedStaffId, otherTherapist.id);
   assert.deepEqual(await fixture.repository.listNotifications(assigned.id), []);
   assert.equal((await fixture.repository.listNotifications(unrelated.id)).length, 1);
-  // Separate therapist contact data is retained until the owner explicitly
-  // authorizes deleting that private operational record too.
+  assert.equal(await fixture.repository.getTherapistContact(fixture.therapist.id), null);
   assert.equal(
-    (await fixture.repository.getTherapistContact(fixture.therapist.id))
-      ?.notificationEmail,
-    "demo.therapist@example.invalid",
+    (await fixture.repository.getTherapistContact(otherTherapist.id))?.notificationEmail,
+    otherContactEmail,
   );
+  assert.deepEqual(mockTherapistLocks(), [otherTherapist.id]);
   const published = await fixture.repository.getPublishedContent();
   assert.equal(published?.snapshot.team.some(
     (member) => member.id === fixture.therapist.id,
@@ -375,5 +395,29 @@ test("an archived therapist can still be permanently deleted with assigned booki
   assert.equal(deleted.bookingCount, 1);
   assert.deepEqual(deleted.bookingReferences, [assigned.reference]);
   assert.equal(await fixture.repository.getBooking(assigned.id), null);
+  assert.equal(await fixture.repository.getTherapistContact(archived.id), null);
   assert.equal((await fixture.repository.getContent()).team.length, 0);
+});
+
+test("aborted therapist cascade retains bookings, notifications, contact and lock", async () => {
+  const { createAdminBooking } = await import("@/server/cms/booking-service");
+  const fixture = await setup();
+  const booking = await createAdminBooking(fixture.input, fixture.context);
+  const notifications = await fixture.repository.listNotifications(booking.id);
+
+  await assert.rejects(
+    fixture.repository.transaction(async (transaction) => {
+      await transaction.lockTherapist(fixture.therapist.id);
+      await transaction.deleteTherapistCascade(fixture.therapist.id);
+      throw new Error("Abort deletion");
+    }),
+    /Abort deletion/,
+  );
+
+  assert.ok(await fixture.repository.getBooking(booking.id));
+  assert.deepEqual(await fixture.repository.listNotifications(booking.id), notifications);
+  assert.ok(await fixture.repository.getTherapistContact(fixture.therapist.id));
+  assert.ok((
+    Reflect.get(globalThis, "__siriraneeCmsMockState") as { therapistLocks: string[] }
+  ).therapistLocks.includes(fixture.therapist.id));
 });

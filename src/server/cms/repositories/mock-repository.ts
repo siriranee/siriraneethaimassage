@@ -38,6 +38,7 @@ type MockState = {
   publications: CmsPublication[];
   mediaAssets: CmsMediaAsset[];
   therapistContacts: CmsTherapistContact[];
+  therapistLocks: string[];
   users: CmsUser[];
   sessions: CmsSession[];
   loginAttempts: CmsLoginAttempt[];
@@ -96,6 +97,7 @@ function createState(): MockState {
     publications: [publication],
     mediaAssets: [],
     therapistContacts: [],
+    therapistLocks: [],
     users: [createMockAdministrator()],
     sessions: [],
     loginAttempts: [],
@@ -112,6 +114,7 @@ function getGlobalState() {
   cmsGlobal.__siriraneeCmsMockState ??= createState();
   cmsGlobal.__siriraneeCmsMockState.mediaAssets ??= [];
   cmsGlobal.__siriraneeCmsMockState.therapistContacts ??= [];
+  cmsGlobal.__siriraneeCmsMockState.therapistLocks ??= [];
   cmsGlobal.__siriraneeCmsMockState.emailDeliveryEvents ??= [];
   cmsGlobal.__siriraneeCmsMockQueue ??= Promise.resolve();
 
@@ -268,6 +271,12 @@ export class MockCmsRepository implements CmsRepository {
         "The therapist's bookings changed while deletion was in progress.",
       );
     }
+    this.state.therapistContacts = this.state.therapistContacts.filter(
+      (contact) => contact.id !== therapistId,
+    );
+    this.state.therapistLocks = this.state.therapistLocks.filter(
+      (id) => id !== therapistId,
+    );
     return clone(therapistDeletionImpact(bookings));
   }
 
@@ -775,6 +784,11 @@ export class MockCmsRepository implements CmsRepository {
 
   async lockTherapist(therapistId: string) {
     // Mock transactions already serialize all mutations through one queue.
-    void therapistId;
+    if (!this.transactionState) {
+      throw new Error("Therapist locks require a transaction.");
+    }
+    if (!this.state.therapistLocks.includes(therapistId)) {
+      this.state.therapistLocks.push(therapistId);
+    }
   }
 }

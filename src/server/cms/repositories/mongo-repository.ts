@@ -451,6 +451,13 @@ export class MongoCmsRepository implements CmsRepository {
       );
     }
 
+    await db
+      .collection<CmsMongoDocument>(collections.therapistContacts)
+      .deleteOne({ _id: therapistId }, this.options());
+    await db
+      .collection<CmsMongoDocument>(collections.therapistLocks)
+      .deleteOne({ _id: therapistId }, this.options());
+
     return impact;
   }
 

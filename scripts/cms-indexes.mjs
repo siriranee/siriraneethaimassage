@@ -1,7 +1,6 @@
 import { MongoClient } from "mongodb";
 
 const auditRetentionDays = 365;
-const notificationRetentionDays = 365;
 const bookingRetentionDays = 2 * 365;
 const dayLockRetentionDays = 30;
 const publicationRetentionCount = 50;
@@ -28,7 +27,6 @@ try {
   const users = db.collection("cmsUsers");
   const audit = db.collection("cmsAuditEvents");
   const bookings = db.collection("cmsBookings");
-  const notifications = db.collection("cmsBookingNotifications");
   const dayLocks = db.collection("cmsBookingDayLocks");
   const publications = db.collection("cmsPublications");
   const metadata = db.collection("cmsMeta");
@@ -109,30 +107,6 @@ try {
     );
   }
 
-  const notificationBackfill = await notifications.updateMany(
-    { expiresAtDate: { $not: { $type: "date" } } },
-    [
-      {
-        $set: {
-          expiresAtDate: {
-            $dateAdd: {
-              startDate: {
-                $convert: {
-                  input: "$createdAt",
-                  to: "date",
-                  onError: "$$NOW",
-                  onNull: "$$NOW",
-                },
-              },
-              unit: "day",
-              amount: notificationRetentionDays,
-            },
-          },
-        },
-      },
-    ],
-  );
-
   const bookingBackfill = await bookings.updateMany(
     { retentionExpiresAtDate: { $not: { $type: "date" } } },
     [
@@ -193,9 +167,6 @@ try {
     ],
   );
 
-  if (notificationBackfill.modifiedCount) {
-    console.log(`Added retention dates to ${notificationBackfill.modifiedCount} booking notification record(s).`);
-  }
   if (bookingBackfill.modifiedCount) {
     console.log(`Added retention dates to ${bookingBackfill.modifiedCount} booking record(s).`);
   }
