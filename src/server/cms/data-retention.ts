@@ -24,8 +24,19 @@ export function getCmsNotificationExpiryDate(
   return retentionDate(createdAt, CMS_NOTIFICATION_RETENTION_DAYS, now);
 }
 
-export function getCmsBookingExpiryDate(startsAt: string, now = new Date()) {
-  return retentionDate(startsAt, CMS_BOOKING_RETENTION_DAYS, now);
+export function getCmsBookingExpiryDate(
+  startsAt: string,
+  createdAt?: string,
+  now = new Date(),
+) {
+  // A historical appointment may be entered after its nominal expiry date.
+  // Keep it for the normal retention period from when it was recorded instead
+  // of allowing MongoDB's TTL index to delete the new record immediately.
+  const appointment = safeRetentionStart(startsAt, now);
+  const recorded = createdAt ? safeRetentionStart(createdAt, now) : appointment;
+  return new Date(
+    Math.max(appointment, recorded) + CMS_BOOKING_RETENTION_DAYS * millisecondsPerDay,
+  );
 }
 
 export function getCmsDayLockExpiryDate(localDate: string, now = new Date()) {

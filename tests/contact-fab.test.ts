@@ -85,5 +85,7 @@ test("footer removes the Explore column and places Privacy in the bottom row", a
     "Privacy should be inside the bottom metadata group",
   );
   assert.match(styles, /grid-template-columns:\s*1\.1fr 1\.25fr 1fr/);
-  assert.match(styles, /\.bottomMeta a\s*\{/);
+  assert.match(styles, /\.bottomMeta a,\s*\.preferencesButton\s*\{/);
+  const decoration = styles.split(".footer::after {")[1]?.split("}")[0] ?? "";
+  assert.match(decoration, /pointer-events:\s*none/);
 });

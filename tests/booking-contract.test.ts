@@ -1,6 +1,58 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { validateBookingContact } from "@/domain/booking/contact-validation";
+
+const validContact = {
+  customerName: "Demo Guest",
+  phone: "+353 89 123 4567",
+  email: "demo@example.invalid",
+  privacyAccepted: true,
+};
+
+test("public booking contact validation reports every missing required detail", () => {
+  assert.deepEqual(Object.keys(validateBookingContact({})), [
+    "customerName", "phone", "email", "privacyAccepted",
+  ]);
+  assert.deepEqual(validateBookingContact(validContact), {});
+  assert.deepEqual(validateBookingContact({
+    ...validContact, customerName: "  Demo Guest  ", email: " demo@example.invalid ", notes: "",
+  }), {});
+});
+
+test("public booking rejects whitespace, malformed details and unchecked privacy", () => {
+  for (const [field, invalidValues] of Object.entries({
+    customerName: [" ", "x", "x".repeat(101)],
+    phone: [" ", "-------", "123456", "1234567890123456", "phone12345", "+353 89 12+34567"],
+    email: [" ", "guest", "guest@example", "guest name@example.com", "x".repeat(255)],
+    notes: ["x".repeat(601)],
+    privacyAccepted: [false, undefined, "true"],
+  })) {
+    for (const value of invalidValues) {
+      assert.ok(validateBookingContact({ ...validContact, [field]: value })[field], `${field}: ${String(value)}`);
+    }
+  }
+  for (const phone of ["0899894916", "+353 (89) 123-4567", "1234567", "+123456789012345"]) {
+    assert.deepEqual(validateBookingContact({ ...validContact, phone }), {});
+  }
+  assert.deepEqual(validateBookingContact({ ...validContact, notes: "x".repeat(600) }), {});
+});
+
+test("public booking form shares server validation and makes email required", async () => {
+  const [planner, server] = await Promise.all([
+    source("src/components/booking/BookingPlanner.tsx"),
+    source("src/server/booking/public-booking.ts"),
+  ]);
+  assert.match(planner, /onBlurCapture=/);
+  assert.match(planner, /onChange=\{\(event\) => validateContactField/);
+  assert.match(planner, /name="email"\s+required/);
+  assert.match(planner, /customer-privacy-error/);
+  assert.match(planner, /firstInvalid\.focus\(\)/);
+  assert.ok(planner.indexOf("const errors = validateBookingContact", planner.indexOf("async function submitBooking")) < planner.indexOf('await fetch("/api/public/bookings"'));
+  assert.ok(server.indexOf("validateBookingContact(source)") < server.indexOf("const create = ()", server.indexOf("export async function createPublicBooking")));
+  assert.match(server, /priorEmailFreeRequest[\s\S]*?findBookingByIdempotencyHash\(idempotencyKeyHash\)/);
+  assert.match(server, /Object\.keys\(contactErrors\)\.length && !legacyEmailFreeReplay/);
+});
 import { resolve } from "node:path";
 
 async function source(path: string) {
@@ -121,10 +173,9 @@ test("CMS booking views use cards with accessible icon-only status actions", asy
   assert.match(viewStyles, /\.details \.bookingDetailStatus[\s\S]*display:\s*flex/);
 
   assert.match(calendarPage, /canManageBookings=\{canManageBookings\}/);
-  assert.match(calendar, /className=\{styles\.agendaBookingCard\}/);
-  assert.match(calendar, /<CmsBookingQuickActions/);
-  assert.match(calendar, /booking\.customerPhone/);
-  assert.match(calendar, /booking\.customerNotes \|\| "No notes provided"/);
+  assert.match(calendar, /<CmsWorkSchedule/);
+  assert.match(calendar, /<TherapistPortrait \{\.\.\.therapist\}/);
+  assert.doesNotMatch(calendar, /CmsBookingQuickActions|customerNotes|internalNotes/);
   assert.match(quickActions, /Confirm booking \$\{booking\.reference\} and email customer/);
   assert.match(quickActions, /No customer email is recorded/);
   assert.match(quickActions, /Cancel booking \$\{booking\.reference\} and email customer/);
@@ -211,10 +262,11 @@ test("booking settings use the API response contract and gate public enablement"
   );
 });
 
-test("booking mutations validate therapist assignment and unsafe initial statuses", async () => {
+test("booking mutations force confirmation, validate therapist assignment and reject unsafe initial statuses", async () => {
   const service = await source("src/server/cms/booking-service.ts");
 
-  assert.match(service, /status !== "pending" && status !== "confirmed"/);
+  assert.match(service, /requestedStatus !== "pending" && requestedStatus !== "confirmed"/);
+  assert.match(service, /status: "confirmed"/);
   assert.match(service, /canTransitionBookingStatus\(current\.status, status\)/);
   for (const field of ["assignedStaffId", "staffId", "therapist"]) {
     assert.match(service, new RegExp(`"${field}"`));
@@ -225,7 +277,7 @@ test("booking mutations validate therapist assignment and unsafe initial statuse
   assert.match(service, /member\.operationalActive/);
   assert.match(service, /member\.serviceIds\.includes\(input\.serviceId\)/);
   assert.match(service, /assignedStaffId:\s*therapist\?\.id \?\? ""/);
-  assert.match(service, /status === "confirmed" && !therapist/);
+  assert.match(service, /if \(!therapist\)/);
   assert.match(service, /assignmentChanged/);
   assert.match(service, /confirmingExistingRequest/);
   assert.match(service, /ignoreBookingOccupancy:\s*confirmingExistingRequest/);
@@ -288,7 +340,7 @@ test("customer confirmation email is dispatched after commit with safe CMS feedb
 
   assert.match(
     bookingService,
-    /await transaction\.saveBooking\(updated, current\.version\);[\s\S]*?recordBookingNotificationPlan\(transaction, updated, notificationKind\)/,
+    /await transaction\.saveBooking\(updated, current\.version\);[\s\S]*?recordBookingNotificationPlan\(\s*transaction,\s*updated,\s*notificationKind/,
   );
   assert.doesNotMatch(
     bookingService,
@@ -330,10 +382,10 @@ test("customer confirmation email is dispatched after commit with safe CMS feedb
   assert.match(quickActions, /and email the customer now/);
   assert.match(editor, /Confirming or cancelling a booking emails the customer/);
   assert.match(adminForm, /Create & confirm booking/);
-  assert.match(adminForm, /Creating as Confirmed immediately sends a confirmation email/);
+  assert.match(adminForm, /Required for upcoming appointments so the customer receives a confirmation email/);
   assert.match(quickActions, /Demo mode will not contact Resend/);
   assert.match(editor, /Demo mode does not contact Resend/);
-  assert.match(adminForm, /Creating a confirmed demo booking does not contact Resend/);
+  assert.match(adminForm, /Required for upcoming demo appointments; demo mode does not send emails/);
   assert.match(
     bookingDetailPage,
     /key=\{`quick-actions:\$\{booking\.id\}:\$\{booking\.version\}`\}/,
@@ -423,9 +475,10 @@ test("contact handoff resolves service and price from the published snapshot", a
 });
 
 test("booking page uses the custom month calendar and visual time choices", async () => {
-  const [planner, plannerStyles, calendar, calendarStyles, calendarLegend] = await Promise.all([
+  const [planner, plannerStyles, publicAvailability, calendar, calendarStyles, calendarLegend] = await Promise.all([
     source("src/components/booking/BookingPlanner.tsx"),
     source("src/components/booking/BookingPlanner.module.css"),
+    source("src/server/booking/public-availability.ts"),
     source("src/components/booking/BookingCalendar.tsx"),
     source("src/components/booking/BookingCalendar.module.css"),
     source("src/components/booking/CalendarLegend.tsx"),
@@ -436,9 +489,17 @@ test("booking page uses the custom month calendar and visual time choices", asyn
   assert.match(planner, /name="preferredTime"/);
   assert.match(planner, /setUnavailableSelectedTime/);
   assert.match(planner, /No longer available/);
+  assert.match(planner, /slot\.available \? "available"/);
+  assert.match(planner, /unavailableLabel: slot\.available \? "" : "Unavailable"/);
   assert.match(planner, /displayedTimeSlots\.length/);
   assert.match(plannerStyles, /\.timeOptionGhost/);
   assert.match(plannerStyles, /cursor:\s*not-allowed/);
+  assert.match(publicAvailability, /const availableSlotIds = new Set/);
+  assert.match(publicAvailability, /bookings:\s*\[\]/);
+  assert.match(
+    publicAvailability,
+    /available:\s*availableSlotIds\.has\(slot\.slotId\)/,
+  );
   assert.match(calendar, /\/api\/public\/availability\/calendar/);
   assert.match(calendar, /<CalendarLegend \/>/);
   assert.match(calendarLegend, /aria-label="Calendar legend"/);
@@ -481,6 +542,7 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
   assert.doesNotMatch(page, /isPendingCapacityExpired\(booking\)/);
   assert.match(page, /closedWeekdays=\{content\.site\.weeklyHours\.map/);
   assert.match(page, /<CmsCalendar/);
+  assert.match(page, /isApprovedImageUrlForOwnership\(member\.imageUrl, cloudinaryOwnership\) \? member\.imageUrl : ""/);
   assert.match(page, /key=\{`\$\{month\}:\$\{selectedDate\}`\}/);
   assert.doesNotMatch(page, /Calendar view|value="week"/);
 
@@ -508,17 +570,18 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
   assert.match(calendar, /Pending/);
   assert.match(calendar, /Partial closure/);
   assert.match(calendar, /isRegularDayOff/);
-  assert.match(calendar, /Closed in the weekly business hours\./);
-  assert.match(
-    calendarStyles,
-    /\.agendaBookingMain\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/,
-  );
-  assert.equal(
-    (calendarStyles.match(/\.agendaBookingMain\s*\{/g) ?? []).length,
-    1,
-  );
+  assert.match(calendar, /weeklyHours\[weekday === 0 \? 6 : weekday - 1\]/);
+  assert.doesNotMatch(calendarStyles, /\.agendaBookingMain|\.agendaBookingDetails|\.agendaBookingFooter/);
+  assert.match(calendar, /filterCmsCalendarBookings\(bookings, selectedTherapistId\)/);
+  assert.match(calendar, /groupByDate\(filteredBookings\)/);
+  assert.match(calendar, /window\.history\.pushState/);
+  assert.match(calendar, /useSearchParams\(\)/);
+  assert.match(calendar, /calendarHref\(previousMonth, undefined, selectedTherapistId\)/);
+  assert.match(calendar, /calendarHref\(nextMonth, undefined, selectedTherapistId\)/);
+  assert.match(calendar, /calendarHref\(todayMonth, today, selectedTherapistId\)/);
+  assert.match(calendarStyles, /\.therapistPortrait\s*\{/);
   assert.match(calendar, /\/cms\/bookings\/new\?date=\$\{selectedDate\}/);
-  assert.match(calendar, /\/cms\/calendar\/closures\/\$\{closure\.id\}\/edit/);
+  assert.match(calendar, /closures=\{selectedClosures\}/);
   assert.doesNotMatch(calendarStyles, /\.legend(?:\s|\{)/);
   assert.match(calendarStyles, /@media \(max-width: 390px\)/);
   assert.match(calendarStyles, /@media \(forced-colors: active\)/);
@@ -528,11 +591,17 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
     closuresPage,
     /defaultDate=\{requestedDate \?\? tomorrowInDublin\(\)\}/,
   );
-  assert.match(newBookingPage, /normalizeCalendarDate/);
+  assert.match(newBookingPage, /currentCalendarDate\("Europe\/Dublin"\)/);
+  assert.match(newBookingPage, /normalizeCalendarDate\(/);
+  assert.match(newBookingPage, /typeof params\.date === "string" \? params\.date : ""/);
   assert.match(
     newBookingPage,
-    /defaultDate=\{requestedDate \?\? nextDublinDate\(\)\}/,
+    /defaultDate=\{selectedDate\}/,
   );
+  assert.doesNotMatch(newBookingPage, /nextDublinDate/);
+  const newBookingForm = await source("src/components/cms/AdminBookingForm.tsx");
+  assert.match(newBookingForm, /type="date" value=\{localDate\}/);
+  assert.doesNotMatch(newBookingForm, /min=\{/);
 });
 
 test("booking page uses static copy and keeps customer instructions concise", async () => {

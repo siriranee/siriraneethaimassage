@@ -12,21 +12,21 @@ export function RouteLoading({
       <div
         aria-busy="true"
         aria-live="polite"
-        className={`${styles.gateway} ${variant === "cms" ? styles.cmsGateway : ""}`}
+        className={`route-loading-gateway ${variant === "cms" ? "route-loading-gateway--cms" : ""}`}
         role="status"
       >
-        <div className={styles.gatewayCard}>
+        <div className="route-loading-gateway-card">
           <Image
             alt=""
             aria-hidden="true"
-            className={styles.logo}
-            height={1200}
+            className="route-loading-logo"
+            height={120}
             loading="eager"
             sizes="7.5rem"
             src="/siriranee_logo.svg"
-            width={1200}
+            width={120}
           />
-          <div aria-hidden="true" className={styles.pulseMark} />
+          <div aria-hidden="true" className="route-loading-pulse-mark" />
           <strong>
             {variant === "cms" ? "Opening Siriranee CMS" : "Loading Siriranee"}
           </strong>

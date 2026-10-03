@@ -54,7 +54,7 @@ const bookingSettings: CmsBookingSettings = {
   rulesConfirmed: false,
   slotIntervalMinutes: 30,
   maxConcurrentBookings: 1,
-  minimumNoticeMinutes: 120,
+  minimumNoticeMinutes: 0,
   bookingHorizonDays: 60,
   bufferBeforeMinutes: 0,
   bufferAfterMinutes: 0,

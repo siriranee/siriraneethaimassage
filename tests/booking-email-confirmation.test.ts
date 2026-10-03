@@ -70,7 +70,8 @@ async function setup() {
   const { createAdminBooking } = await import("@/server/cms/booking-service");
   const created = await createAdminBooking(fixture.input, fixture.context);
   const booking = await fixture.repository.saveBooking(
-    { ...created, source: "website" },
+    // Retain coverage for confirmation links issued to older pending requests.
+    { ...created, source: "website", status: "pending" },
     created.version,
   );
   return { ...fixture, booking };

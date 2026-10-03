@@ -1,12 +1,21 @@
 import "server-only";
 
-import { compareCmsTeamMembersByName } from "@/domain/cms/team";
+import type { CmsContentState } from "@/domain/cms/types";
 import { isApprovedPublicImageUrl } from "@/lib/media/cloudinary-delivery";
 import { getPublishedCmsContent } from "@/server/cms/content-service";
 
+// Legacy profiles have no creation timestamp. Keep their owner-confirmed order.
+const establishedTherapistOrder = new Map<string, number>([
+  ["siriranee", 0],
+  ["mon-ubon", 1],
+]);
+
 export async function getPublicBookingPlannerData() {
   const content = await getPublishedCmsContent();
+  return buildPublicBookingPlannerData(content);
+}
 
+export function buildPublicBookingPlannerData(content: CmsContentState) {
   const services = content.services
     .filter(
       (service) =>
@@ -30,7 +39,8 @@ export async function getPublicBookingPlannerData() {
     }));
 
   const activeServiceIds = new Set(services.map((service) => service.id));
-  const therapists = [...content.team]
+  // Stable sorting preserves added order for future profiles, even after edits.
+  const therapists = content.team
     .filter(
       (member) =>
         member.publicProfile &&
@@ -38,7 +48,10 @@ export async function getPublicBookingPlannerData() {
         !member.archived &&
         member.serviceIds.some((serviceId) => activeServiceIds.has(serviceId)),
     )
-    .sort(compareCmsTeamMembersByName)
+    .sort((first, second) =>
+      (establishedTherapistOrder.get(first.slug) ?? establishedTherapistOrder.size) -
+      (establishedTherapistOrder.get(second.slug) ?? establishedTherapistOrder.size),
+    )
     .map((member) => ({
       id: member.id,
       slug: member.slug,

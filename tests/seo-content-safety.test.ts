@@ -113,6 +113,16 @@ test("Vercel previews block indexing without changing local or production robots
   }
 });
 
+test("security headers use browser-supported permission directives", async () => {
+  const config = await source("next.config.ts");
+
+  assert.match(
+    config,
+    /value: "camera=\(\), microphone=\(\), geolocation=\(\)"/,
+  );
+  assert.doesNotMatch(config, /browsing-topics/);
+});
+
 test("public marketing copy avoids unsupported qualification claims", async () => {
   const publicCopy = (
     await Promise.all([

@@ -10,7 +10,7 @@ import styles from "@/components/cms/CmsViews.module.css";
 const settingCards = [
   { href: "/cms/settings/business", icon: Store, permission: "settings:view", title: "Business information", text: "Address, contact channels, service areas, directions and local SEO." },
   { href: "/cms/settings/hours", icon: Clock3, permission: "settings:view", title: "Opening hours", text: "Weekly hours and owner confirmation status." },
-  { href: "/cms/settings/booking", icon: BookOpenCheck, permission: "settings:view", title: "Booking rules", text: "Dublin timezone, capacity, notice, buffers, horizon and cancellation cutoff." },
+  { href: "/cms/settings/booking", icon: BookOpenCheck, permission: "settings:view", title: "Booking rules", text: "Dublin timezone, capacity, buffers, horizon and cancellation cutoff." },
   { href: "/cms/settings/integrations", icon: PlugZap, permission: "settings:view", title: "Integrations", text: "Booking provider, maps, WhatsApp, Instagram and review links." },
   { href: "/cms/admin", icon: Users, permission: "users:manage", title: "Admin users", text: "Create accounts, control access, reset passwords and revoke sessions." },
   { href: "/cms/audit-log", icon: ScrollText, permission: "audit:view", title: "Audit log", text: "Review security and content changes without exposing secrets." },

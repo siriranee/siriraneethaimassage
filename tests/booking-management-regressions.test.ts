@@ -30,6 +30,9 @@ test("quick confirmation and cancellation preserve notes; an explicit empty valu
   const fixture = await setup();
   const { createAdminBooking, updateAdminBooking } = await import("@/server/cms/booking-service");
   let booking = await createAdminBooking(fixture.input, fixture.context);
+  // Pending bookings created before automatic confirmation still support the
+  // historical approval workflow.
+  booking = await fixture.repository.saveBooking({ ...booking, status: "pending" }, booking.version);
   for (const status of ["confirmed", "cancelled"]) {
     booking = await updateAdminBooking(booking.id, { status, changeReason: "customer-request" }, booking.version, fixture.context);
     assert.equal(booking.internalNotes, "Important operational note");
@@ -65,19 +68,25 @@ test("notes-only changes preserve legacy unassigned appointments even when sched
   assert.equal(updated.internalNotes, "Staff can update an existing record.");
 });
 
-test("existing future requests confirm inside the notice window, but a reschedule and a new request still obey it", async () => {
+test("stored notice does not block future CMS availability, creation or rescheduling", async () => {
   const fixture = await setup();
-  const { createAdminBooking, updateAdminBooking } = await import("@/server/cms/booking-service");
+  const { createAdminBooking, getAdminAvailability, updateAdminBooking } = await import("@/server/cms/booking-service");
   const booking = await createAdminBooking(fixture.input, fixture.context);
   const content = await fixture.repository.getContent();
   await fixture.repository.saveContent({ ...content, revision: content.revision + 1, bookingSettings: { ...content.bookingSettings, minimumNoticeMinutes: 48 * 60 } }, content.revision);
+  const available = await getAdminAvailability({
+    serviceId: fixture.service.id,
+    therapistId: fixture.therapist.id,
+    durationMinutes: 60,
+    localDate: fixture.localDate,
+  });
+  assert.ok(available.some((slot) => slot.localTime === "14:00"));
   const confirmed = await updateAdminBooking(booking.id, { status: "confirmed", changeReason: "customer-request" }, booking.version, fixture.context);
   assert.equal(confirmed.status, "confirmed");
-  await assert.rejects(
-    updateAdminBooking(booking.id, { localTime: "14:00", changeReason: "customer-request" }, confirmed.version, fixture.context),
-    /outside opening hours, blocked or fully booked/,
-  );
-  await assert.rejects(createAdminBooking({ ...fixture.input, localTime: "14:00" }, fixture.context), /outside opening hours, blocked or fully booked/);
+  const rescheduled = await updateAdminBooking(booking.id, { localTime: "14:00", changeReason: "customer-request" }, confirmed.version, fixture.context);
+  assert.equal(rescheduled.localTime, "14:00");
+  const second = await createAdminBooking({ ...fixture.input, customerName: "Demo Second Safety Guest", localTime: "15:00" }, fixture.context);
+  assert.equal(second.localTime, "15:00");
 });
 
 test("overlapping pending requests can both be confirmed for their original time", async () => {
@@ -87,7 +96,10 @@ test("overlapping pending requests can both be confirmed for their original time
     getAdminAvailability,
     updateAdminBooking,
   } = await import("@/server/cms/booking-service");
-  const first = await createAdminBooking(fixture.input, fixture.context);
+  const firstCreated = await createAdminBooking(fixture.input, fixture.context);
+  const first = await fixture.repository.saveBooking(
+    { ...firstCreated, status: "pending" }, firstCreated.version,
+  );
   const second = await createAdminBooking(
     { ...fixture.input, customerName: "Demo Second Safety Guest" },
     fixture.context,
@@ -99,17 +111,10 @@ test("overlapping pending requests can both be confirmed for their original time
     first.version,
     fixture.context,
   );
-  const secondConfirmed = await updateAdminBooking(
-    second.id,
-    { status: "confirmed", changeReason: "customer-request" },
-    second.version,
-    fixture.context,
-  );
-
   assert.equal(firstConfirmed.status, "confirmed");
-  assert.equal(secondConfirmed.status, "confirmed");
-  assert.equal(firstConfirmed.startsAt, secondConfirmed.startsAt);
-  assert.equal(firstConfirmed.assignedStaffId, secondConfirmed.assignedStaffId);
+  assert.equal(second.status, "confirmed");
+  assert.equal(firstConfirmed.startsAt, second.startsAt);
+  assert.equal(firstConfirmed.assignedStaffId, second.assignedStaffId);
   const availability = await getAdminAvailability({
     serviceId: fixture.service.id,
     therapistId: fixture.therapist.id,
@@ -119,15 +124,14 @@ test("overlapping pending requests can both be confirmed for their original time
   assert.ok(!availability.some((slot) => slot.localTime === fixture.input.localTime));
 });
 
-test("confirmation still rejects past appointments, closures and unavailable therapists", async (t) => {
+test("legacy pending confirmation still rejects closures and unavailable therapists", async (t) => {
   const { createAdminBooking, updateAdminBooking } = await import("@/server/cms/booking-service");
-  for (const blocker of ["past", "closure", "inactive-therapist"]) {
+  for (const blocker of ["closure", "inactive-therapist"]) {
     await t.test(blocker, async () => {
       const fixture = await setup();
       let booking = await createAdminBooking(fixture.input, fixture.context);
-      if (blocker === "past") {
-        booking = await fixture.repository.saveBooking({ ...booking, localDate: "2000-01-01", startsAt: "2000-01-01T12:00:00Z", endsAt: "2000-01-01T13:00:00Z" }, booking.version);
-      } else if (blocker === "closure") {
+      booking = await fixture.repository.saveBooking({ ...booking, status: "pending" }, booking.version);
+      if (blocker === "closure") {
         await fixture.repository.saveClosure({ id: "safety-closure", localDate: fixture.localDate, closedAllDay: true, startsAtLocal: "", endsAtLocal: "", reason: "Test closure", publicLabel: "Closed", active: true, version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), updatedBy: fixture.actor.id });
       } else {
         const content = await fixture.repository.getContent();

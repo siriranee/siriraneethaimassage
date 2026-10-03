@@ -1,6 +1,6 @@
 import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
-import { createAdminBooking } from "@/server/cms/booking-service";
+import { createAdminBooking, isHistoricalAdminBooking } from "@/server/cms/booking-service";
 import { cmsErrorResponse, cmsNoStoreJson, readCmsJsonObject } from "@/server/cms/http";
 import { dispatchBookingMutationEmails } from "@/server/cms/notification-service";
 import { listCmsBookings } from "@/server/cms/read-service";
@@ -28,7 +28,9 @@ export async function POST(request: Request) {
       requestId: getRequestId(request),
       idempotencyKey: request.headers.get("idempotency-key") ?? undefined,
     });
-    const emails = await dispatchBookingMutationEmails(getCmsRepository(), null, booking);
+    const emails = isHistoricalAdminBooking(booking)
+      ? { therapistEmails: [] }
+      : await dispatchBookingMutationEmails(getCmsRepository(), null, booking);
     return cmsNoStoreJson(
       { booking, ...emails },
       { status: 201 },

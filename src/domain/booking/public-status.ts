@@ -62,7 +62,7 @@ const statusCopy: Readonly<
   },
   confirmed: {
     label: "Confirmed",
-    message: "Your booking has been confirmed by the Siriranee team.",
+    message: "Your booking is confirmed.",
   },
   completed: {
     label: "Completed",

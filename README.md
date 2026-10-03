@@ -14,7 +14,7 @@ Howth, Dublin, Ireland.
 - Source-controlled public page headings, SEO, home-hero slides and site gallery.
 - Customer booking flow with service, therapist, date and time selection.
   Customers choose an eligible public therapist before viewing dates and times.
-- Dublin-time availability with capacity, closures, notice period, booking
+- Dublin-time availability with capacity, closures, booking
   horizon, treatment buffers and daylight-saving handling.
 - Secure CMS for bookings, the operational month calendar, bounded recurring
   closures, services and their image galleries, therapist records and
@@ -24,18 +24,14 @@ Howth, Dublin, Ireland.
   publication history. A failed content or publication write leaves the live
   website unchanged.
 - URL-based booking filters, per-booking activity timelines, unsaved-change
-  warnings and metadata-only notification records. A newly stored website
-  request triggers one owner Resend alert in Thai and English plus a separate
-  Thai-first, English-second private operational request email to the selected
-  therapist with the customer contact details and booking note needed to manage
-  the appointment. Either signed
-  review flow can confirm without a CMS login. When the booking is confirmed,
-  Resend sends the customer an English confirmation with the appointment,
-  published business contact details and safe public links.
-  Confirmed therapist assignment, reschedule, removal and cancellation events
-  are stored in a durable private outbox and sent after saving, using
-  Thai-first, English-second Resend templates with the relevant customer and
-  appointment details.
+  warnings and metadata-only notification records. New website and CMS
+  appointments are confirmed when saved. The owner sees a dashboard event;
+  after the booking transaction commits, separate durable email jobs attempt
+  delivery of a customer confirmation and a Thai-first, English-second
+  assignment message to the selected therapist. New website bookings do not
+  send the old owner "request awaiting confirmation" email. Therapist
+  reschedule, removal and cancellation events also use the durable private
+  outbox.
   Recipient addresses and rendered messages are never stored in notification
   records, and customer confirmation emails exclude customer and internal notes.
 - MongoDB persistence, username-and-password authentication, role-based access,
@@ -46,8 +42,8 @@ Howth, Dublin, Ireland.
   by signed direct Cloudinary uploads and a durable CMS media registry.
 - Safe local mock CMS and fail-closed production readiness gates.
 
-Direct website booking is implemented but remains disabled until the production
-database, owner approvals, privacy notice and Resend booking-email settings are ready.
+Direct website booking has production readiness gates. Verify the database,
+owner-approved settings, privacy notice and Resend delivery before enabling it.
 
 ## Local development
 
@@ -127,15 +123,14 @@ The normal production sequence is:
 7. Create a Resend API key, verify the sending domain, and set
    `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and `RESEND_BOOKING_TO_EMAIL` in the
    deployment secret manager. Use a sender address on `siriranee.com`.
-   `RESEND_BOOKING_TO_EMAIL` is the owner address that receives every new
-   website booking request. That email includes a signed, time-limited review
-   link; opening it never changes the booking, and the owner must press the
-   confirmation button on the review page. Confirmed customer emails go to the
-   optional email stored with that booking. Therapist messages go separately to
-   the private address saved on the assigned therapist record. Pending-request
-   messages include their own therapist-bound review button. The selected
-   therapist can review and confirm without a CMS login; opening the link alone
-   never confirms the booking.
+   `RESEND_BOOKING_TO_EMAIL` remains a required owner address for the booking
+   email configuration and legacy pending-request delivery; new confirmed
+   website bookings show an owner dashboard event instead of sending a new
+   request email. Customer confirmations go to the required customer email for
+   an upcoming appointment. Therapist messages go separately to the private
+   address saved on the assigned therapist record. Existing pending bookings
+   retain their signed, time-limited owner and therapist review links; opening
+   a link alone never confirms a booking.
    No additional therapist email environment variable is required. For testing
    with Resend's shared domain, each recipient must satisfy Resend's account
    restrictions.
@@ -163,25 +158,27 @@ The normal production sequence is:
    approved photography is available.
 12. Test image preparation, upload, direct publication and failed-save cleanup, then
    set CMS_MEDIA_UPLOAD_READY=true.
-13. Send a test booking and confirm the owner email's Thai section, English
-   section, reply-to address, secure review button and CMS booking link. Confirm
-   that the selected therapist receives one separate private pending request
-   email with Thai first and English second, the correct customer details and
-   booking note, can open its review button
-   without signing in, and must press
-   the confirmation button on the page. Then confirm that
-   changing the booking from pending to confirmed sends one customer email with
-   the correct Dublin appointment time and public links. Test
-   the separate therapist assignment, reschedule, reassignment and cancellation
-   messages. Complete the privacy, retention, monitoring and isolated
-   recovery-drill operational reviews before launch.
-14. After end-to-end production testing, set
+13. In staging, or during a controlled production smoke test with the public
+   booking gate temporarily enabled, create one upcoming test booking through
+   the website and another through CMS Add booking. Confirm each is immediately
+   **Confirmed**, appears in the owner dashboard, and sends one customer
+   confirmation with the correct Dublin time and public links, plus one
+   separate Thai-first, English-second therapist assignment email with the
+   correct customer details. No new owner
+   request-to-confirm email should be sent. In CMS, also record a past-start
+   appointment and verify that neither customer nor therapist email is queued.
+   Test therapist reschedule, reassignment and cancellation messages. If legacy
+   pending bookings exist, verify their signed review links still require a
+   deliberate confirmation click. Complete the privacy, retention, monitoring
+   and isolated recovery-drill operational reviews before launch.
+14. After end-to-end production testing and owner sign-off, set
    CMS_PUBLIC_BOOKING_READY=true and enable public booking in CMS settings.
 
 The hosted build and runtime both require complete Resend settings before
 direct booking is available. A temporary Resend failure never rolls back an
 already stored or confirmed booking. Separate durable outbox records and stable
-provider idempotency keys protect the owner alert and customer confirmation.
+provider idempotency keys protect customer and therapist messages; the owner
+dashboard alert does not require a Resend send.
 The CMS records failed or uncertain delivery for operator review without
 storing the recipient or message body. Therapist messages
 use the same durable delivery controls and existing Resend credentials, with
@@ -232,38 +229,45 @@ cleanup while an older CMS version can still write content.
 The notification address and optional phone number are operational data, not
 customer-facing content. In MongoDB they are stored separately with AES-256-GCM
 encryption under the existing `CMS_PII_ENCRYPTION_KEY`; they are excluded from
-publication snapshots and public APIs. A pending website request sends the
-selected therapist a private operational message with the customer name, phone,
-email and booking note that clearly says the appointment is not yet confirmed.
-Every therapist message presents Thai first and English second. Internal CMS
-notes are never included. After the shop confirms it, the durable outbox sends
-a separate assignment message and distinct messages for rescheduling, removal or
-reassignment, and cancellation. If the owner and therapist addresses are the
-same, the initial therapist copy is suppressed and the richer owner email is
-sent once. The existing `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are reused, so
-therapist notifications add no environment variable.
+publication snapshots and public APIs. A new confirmed booking sends the
+selected therapist a private assignment message with the customer name, phone,
+email and booking note needed to manage the appointment. Every therapist
+message presents Thai first and English second; internal CMS notes are never
+included. The durable outbox also records distinct rescheduling, removal or
+reassignment, and cancellation messages. New bookings do not send a separate
+owner request email, so an owner who is also the therapist receives only the
+therapist message for the new appointment. Older pending bookings retain their
+original request/review email workflow. The existing `RESEND_API_KEY` and
+`RESEND_FROM_EMAIL` are reused, so therapist notifications add no environment
+variable.
 
 ### Booking email operations and delivery tracking
 
-Saving a booking always finishes before contacting Resend. A website request
-alerts the owner and selected therapist once, without confirming the customer.
-The owner email opens a safe review page, so automated email link scanners cannot
-confirm the appointment. Confirming sends the customer confirmation and a
-separate therapist assignment.
+Saving a booking always finishes before contacting Resend. New website and CMS
+bookings are confirmed immediately. The owner sees a dashboard notification;
+the customer confirmation and separate therapist assignment emails are queued
+durably within the booking transaction and dispatched after it commits. CMS
+staff can select past dates and times within the normal opening-hour and
+availability rules. An appointment whose start time has already passed is
+recorded as confirmed without queuing customer or therapist email; customer
+email is required for upcoming CMS appointments, but optional for these
+historical entries. Existing pending bookings and their no-login review links
+still work: viewing a link never confirms the booking; pressing its confirmation
+button does. A historical entry without customer email cannot be moved to a
+future appointment; create a new booking with the customer's email instead.
 Changing a confirmed appointment or its therapist sends updated customer details
 and the appropriate therapist update/removal/assignment messages. Cancellation
 sends separate customer and assigned-therapist notices. Saving notes alone sends
 no email. Pending-request history remains visible in the CMS, labelled with the
 booking's current status rather than as a new request needing confirmation.
 
-When the owner and assigned therapist share an email address, that inbox receives
-one operational message per event, not an extra copy for each role: the owner
-request first, then therapist confirmation, change or cancellation updates.
-These are different lifecycle events, not duplicate requests. Customer emails
-remain separate. Replaying a dispatch or retrying an accepted event does not
-send another copy. Two different therapist records should use their own
-notification addresses; reassignment produces distinct removal and assignment
-notices for those profiles.
+When the owner and assigned therapist share an email address, a new booking
+sends one operational therapist message to that inbox, not an additional owner
+request. Legacy pending requests keep their existing shared-inbox deduplication.
+Customer emails remain separate. Replaying a dispatch or retrying an accepted
+event does not send another copy. Two different therapist records should use
+their own notification addresses; reassignment produces distinct removal and
+assignment notices for those profiles.
 
 Removal notices preserve the previous therapist's original treatment, date,
 time and duration even when the reassignment also changes the appointment.
@@ -277,9 +281,10 @@ Already accepted emails are never blindly resent, including emails that later
 bounce. Uncertain provider outcomes retain the original 23-hour safe retry
 window; expired or changed-payload events require checking Resend and contacting
 the customer as appropriate. There is no scheduled/background email recovery.
-Notes-only changes no longer invalidate an otherwise unchanged owner-request
-email retry. Legacy fingerprint migration requires proof of the same message
-and recipient and does not extend an uncertain send's safe retry window.
+Notes-only changes no longer invalidate an otherwise unchanged legacy
+owner-request email retry. Legacy fingerprint migration requires proof of the
+same message and recipient and does not extend an uncertain send's safe retry
+window.
 Saved email warnings appear on the dashboard, booking list and calendar after
 refresh, including cancelled bookings. Successful retries clear their warning;
 later delivery failures restore it. Historical unresolved customer/therapist
@@ -298,8 +303,10 @@ To see delivery rather than only provider acceptance:
 4. Run `npm run cms:booking-launch-indexes` to inspect and
    `npm run cms:booking-launch-indexes -- --apply` to install only additive
    booking/delivery indexes. The launch command does not prune data.
-5. Send one controlled test booking through request, confirmation and cancellation.
-   Verify each expected recipient, booking reference and CMS delivery badge.
+5. Send one controlled upcoming test booking through immediate confirmation and
+   cancellation. Verify each expected recipient, booking reference and CMS
+   delivery badge. Verify a historical CMS entry creates no customer or therapist
+   email event.
    An accepted email is not proof of inbox delivery, and delivered is not proof
    the recipient read it. Historical sends remain accepted unless a provider
    delivery event is received.

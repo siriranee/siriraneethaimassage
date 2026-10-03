@@ -162,10 +162,9 @@ test("legacy therapist data normalises without retired fields and preserves vouc
   assert.equal(normalised.vouchers?.[0]?.sortOrder, 37);
 });
 
-test("every therapist selector uses the shared alphabetical order", async () => {
+test("CMS and public team listings retain the shared alphabetical order", async () => {
   const consumers = await Promise.all([
     source("src/server/cms/public-adapter.ts"),
-    source("src/server/booking/public-config.ts"),
     source("src/app/cms/(protected)/team/page.tsx"),
     source("src/app/cms/(protected)/bookings/page.tsx"),
     source("src/app/cms/(protected)/bookings/new/page.tsx"),
@@ -183,6 +182,67 @@ test("every therapist selector uses the shared alphabetical order", async () => 
     [...therapists].sort(compareCmsTeamMembersByName).map(({ id }) => id),
     ["mon", "siriranee"],
   );
+});
+
+test("booking therapists keep oldest-added order through filtering and profile edits", async () => {
+  const [{ buildPublicBookingPlannerData }, { createDefaultContentState }] =
+    await Promise.all([
+      import("@/server/booking/public-config"),
+      import("@/server/cms/default-content"),
+    ]);
+  const defaults = createDefaultContentState();
+  const serviceId = "test-massage";
+  const member = {
+    fullName: "Test therapist",
+    publicRole: "Massage therapist",
+    shortBio: "",
+    imageUrl: "",
+    imageAlt: "",
+    serviceIds: [serviceId],
+    publicProfile: true,
+    operationalActive: true,
+    version: 1,
+    updatedAt: "2026-09-01T00:00:00.000Z",
+  };
+  const content: CmsContentState = {
+    ...defaults,
+    services: [{
+      id: serviceId,
+      slug: serviceId,
+      name: "Test massage",
+      shortDescription: "Test treatment",
+      longDescription: "Test treatment",
+      imageUrl: "",
+      imageAlt: "",
+      hero: { imageUrl: "", altText: "" },
+      galleryImages: [],
+      prices: [{ id: "one-hour", durationMinutes: 60, priceCents: 6500, active: true }],
+      idealFor: [],
+      highlights: [],
+      priceNote: "",
+      seoTitle: "Test massage",
+      seoDescription: "Test treatment",
+      version: 1,
+      createdAt: member.updatedAt,
+      updatedAt: member.updatedAt,
+    }],
+    team: [
+      { ...member, id: "archived", slug: "archived", name: "Archived", archived: true },
+      { ...member, id: "mon", slug: "mon-ubon", name: "Mon (Ubon)" },
+      { ...member, id: "new", slug: "new", name: "A new therapist" },
+      { ...member, id: "siriranee", slug: "siriranee", name: "Siriranee", updatedAt: "2026-09-19T00:00:00.000Z" },
+      { ...member, id: "newest", slug: "newest", name: "Another new therapist" },
+      { ...member, id: "private", slug: "private", name: "Private", publicProfile: false },
+      { ...member, id: "inactive", slug: "inactive", name: "Inactive", operationalActive: false },
+      { ...member, id: "unavailable", slug: "unavailable", name: "Unavailable", serviceIds: [] },
+    ],
+  };
+  const original = structuredClone(content);
+  assert.deepEqual(
+    buildPublicBookingPlannerData(content).therapists.map(({ name }) => name),
+    ["Siriranee", "Mon (Ubon)", "A new therapist", "Another new therapist"],
+  );
+  assert.deepEqual(content, original, "The stored team order must not be mutated");
 });
 
 test("stored therapist field cleanup is review-gated, transactional and verified", async () => {

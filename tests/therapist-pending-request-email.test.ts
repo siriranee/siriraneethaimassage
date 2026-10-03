@@ -69,7 +69,9 @@ async function setup() {
   const { createAdminBooking } = await import("@/server/cms/booking-service");
   const created = await createAdminBooking(fixture.input, fixture.context);
   const booking = await fixture.repository.saveBooking(
-    { ...created, source: "website" },
+    // Pending website requests from before automatic confirmation remain
+    // supported for reassignment, withdrawal and retry handling.
+    { ...created, source: "website", status: "pending" },
     created.version,
   );
   return { ...fixture, booking, secondTherapist };

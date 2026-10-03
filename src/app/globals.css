@@ -134,6 +134,80 @@ svg {
   display: block;
 }
 
+/* The root loading boundary can stream before route-level CSS is applied. */
+.route-loading-gateway {
+  display: grid;
+  min-height: 100svh;
+  padding: 2rem var(--pad-x);
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 18%, rgb(var(--color-gold-500-rgb) / 0.2), transparent 25rem),
+    linear-gradient(145deg, var(--color-ivory), var(--color-purple-100));
+}
+
+.route-loading-gateway--cms {
+  background:
+    radial-gradient(circle at 50% 12%, rgb(var(--color-purple-400-rgb) / 0.16), transparent 24rem),
+    linear-gradient(180deg, var(--color-purple-50), var(--color-canvas));
+}
+
+.route-loading-gateway-card {
+  display: grid;
+  width: min(100%, 28rem);
+  justify-items: center;
+  padding: 2.5rem 1.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-large);
+  background: rgb(var(--color-surface-rgb) / 0.88);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+  backdrop-filter: blur(0.85rem);
+}
+
+.route-loading-logo {
+  width: 7.5rem;
+  height: auto;
+  margin-bottom: 1rem;
+  object-fit: contain;
+}
+
+.route-loading-pulse-mark {
+  width: 2.35rem;
+  height: 0.32rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-purple-100);
+}
+
+.route-loading-pulse-mark::after {
+  display: block;
+  width: 55%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-purple-500);
+  content: "";
+  animation: routeLoadingPulse 1.15s ease-in-out infinite alternate;
+}
+
+.route-loading-gateway-card strong {
+  margin-bottom: 0.25rem;
+  color: var(--color-purple-900);
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+}
+
+.route-loading-gateway-card span {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+@keyframes routeLoadingPulse {
+  to {
+    transform: translateX(82%);
+  }
+}
+
 button,
 input,
 select,
@@ -406,6 +480,10 @@ b {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .route-loading-pulse-mark::after {
+    animation: none;
+  }
+
   html {
     scroll-behavior: auto;
   }

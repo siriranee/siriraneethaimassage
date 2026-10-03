@@ -178,7 +178,7 @@ test("notification records keep Resend delivery metadata free of contact details
   assert.match(notifications, /provider: "resend"/);
   assert.match(
     publicBooking,
-    /const result = await create\(\);[\s\S]*?await attemptRequestEmails\(result\.booking\)/,
+    /const result = await create\(\);[\s\S]*?await attemptBookingEmails\(result\.booking\)/,
   );
   assert.match(publicBooking, /recordTherapistBookingEmailPlans\(transaction, null, booking\)/);
 });
@@ -460,4 +460,21 @@ test("settings forms share accessible native and server field validation", async
       new RegExp(`data-cms-field=\\{[^}\\n]*weeklyHours\\.\\$\\{index\\}\\.${field}`),
     );
   }
+});
+
+test("booking policy no longer exposes or applies a minimum notice setting", async () => {
+  const [form, validation, availability, settingsPage] = await Promise.all([
+    source("src/components/cms/BookingSettingsForm.tsx"),
+    source("src/server/cms/content-validation.ts"),
+    source("src/domain/booking/availability.ts"),
+    source("src/app/cms/(protected)/settings/page.tsx"),
+  ]);
+
+  assert.doesNotMatch(form, /name="minimumNoticeMinutes"|data\.get\("minimumNoticeMinutes"\)/);
+  assert.match(form, /Future times can be booked without advance notice/);
+  assert.doesNotMatch(settingsPage, /capacity, notice, buffers/);
+  assert.match(validation, /minimumNoticeMinutes:\s*0/);
+  assert.doesNotMatch(validation, /source\.minimumNoticeMinutes/);
+  assert.doesNotMatch(availability, /settings\.minimumNoticeMinutes/);
+  assert.match(availability, /startsAt\.epochMilliseconds < now\.epochMilliseconds/);
 });

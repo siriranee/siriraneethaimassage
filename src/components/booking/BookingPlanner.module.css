@@ -909,6 +909,25 @@
   line-height: 1.45;
 }
 
+.required {
+  color: var(--color-purple-700);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.fieldHint {
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.bookingField input[aria-invalid="true"],
+.bookingField textarea[aria-invalid="true"],
+.privacyChoice.privacyChoiceInvalid {
+  border-color: var(--color-danger);
+}
+
 .privacyChoice {
   display: flex;
   margin-top: 1rem;

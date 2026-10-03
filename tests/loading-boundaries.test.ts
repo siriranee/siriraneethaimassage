@@ -38,6 +38,27 @@ test("loading UI is accessible, branded, responsive and motion-safe", async () =
   assert.match(styles, /animation:\s*none/);
 });
 
+test("the streamed gateway has its critical styles in the root stylesheet", async () => {
+  const [component, rootLayout, rootStyles] = await Promise.all([
+    source("src/components/RouteLoading.tsx"),
+    source("src/app/layout.tsx"),
+    source("src/app/globals.css"),
+  ]);
+
+  assert.match(rootLayout, /import "\.\/globals\.css"/);
+  for (const className of [
+    "route-loading-gateway",
+    "route-loading-gateway-card",
+    "route-loading-logo",
+    "route-loading-pulse-mark",
+  ]) {
+    assert.ok(component.includes(className));
+    assert.ok(rootStyles.includes(`.${className} {`));
+  }
+  assert.match(component, /height=\{120\}/);
+  assert.match(component, /width=\{120\}/);
+});
+
 test("route transitions show feedback for links, redirects and browser history", async () => {
   const [instrumentation, indicator, indicatorStyles, rootLayout, cmsLayout] =
     await Promise.all([

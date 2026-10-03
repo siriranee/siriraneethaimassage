@@ -52,7 +52,6 @@ type BookingInput = {
   readonly durationMinutes: number;
   readonly localDate: string;
   readonly localTime: string;
-  readonly status: BookingStatus;
   readonly source: BookingSource;
   readonly internalNotes: string;
 };
@@ -113,23 +112,17 @@ function parseBookingInput(value: unknown): BookingInput {
     ? (value as Record<string, unknown>)
     : {};
   assertNoStaffAssignment(source);
-  const status = String(source.status);
+  const requestedStatus = source.status === undefined ? "confirmed" : String(source.status);
   const bookingSource = String(source.source);
   const durationMinutes = Number(source.durationMinutes);
   const localDate = String(source.localDate ?? "").trim();
   const localTime = String(source.localTime ?? "").trim();
   const phone = requiredText(source.phone, "phone", 7, 30);
 
-  if (!bookingStatuses.some((item) => item === status)) {
+  if (requestedStatus !== "pending" && requestedStatus !== "confirmed") {
     throw new CmsValidationError("Choose a valid booking status.", {
       status: "Choose a valid booking status.",
     });
-  }
-  if (status !== "pending" && status !== "confirmed") {
-    throw new CmsValidationError(
-      "New bookings must start as pending or confirmed.",
-      { status: "Choose Pending or Confirmed for a new booking." },
-    );
   }
   if (!bookingSources.some((item) => item === bookingSource) || bookingSource === "website" || bookingSource === "provider") {
     throw new CmsValidationError("Choose phone, WhatsApp, walk-in or administrator as the source.", {
@@ -173,7 +166,6 @@ function parseBookingInput(value: unknown): BookingInput {
     durationMinutes,
     localDate,
     localTime,
-    status: status as BookingStatus,
     source: bookingSource as BookingSource,
     internalNotes: optionalText(source.internalNotes, 1000, "internalNotes"),
   };
@@ -190,8 +182,8 @@ async function findSlot(
   input: Pick<BookingInput, "serviceId" | "therapistId" | "durationMinutes" | "localDate" | "localTime">,
   options: {
     readonly excludedBookingId?: string;
-    readonly existingAppointment?: boolean;
     readonly ignoreBookingOccupancy?: boolean;
+    readonly enforceWindow?: boolean;
   } = {},
 ) {
   const content = await repository.getContent();
@@ -239,13 +231,9 @@ async function findSlot(
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
     therapistId: therapist?.id,
-    // Existing requests can be handled near their start time. Opening hours,
-    // closures, therapist eligibility and the prohibition on past slots still
-    // apply; a pure confirmation can separately bypass booking occupancy below.
-    settings: options.existingAppointment
-      ? { ...content.bookingSettings, minimumNoticeMinutes: 0 }
-      : content.bookingSettings,
+    settings: content.bookingSettings,
     now,
+    enforceWindow: options.enforceWindow,
     weeklyHours: content.site.weeklyHours,
     closures,
     bookings: options.ignoreBookingOccupancy
@@ -267,6 +255,11 @@ async function findSlot(
 
 function bookingReference(localDate: string) {
   return `SRN-${localDate.replaceAll("-", "")}-${randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+export function isHistoricalAdminBooking(booking: CmsBooking) {
+  return booking.source !== "website" &&
+    Date.parse(booking.startsAt) <= Date.parse(booking.createdAt);
 }
 
 export async function getAdminAvailability(input: {
@@ -318,6 +311,7 @@ export async function getAdminAvailability(input: {
     durationMinutes: input.durationMinutes,
     therapistId: therapist?.id,
     settings: content.bookingSettings,
+    enforceWindow: false,
     weeklyHours: content.site.weeklyHours,
     closures,
     bookings,
@@ -367,14 +361,23 @@ export async function createAdminBooking(
 
     if (input.therapistId) await transaction.lockTherapist(input.therapistId);
     await transaction.lockBookingDate(input.localDate);
-    const { price, service, slot, therapist } = await findSlot(transaction, input);
-    if (input.status === "confirmed" && !therapist) {
+    const { price, service, slot, therapist } = await findSlot(transaction, input, {
+      enforceWindow: false,
+    });
+    if (!therapist) {
       throw new CmsValidationError(
-        "Assign an active massage therapist before confirming this booking.",
+        "Assign an active massage therapist before creating this booking.",
         { therapistId: "Choose a massage therapist." },
       );
     }
     const now = new Date().toISOString();
+    const historical = Date.parse(slot.startsAt) <= Date.parse(now);
+    if (!historical && !input.email) {
+      throw new CmsValidationError(
+        "Enter the customer's email to send their confirmation.",
+        { email: "Enter the customer's email for this upcoming appointment." },
+      );
+    }
     const booking: CmsBooking = {
       id: randomUUID(),
       reference: bookingReference(input.localDate),
@@ -395,7 +398,7 @@ export async function createAdminBooking(
       localDate: slot.localDate,
       localTime: slot.localTime,
       timezone: "Europe/Dublin",
-      status: input.status,
+      status: "confirmed",
       source: input.source,
       assignedStaffId: therapist?.id ?? "",
       assignedStaffName: therapist?.name ?? "",
@@ -414,9 +417,16 @@ export async function createAdminBooking(
     await transaction.saveBooking(booking);
     const notificationKind = bookingNotificationKind(null, booking);
     if (notificationKind) {
-      await recordBookingNotificationPlan(transaction, booking, notificationKind);
+      await recordBookingNotificationPlan(
+        transaction,
+        booking,
+        notificationKind,
+        historical ? { channels: ["dashboard"] } : {},
+      );
     }
-    await recordTherapistBookingEmailPlans(transaction, null, booking);
+    if (!historical) {
+      await recordTherapistBookingEmailPlans(transaction, null, booking);
+    }
     await appendCmsAudit(transaction, {
       actor: context.actor,
       action: "booking.created",
@@ -568,13 +578,22 @@ export async function updateAdminBooking(
         },
         {
           excludedBookingId: current.id,
-          existingAppointment: !timeChanged,
           // Pending requests do not reserve capacity. Staff can therefore
           // approve multiple already-received requests for the same time.
           // Hours, closures, therapist eligibility and past dates still apply.
           ignoreBookingOccupancy: confirmingExistingRequest,
         },
       );
+      if (
+        isHistoricalAdminBooking(current) &&
+        !current.customer.email &&
+        Date.parse(result.slot.startsAt) > Date.now()
+      ) {
+        throw new CmsValidationError(
+          "This historical booking has no customer email. Create a new booking with an email for the future appointment.",
+          { localDate: "A future appointment needs a customer email to send its update." },
+        );
+      }
       startsAt = result.slot.startsAt;
       endsAt = result.slot.endsAt;
       assignedStaffName = result.therapist?.name ?? "";
@@ -599,9 +618,16 @@ export async function updateAdminBooking(
     await transaction.saveBooking(updated, current.version);
     const notificationKind = bookingNotificationKind(current, updated);
     if (notificationKind) {
-      await recordBookingNotificationPlan(transaction, updated, notificationKind);
+      await recordBookingNotificationPlan(
+        transaction,
+        updated,
+        notificationKind,
+        isHistoricalAdminBooking(updated) ? { channels: ["dashboard"] } : {},
+      );
     }
-    await recordTherapistBookingEmailPlans(transaction, current, updated);
+    if (!isHistoricalAdminBooking(updated)) {
+      await recordTherapistBookingEmailPlans(transaction, current, updated);
+    }
     await appendCmsAudit(transaction, {
       actor: context.actor,
       action: "booking.updated",

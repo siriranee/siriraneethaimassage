@@ -60,7 +60,7 @@ const reassuranceItems = [
   {
     icon: CalendarCheck,
     title: "Book an appointment",
-    text: "Choose your preferences, then contact the team to request a time.",
+    text: "Choose an available time online, or contact the team for help.",
   },
 ] as const;
 
@@ -69,7 +69,7 @@ function buildFaqs(address: string, hasVouchers: boolean) {
   {
     question: "How do I book a massage at Siriranee?",
     answer:
-      "Choose a treatment and duration on our booking page, then contact the Siriranee team to request your preferred date and time. Your appointment is confirmed directly by the team.",
+      "Choose a treatment, therapist, duration, date and available time on our booking page. When online booking is available, submitting the form confirms your appointment immediately. Otherwise, contact the team to arrange a time.",
   },
   {
     question: "Where is the spa?",
@@ -88,7 +88,7 @@ function buildFaqs(address: string, hasVouchers: boolean) {
   {
     question: "Where can I check current prices and availability?",
     answer:
-      "Prices shown on treatment pages reflect currently verified information. Contact the Siriranee team for current availability; an appointment is confirmed only after the team replies.",
+      "Current prices are shown on treatment pages. When online booking is available, the booking page shows available dates and times. You can also contact the team for help.",
   },
   ...(hasVouchers ? [{
     question: "Can I arrange a massage gift voucher?",

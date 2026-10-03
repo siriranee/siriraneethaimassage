@@ -29,6 +29,16 @@ test("CMS operational data uses the configured retention windows", () => {
     Date.parse("2026-06-01T10:00:00.000Z") + 730 * day,
   );
   assert.equal(
+    getCmsBookingExpiryDate("2020-06-01T10:00:00.000Z", "2026-10-03T14:00:00.000Z").getTime(),
+    Date.parse("2026-10-03T14:00:00.000Z") + 730 * day,
+    "a newly entered historical appointment must not expire immediately",
+  );
+  assert.equal(
+    getCmsBookingExpiryDate("2027-06-01T10:00:00.000Z", "2026-10-03T14:00:00.000Z").getTime(),
+    Date.parse("2027-06-01T10:00:00.000Z") + 730 * day,
+    "upcoming appointments still retain the full period after the appointment",
+  );
+  assert.equal(
     getCmsDayLockExpiryDate("2026-09-04").getTime(),
     Date.parse("2026-09-04T00:00:00.000Z") + 30 * day,
   );
@@ -41,7 +51,7 @@ test("MongoDB persistence stores TTL dates and retains only recent publications"
   );
   const indexes = readFileSync("scripts/cms-indexes.mjs", "utf8");
 
-  assert.match(repository, /retentionExpiresAtDate: getCmsBookingExpiryDate\(booking\.startsAt\)/);
+  assert.match(repository, /retentionExpiresAtDate: getCmsBookingExpiryDate\(booking\.startsAt, booking\.createdAt\)/);
   assert.match(repository, /expiresAtDate: getCmsNotificationExpiryDate\(value\.createdAt\)/);
   assert.match(repository, /expiresAtDate: getCmsDayLockExpiryDate\(localDate\)/);
   assert.match(repository, /\.limit\(CMS_PUBLICATION_RETENTION_COUNT\)/);

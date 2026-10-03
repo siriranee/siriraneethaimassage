@@ -57,9 +57,7 @@ export function AdminBookingForm({
   const [feedback, setFeedback] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Readonly<Record<string, string>>>({});
   const idempotencyKeyRef = useRef("");
-  const [bookingStatus, setBookingStatus] = useState<"pending" | "confirmed">(
-    "pending",
-  );
+  const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
   const selectedVariant = useMemo(
     () => variants.find((variant) => `${variant.serviceId}|${variant.durationMinutes}` === variantKey),
     [variantKey, variants],
@@ -74,16 +72,25 @@ export function AdminBookingForm({
     [selectedVariant, therapists],
   );
   const [therapistId, setTherapistId] = useState("");
+  const selectedSlot = slots.find((slot) => slot.localTime === localTime);
+  const isHistoricalSelection = Boolean(
+    selectedSlot && Date.parse(selectedSlot.startsAt) <= currentTimeMs,
+  );
 
   useEffect(() => {
-    if (!selectedVariant || !localDate) return;
+    const timer = window.setInterval(() => setCurrentTimeMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedVariant || !localDate || !therapistId) return;
 
     const controller = new AbortController();
     const params = new URLSearchParams({
       serviceId: selectedVariant.serviceId,
       durationMinutes: String(selectedVariant.durationMinutes),
       localDate,
-      ...(therapistId ? { therapistId } : {}),
+      therapistId,
     });
     void fetch(`/api/cms/availability?${params.toString()}`, {
       cache: "no-store",
@@ -143,16 +150,16 @@ export function AdminBookingForm({
 
     const data = new FormData(form);
     const customerEmail = String(data.get("email") ?? "").trim();
-    if (
-      bookingStatus === "confirmed" &&
-      !window.confirm(
-        isMock
-          ? "Create this demo booking as confirmed? Demo mode will not contact Resend."
-          : customerEmail
-          ? `Create this booking as confirmed and email ${customerEmail} now?`
-          : "Create this booking as confirmed? No customer email is recorded, so no confirmation email will be sent.",
-      )
-    ) {
+    const historicalAtSubmission = Boolean(
+      selectedSlot && Date.parse(selectedSlot.startsAt) <= Date.now(),
+    );
+    if (!window.confirm(
+      isMock
+        ? "Create this demo booking as confirmed? Demo mode will not send emails."
+        : historicalAtSubmission
+          ? "Create this historical booking as confirmed? No customer or therapist email will be sent."
+          : `Create this booking as confirmed? The system will send a confirmation to ${customerEmail} and notify the therapist.`,
+    )) {
       return;
     }
 
@@ -178,7 +185,7 @@ export function AdminBookingForm({
           durationMinutes: selectedVariant.durationMinutes,
           localDate,
           localTime,
-          status: data.get("status"),
+          status: "confirmed",
           source: data.get("source"),
           internalNotes: data.get("internalNotes"),
         }),
@@ -231,20 +238,20 @@ export function AdminBookingForm({
                 setLocalTime("");
                 setAvailabilityState("loading");
               }}
-              required={bookingStatus === "confirmed"}
+              required
               value={therapistId}
             >
-              <option value="">Unassigned (pending bookings only)</option>
+              <option value="">Choose a massage therapist</option>
               {eligibleTherapists.map((therapist) => (
                 <option key={therapist.id} value={therapist.id}>{therapist.name}</option>
               ))}
             </select>
-            <small>Availability is checked for the selected therapist. Confirmed bookings require an assignment. {isMock ? "Demo mode does not send emails." : "The assigned therapist receives a separate appointment email."}</small>
+            <small>Availability is checked for the selected therapist. {isMock ? "Demo mode does not send emails." : "Upcoming appointments send the therapist a separate email; historical entries do not."}</small>
           </label>
-          <label className={styles.field}>Date<input min={defaultDate} name="localDate" onChange={(event) => changeDate(event.target.value)} required type="date" value={localDate} /></label>
+          <label className={styles.field}>Date<input name="localDate" onChange={(event) => changeDate(event.target.value)} required type="date" value={localDate} /><small>Past dates and times can be recorded in Dublin time.</small></label>
           <label className={styles.field}>Available time
-            <select data-cms-field="localTime" disabled={availabilityState === "loading" || !slots.length} name="localTime" onChange={(event) => setLocalTime(event.target.value)} required value={localTime}>
-              <option value="">{availabilityState === "loading" ? "Checking times..." : slots.length ? "Choose a time" : "No available times"}</option>
+            <select data-cms-field="localTime" disabled={!therapistId || availabilityState === "loading" || !slots.length} name="localTime" onChange={(event) => setLocalTime(event.target.value)} required value={localTime}>
+              <option value="">{!therapistId ? "Choose a therapist first" : availabilityState === "loading" ? "Checking times..." : slots.length ? "Choose a time" : "No available times"}</option>
               {slots.map((slot) => <option key={slot.slotId} value={slot.localTime}>{slot.localTimeLabel}</option>)}
             </select>
             {availabilityMessage ? <small>{availabilityMessage}</small> : null}
@@ -257,15 +264,14 @@ export function AdminBookingForm({
         <div className={styles.grid}>
           <label className={styles.field}>Customer name<input defaultValue={isMock ? "Demo guest" : ""} maxLength={100} minLength={2} name="customerName" required /></label>
           <label className={styles.field}>Phone<input defaultValue={isMock ? "+353 00 000 0000" : ""} inputMode="tel" maxLength={30} minLength={7} name="phone" pattern="(?=(?:\\D*\\d){7,})\\+?[\\d\\s().-]{7,30}" required title="Use 7–30 characters and include at least seven digits." type="tel" /></label>
-          <label className={styles.fullField}>Email, optional<input maxLength={254} name="email" type="email" /><small>{isMock ? "Demo mode does not contact Resend." : "A confirmation email is sent only when this booking is created or later moved to Confirmed."}</small></label>
+          <label className={styles.fullField}>Customer email{isHistoricalSelection ? ", optional for historical entries" : ""}<input maxLength={254} name="email" required={!isHistoricalSelection} type="email" /><small>{isMock ? "Required for upcoming demo appointments; demo mode does not send emails." : isHistoricalSelection ? "This appointment has already started, so no customer or therapist emails will be sent." : "Required for upcoming appointments so the customer receives a confirmation email. Historical entries may omit it."}</small></label>
           <label className={styles.fullField}>Customer note, optional<textarea maxLength={1000} name="customerNotes" /><small>Do not record unnecessary medical or sensitive information.</small></label>
         </div>
       </section>
 
       <section className={styles.section}>
-        <header className={styles.sectionHeader}><h2>Booking details</h2><p>Record how the appointment arrived and whether it is already confirmed.</p></header>
+        <header className={styles.sectionHeader}><h2>Booking details</h2><p>New bookings are confirmed immediately. Record how the appointment arrived.</p></header>
         <div className={styles.grid}>
-          <label className={styles.field}>Status<select name="status" onChange={(event) => setBookingStatus(event.target.value as "pending" | "confirmed")} value={bookingStatus}><option value="pending">Pending</option><option value="confirmed">Confirmed</option></select><small>{isMock ? "Creating a confirmed demo booking does not contact Resend." : "Creating as Confirmed immediately sends a confirmation email when the customer has an email address."}</small></label>
           <label className={styles.field}>Source<select defaultValue="phone" name="source"><option value="phone">Phone</option><option value="whatsapp">WhatsApp</option><option value="walk-in">Walk-in</option><option value="administrator">Administrator</option></select></label>
           <label className={styles.fullField}>Internal notes<textarea maxLength={1000} name="internalNotes" /></label>
         </div>
@@ -273,7 +279,7 @@ export function AdminBookingForm({
 
       <div className={styles.saveBar}>
         <span aria-live="polite">{feedback ? <span className={styles.error} role="alert">{feedback}</span> : selectedVariant ? `€${(selectedVariant.priceCents / 100).toFixed(0)} · ${selectedVariant.durationMinutes} minutes` : "Choose a treatment"}</span>
-        <button disabled={saving} type="submit">{saving ? "Saving..." : bookingStatus === "confirmed" ? isMock ? "Create & confirm demo booking" : "Create & confirm booking" : "Create pending booking"}</button>
+        <button disabled={saving} type="submit">{saving ? "Saving..." : isMock ? "Create & confirm demo booking" : "Create & confirm booking"}</button>
       </div>
     </CmsValidatedForm>
   );

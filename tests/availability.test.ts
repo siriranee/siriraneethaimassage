@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Temporal } from "@js-temporal/polyfill";
 
 import { classifyAvailabilityCalendarDay } from "@/domain/booking/calendar";
 import {
   buildCalendarMonthCells,
+  calendarDateOnOrAfter,
   calendarMonthRange,
   calendarWeekdayLabels,
+  currentCalendarDate,
   monthFromCalendarDate,
   normalizeCalendarDate,
   normalizeCalendarMonth,
@@ -62,6 +65,18 @@ test("calendar month helpers reject invalid dates and build a Sunday-first grid"
   assert.equal(cells[4], "2024-02-01");
   assert.equal(cells[32], "2024-02-29");
   assert.equal(cells[33], null);
+});
+
+test("CMS booking date starts on Dublin today and keeps valid calendar selections", () => {
+  const lateUtcInstant = Temporal.Instant.from("2026-10-01T23:30:00Z");
+  const todayInDublin = currentCalendarDate("Europe/Dublin", lateUtcInstant);
+  assert.equal(todayInDublin, "2026-10-02");
+  assert.equal(currentCalendarDate("UTC", lateUtcInstant), "2026-10-01");
+  assert.equal(calendarDateOnOrAfter("", todayInDublin), todayInDublin);
+  assert.equal(calendarDateOnOrAfter("2026-10-02", todayInDublin), todayInDublin);
+  assert.equal(calendarDateOnOrAfter("2026-10-03", todayInDublin), "2026-10-03");
+  assert.equal(calendarDateOnOrAfter("2026-10-01", todayInDublin), todayInDublin);
+  assert.equal(calendarDateOnOrAfter("2026-02-30", todayInDublin), todayInDublin);
 });
 
 function settings(
@@ -140,8 +155,46 @@ test("fully booked overlapping slots are removed", () => {
 
   assert.deepEqual(
     result.map((slot) => slot.localTime),
-    ["11:00", "11:30", "12:00", "12:30", "13:00"],
+    ["11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00"],
   );
+});
+
+test("the final booking window extends one hour with the configured interval", () => {
+  for (const [closing, expected] of [
+    ["18:00", ["17:00", "17:30", "18:00"]],
+    ["19:00", ["18:00", "18:30", "19:00"]],
+  ] as const) {
+    const result = slots({ weeklyHours: weeklyHours("11:00", closing) });
+    assert.deepEqual(result.slice(-3).map((slot) => slot.localTime), expected);
+    assert.equal(result.at(-1)?.endsAt, `2026-06-01T${closing}:00Z`);
+  }
+  assert.equal(slots({ durationMinutes: 90, weeklyHours: weeklyHours("11:00", "18:00") }).at(-1)?.localTime, "17:30");
+  assert.equal(slots({ settings: settings({ bufferAfterMinutes: 30 }), weeklyHours: weeklyHours("11:00", "18:00") }).at(-1)?.localTime, "17:30");
+  assert.equal(slots({ settings: settings({ slotIntervalMinutes: 60 }), weeklyHours: weeklyHours("11:00", "18:00") }).at(-1)?.localTime, "18:00");
+});
+
+test("extended slots still respect confirmed bookings, closures and days off", () => {
+  const lateBooking = {
+    startsAt: "2026-06-01T17:00:00Z",
+    endsAt: "2026-06-01T18:00:00Z",
+    assignedStaffId: "therapist-a",
+    status: "confirmed" as const,
+  };
+  const base = { weeklyHours: weeklyHours("11:00", "18:00"), therapistId: "therapist-a" };
+  assert.equal(slots({ ...base, bookings: [lateBooking] }).at(-1)?.localTime, "17:00");
+  assert.equal(slots({ ...base, settings: settings({ maxConcurrentBookings: 2 }), bookings: [lateBooking] }).at(-1)?.localTime, "17:00");
+  assert.equal(slots({ ...base, closures: [closure({ closedAllDay: false, startsAtLocal: "18:00", endsAtLocal: "19:00" })] }).at(-1)?.localTime, "17:00");
+  assert.equal(slots({ ...base, closures: [closure()] }).length, 0);
+  assert.equal(slots({ weeklyHours: base.weeklyHours.map((day) => ({ ...day, open: false })) }).length, 0);
+});
+
+test("extended slots stay within the same Dublin day and respect winter time", () => {
+  const nearMidnight = slots({ weeklyHours: weeklyHours("21:00", "23:30") });
+  assert.equal(nearMidnight.at(-1)?.localTime, "23:00");
+  assert.equal(nearMidnight.at(-1)?.endsAt, "2026-06-01T23:00:00Z");
+  const winter = slots({ localDate: "2026-12-01", weeklyHours: weeklyHours("11:00", "18:00") });
+  assert.equal(winter.at(-1)?.localTime, "18:00");
+  assert.equal(winter.at(-1)?.endsAt, "2026-12-01T19:00:00Z");
 });
 
 test("remaining capacity is reported when concurrent capacity is greater than one", () => {
@@ -269,7 +322,7 @@ test("partial and all-day closures remove intersecting slots", () => {
 
   assert.deepEqual(
     slots({ closures: [partial] }).map((slot) => slot.localTime),
-    ["10:00", "12:00", "12:30", "13:00"],
+    ["10:00", "12:00", "12:30", "13:00", "13:30", "14:00"],
   );
   assert.equal(
     slots({ closures: [{ ...partial, closedAllDay: true }] }).length,
@@ -301,7 +354,7 @@ test("only confirmed bookings reserve appointment capacity", () => {
   assert.ok(!confirmedBooking.some((slot) => slot.localTime === "10:00"));
 });
 
-test("buffers, notice windows and booking horizon are enforced", () => {
+test("buffers and booking horizon are enforced without a minimum notice window", () => {
   const buffered = slots({
     settings: settings({ bufferAfterMinutes: 30 }),
     bookings: [
@@ -314,13 +367,28 @@ test("buffers, notice windows and booking horizon are enforced", () => {
   });
   assert.ok(!buffered.some((slot) => slot.localTime === "10:00"));
 
-  const notice = slots({
+  const noNotice = slots({
+    now: "2026-06-01T09:15:00Z",
+    enforceWindow: true,
+    settings: settings({ minimumNoticeMinutes: 48 * 60, bookingHorizonDays: 2 }),
+  });
+  assert.ok(!noNotice.some((slot) => slot.localTime === "10:00"));
+  assert.ok(noNotice.some((slot) => slot.localTime === "10:30"));
+  assert.ok(noNotice.some((slot) => slot.localTime === "11:30"));
+
+  const beforeOpening = slots({
+    now: "2026-06-01T08:45:00Z",
+    enforceWindow: true,
+    settings: settings({ minimumNoticeMinutes: 48 * 60 }),
+  });
+  assert.ok(beforeOpening.some((slot) => slot.localTime === "10:00"));
+
+  const atStart = slots({
     now: "2026-06-01T09:00:00Z",
     enforceWindow: true,
-    settings: settings({ minimumNoticeMinutes: 120, bookingHorizonDays: 2 }),
+    settings: settings({ minimumNoticeMinutes: 48 * 60 }),
   });
-  assert.ok(!notice.some((slot) => slot.localTime === "11:30"));
-  assert.ok(notice.some((slot) => slot.localTime === "12:00"));
+  assert.ok(atStart.some((slot) => slot.localTime === "10:00"));
 
   assert.equal(
     slots({
@@ -398,7 +466,7 @@ test("calendar distinguishes available, fully booked and outside-window days", (
 
   assert.deepEqual(classifyAvailabilityCalendarDay(base), {
     state: "available",
-    availableSlotCount: 1,
+    availableSlotCount: 3,
   });
   assert.equal(
     classifyAvailabilityCalendarDay({
@@ -406,7 +474,7 @@ test("calendar distinguishes available, fully booked and outside-window days", (
       bookings: [
         {
           startsAt: "2026-06-01T09:00:00Z",
-          endsAt: "2026-06-01T10:00:00Z",
+          endsAt: "2026-06-01T11:00:00Z",
           status: "confirmed",
         },
       ],
@@ -449,6 +517,17 @@ test("calendar keeps partially open days available and labels no-slot days unava
       settings: settings({ minimumNoticeMinutes: 240 }),
       weeklyHours: weeklyHours("10:00", "11:00"),
       now: "2026-06-01T09:30:00Z",
+      minimumDate: "2026-06-01",
+    }).state,
+    "available",
+  );
+  assert.equal(
+    classifyAvailabilityCalendarDay({
+      ...base,
+      closures: [],
+      settings: settings({ minimumNoticeMinutes: 240 }),
+      weeklyHours: weeklyHours("10:00", "11:00"),
+      now: "2026-06-01T11:05:00Z",
       minimumDate: "2026-06-01",
     }).state,
     "unavailable",

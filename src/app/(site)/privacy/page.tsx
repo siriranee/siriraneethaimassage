@@ -37,7 +37,7 @@ export default async function PrivacyPage() {
           <h2>Who this notice is about</h2>
           <p>
             This notice describes how {site.name} uses personal information
-            connected with this website and appointment requests. Siriranee Thai
+            connected with this website and appointments. Siriranee Thai
             Massage is responsible for deciding why and how that information is
             used.
           </p>
@@ -53,14 +53,14 @@ export default async function PrivacyPage() {
           <h2>Appointment information</h2>
           <p>
             When direct website booking is enabled, the form asks for your name,
-            phone number, optional email address, optional notes, selected
+            phone number, email address, optional notes, selected
             treatment, massage therapist, duration, date and time. It also records when you accepted
             this version of the privacy notice and limited technical information
             used to prevent abuse.
           </p>
           <p>
-            This information is used to review, confirm, change and administer your
-            appointment, contact you about the request, protect booking
+            This information is used to confirm and administer your appointment,
+            contact you about the booking, protect booking
             availability and maintain an operational record.
           </p>
         </section>
@@ -71,21 +71,19 @@ export default async function PrivacyPage() {
             Booking contact details are encrypted before they are stored. Access is
             limited to authorised Siriranee administrators and staff who need the
             information to manage appointments. MongoDB stores the encrypted
-            booking record. After a website request is stored, Resend processes the
-            appointment and contact details needed to deliver an operational email
-            notification to the owner, including any optional notes supplied with
-            the request. If you provide an email address and the shop confirms the
-            appointment, Resend also processes your name, email address,
-            appointment details and published business details needed to send your
-            confirmation. When therapist email delivery is enabled, Resend
-            separately sends the selected therapist your name, phone number,
-            email address, any optional booking note, and the booking reference,
-            treatment, duration, date, time and pending status when the request is
-            submitted, followed by relevant appointment updates. A private,
-            time-limited link lets the selected therapist review the appointment
-            details and confirm the request without signing in. That review page
-            does not display your contact details or booking note. Internal CMS
-            notes are not included in therapist emails or review pages. Therapist
+            booking record. For a newly confirmed website booking, the owner
+            receives a CMS dashboard alert. Resend processes your name, email
+            address, appointment details and published business details to send
+            your confirmation email. It also sends the selected therapist an
+            appointment email containing your name, phone number, email address,
+            any optional booking note, and the booking reference, treatment,
+            duration, date and time. Relevant appointment changes may generate
+            further emails. Older requests that are still pending may have sent
+            the owner and selected therapist a request email with a private link
+            for reviewing and confirming the appointment. Opening that link alone
+            does not confirm it, and its review page does not display your contact
+            details or booking note. Internal CMS notes are not included in
+            therapist emails or review pages. Therapist
             notification addresses and private phone numbers are stored separately
             from public profile content and encrypted in production. The customer
             confirmation does not include your notes or internal CMS notes.
@@ -93,12 +91,13 @@ export default async function PrivacyPage() {
             only when configured for this service.
           </p>
           <p>
-            Booking records are retained for two years after the appointment and
-            then deleted automatically. Operational notification records and CMS
-            audit records are retained for one year. A pending request does not
-            reserve appointment capacity, so another customer may request the same
-            time before the shop confirms it. Confirmed appointments block new
-            requests according to the shop&apos;s therapist and capacity settings.
+            Booking records are retained for two years after the appointment,
+            or for two years after a historical appointment is recorded if that
+            is later, and then deleted automatically. Operational notification records and CMS
+            audit records are retained for one year. Newly confirmed website
+            appointments block new bookings according to the shop&apos;s therapist
+            and capacity settings. Older requests that remain pending do not
+            reserve appointment capacity until they are confirmed.
             Provider systems may apply their own documented retention periods.
           </p>
         </section>
@@ -128,10 +127,18 @@ export default async function PrivacyPage() {
             only after you choose to open them.
           </p>
           <p>
-            No advertising or analytics cookies are intentionally set by this
-            version of the website. Essential hosting and security infrastructure
-            may process request information such as IP address, browser details and
-            server logs.
+            If you accept analytics cookies, Google Analytics measures public
+            page visits and successful website bookings so we can understand
+            how the website is used. We send page paths without query strings
+            and a booking event with the treatment and duration. We do
+            not send your name, contact details, booking reference, appointment
+            time or booking note as analytics event details. Google may set
+            analytics cookies and process technical information under its own
+            retention settings. Analytics is optional; choosing to reject it
+            does not affect booking. You can change your choice using
+            &ldquo;Analytics preferences&rdquo; in the footer. Essential hosting
+            and security infrastructure may still process request information
+            such as IP address, browser details and server logs.
           </p>
         </section>
 
@@ -162,8 +169,8 @@ export default async function PrivacyPage() {
             )}
           </p>
           <p>
-            This implementation-ready draft still requires owner and, where
-            appropriate, legal review before direct online booking is switched on.
+            This notice should be reviewed and kept up to date as the booking
+            process and service providers change.
           </p>
         </section>
       </article>

@@ -1,6 +1,7 @@
 # Siriranee Thai Massage implementation status
 
-Updated: 3 September 2026
+Booking workflow updated: 3 October 2026. Other launch items still require
+production verification.
 
 ## Complete and validated
 
@@ -43,21 +44,29 @@ Updated: 3 September 2026
 - Booking dashboard, URL-based booking filters, booking
   detail, controlled change reasons, per-booking audit timeline, status updates,
   rescheduling, bounded recurring closures and day/week/month calendar.
-- Metadata-only notification activity records. New website requests create one
-  owner-only Resend email after the booking transaction commits. The responsive
-  email presents Thai first and English second, while recipient addresses and
-  rendered message bodies are never copied into MongoDB. Optional customer
-  notes remain in the encrypted booking record and are not copied into email.
+- Metadata-only notification activity records and durable email outboxes.
+  New website and CMS bookings are confirmed immediately. The owner sees a
+  dashboard event, while customer confirmation and separate Thai-first,
+  English-second therapist assignment emails are attempted after the booking
+  transaction commits. New website bookings do not send the former owner
+  request-to-confirm email. Recipient addresses and rendered message bodies
+  are not copied into notification records; therapist operational messages
+  include the customer contact details and booking note needed to manage the
+  appointment, but never internal CMS notes.
 - Public treatment/date/time booking backend with same-origin checks, bounded
   JSON, validation, rate limiting, idempotency and encrypted customer details.
 - Privacy-preserving booking-status lookup by booking ID or reference; it
   exposes status copy only and keeps identifiers out of page URLs.
-- Confirmed-booking capacity checks with closures, buffers, notice period,
-  booking horizon and Europe/Dublin daylight-saving handling. Pending requests
-  remain available for staff review without reserving a public time slot.
-- Customers never see, submit or select a therapist, and booking management has
-  no staff-assignment workflow. Privileged staff, calendar and price fields are
-  rejected by the public booking API.
+- Confirmed-booking capacity checks with closures, buffers,
+  public booking horizon and Europe/Dublin daylight-saving handling. New
+  confirmed appointments reserve capacity; older pending requests remain
+  manageable through the existing review flow.
+- Customers select an eligible therapist; CMS staff can assign or reassign one.
+  Privileged staff, calendar and price fields are rejected by the public booking
+  API. CMS Add booking accepts past dates and times subject to normal hours and
+  availability. Past-start entries are confirmed without customer or therapist
+  email; upcoming CMS entries require a customer email. A historical entry
+  without customer email cannot be moved to a future appointment.
 - Automated TypeScript, lint, content, environment, availability, permission,
   security-contract and production-build checks.
 - Sticky CMS navbar and responsive left navigation drawer. Retired CMS Pages,
@@ -92,7 +101,7 @@ Updated: 3 September 2026
   transfer wording.
 - Owner confirmation of the Resend sender domain and recipient address through
   a real production test email.
-- Booking response-time, failed-email review and pending-request follow-up procedures.
+- Failed-email review and legacy pending-request follow-up procedures.
 - Production hosting access to the verified Cloudinary credentials, signed
   upload preset, provider retention policy and final image approval workflow.
 - Automated backup frequency, retention and restore-test schedule.
@@ -124,7 +133,7 @@ still need verification after the production deployment.
 2. Configure hosting with the verified MongoDB and Cloudinary accounts, Resend
    API key, verified sender and owner recipient, then configure monitoring.
 3. Approve the final privacy notice and retention schedule.
-4. Establish failed-email review, response-time and pending-request follow-up procedures.
+4. Establish failed-email review and legacy pending-request follow-up procedures.
 5. Configure automated encrypted backups and complete an isolated restore drill.
 6. Replace initial test access with unique, high-entropy production
    administrator credentials without retaining plaintext passwords.

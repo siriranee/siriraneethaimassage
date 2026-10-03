@@ -38,7 +38,7 @@ const pageCopy = {
     description: "Choose a treatment, date and time.",
     seoTitle: "Book a Massage in Howth, Dublin",
     seoDescription:
-      "Book a massage at Siriranee Thai Massage in Howth, Dublin. Choose a treatment, duration and preferred date and time, then send your appointment request.",
+      "Book a massage at Siriranee Thai Massage in Howth, Dublin. Choose a treatment, therapist, duration and available time to confirm your appointment online.",
   },
   about: {
     eyebrow: "Our approach",
@@ -69,10 +69,10 @@ const pageCopy = {
     eyebrow: "Your information",
     title: "Privacy Notice",
     description:
-      "How we use and protect information from website visits and appointment requests.",
+      "How we use and protect information from website visits and appointments.",
     seoTitle: "Privacy Notice",
     seoDescription:
-      "How Siriranee Thai Massage handles website visits, appointment requests and external services.",
+      "How Siriranee Thai Massage handles website visits, appointments and external services.",
   },
   promotions: {
     eyebrow: "Treat someone",

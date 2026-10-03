@@ -30,7 +30,8 @@ test("a shared owner/therapist inbox receives one message per event, with custom
     version: 2, updatedAt: new Date().toISOString(), updatedBy: fixture.actor.id,
   }, 1);
   let booking = await createAdminBooking(fixture.input, fixture.context);
-  booking = await fixture.repository.saveBooking({ ...booking, source: "website" }, booking.version);
+  // Exercise legacy requests while new bookings use automatic confirmation.
+  booking = await fixture.repository.saveBooking({ ...booking, source: "website", status: "pending" }, booking.version);
   const calls: Array<{ audience: string; event: string; to: string }> = [];
   const sent = () => ({ status: "sent" as const, attempted: true as const, providerMessageId: randomUUID() });
   const customer: CustomerBookingEmailSender = async (current) => {

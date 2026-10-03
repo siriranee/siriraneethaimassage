@@ -196,12 +196,22 @@ test("attention reads are bounded, booking-scoped and expose no delivery secrets
 });
 
 test("all quick-action surfaces retain version keys and durable warnings even when cancelled cards disappear", async () => {
-  for (const path of ["src/app/cms/(protected)/page.tsx", "src/app/cms/(protected)/bookings/page.tsx", "src/app/cms/(protected)/calendar/page.tsx"]) {
+  for (const path of ["src/app/cms/(protected)/page.tsx", "src/app/cms/(protected)/bookings/page.tsx"]) {
     assert.match(await readFile(path, "utf8"), /<CmsBookingEmailAttentionNotice items=\{emailAttention\}/);
   }
-  for (const path of ["src/app/cms/(protected)/page.tsx", "src/app/cms/(protected)/bookings/page.tsx", "src/components/cms/CmsCalendar.tsx"]) {
+  for (const path of ["src/app/cms/(protected)/page.tsx", "src/app/cms/(protected)/bookings/page.tsx"]) {
     const source = await readFile(path, "utf8");
     assert.match(source, /key=\{`\$\{booking\.id\}:\$\{booking\.version\}`\}/);
     assert.match(source, /emailAttention=\{/);
   }
+});
+
+test("compact calendar preserves email warnings and scopes them to the selected therapist", async () => {
+  const page = await readFile("src/app/cms/(protected)/calendar/page.tsx", "utf8");
+  const calendar = await readFile("src/components/cms/CmsCalendar.tsx", "utf8");
+  assert.match(page, /listCmsBookingEmailAttention\(bookings\.map\(\(booking\) => booking\.id\), bookings\.length\)/);
+  assert.match(page, /assignedStaffId: bookingAssignments\.get\(item\.bookingId\)/);
+  assert.match(calendar, /filterCmsCalendarBookings\(emailAttention, selectedTherapistId\)\.slice\(0, 8\)/);
+  assert.match(calendar, /<CmsBookingEmailAttentionNotice items=\{filteredEmailAttention\}/);
+  assert.doesNotMatch(calendar, /CmsBookingQuickActions/);
 });

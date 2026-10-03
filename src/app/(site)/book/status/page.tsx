@@ -13,7 +13,7 @@ import styles from "./page.module.css";
 export const metadata: Metadata = createMetadata({
   title: "Check booking status",
   description:
-    "Check the current status of a Siriranee Thai Massage booking request.",
+    "Check the current status of a Siriranee Thai Massage booking.",
   path: "/book/status",
   noIndex: true,
 });

@@ -941,7 +941,7 @@ export class MongoCmsRepository implements CmsRepository {
       filter,
       {
         ...encodeBooking(booking),
-        retentionExpiresAtDate: getCmsBookingExpiryDate(booking.startsAt),
+        retentionExpiresAtDate: getCmsBookingExpiryDate(booking.startsAt, booking.createdAt),
       },
       { ...this.options(), upsert: expectedVersion === undefined },
     );

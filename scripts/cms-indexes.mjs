@@ -141,12 +141,24 @@ try {
           retentionExpiresAtDate: {
             $dateAdd: {
               startDate: {
-                $convert: {
-                  input: "$startsAt",
-                  to: "date",
-                  onError: "$$NOW",
-                  onNull: "$$NOW",
-                },
+                $max: [
+                  {
+                    $convert: {
+                      input: "$startsAt",
+                      to: "date",
+                      onError: "$$NOW",
+                      onNull: "$$NOW",
+                    },
+                  },
+                  {
+                    $convert: {
+                      input: "$createdAt",
+                      to: "date",
+                      onError: "$$NOW",
+                      onNull: "$$NOW",
+                    },
+                  },
+                ],
               },
               unit: "day",
               amount: bookingRetentionDays,

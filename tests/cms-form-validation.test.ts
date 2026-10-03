@@ -23,7 +23,7 @@ test("the shared CMS form reports accessible field errors while a value is corre
   assert.match(form, /aria-invalid/);
   assert.match(form, /aria-errormessage/);
   assert.match(form, /role="alert"/);
-  assert.match(form, /focusIssue\(issue\)/);
+  assert.match(form, /focusIssue\(pendingIssue\)/);
   assert.match(form, /dataset\.cmsMatchField/);
   assert.match(form, /dataset\.cmsAfterField/);
   assert.match(form, /dataset\.cmsNotBeforeField/);
@@ -33,7 +33,13 @@ test("the shared CMS form reports accessible field errors while a value is corre
   assert.match(form, /pendingServerFocusRef/);
   assert.match(form, /dataset\.cmsRevalidateWhen/);
   assert.match(styles, /label\[data-cms-validation-error\]/);
-  assert.match(styles, /position: sticky/);
+  assert.doesNotMatch(form, /styles\.summary|summaryRef|Please correct these|Please correct this field/);
+  assert.doesNotMatch(styles, /\.summary|position: sticky/);
+  assert.match(form, /id=\{`\$\{instanceId\}-validation-\$\{index\}`\}/);
+  assert.match(form, /issue\.unmapped \? styles\.formError : styles\.accessibleError/);
+  assert.match(form, /unmapped: !control/);
+  assert.match(form, /formError\.focus\(\)/);
+  assert.match(styles, /\.accessibleError/);
 });
 
 test("every CMS editor form uses inline validation or the therapist-specific equivalent", async () => {

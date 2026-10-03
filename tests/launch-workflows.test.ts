@@ -235,7 +235,8 @@ test("isolated launch verification covers services, ten bookings and administrat
         ...current.bookingSettings,
         publicBookingEnabled: true,
         rulesConfirmed: true,
-        minimumNoticeMinutes: 0,
+        // A legacy persisted notice value must not delay public or CMS slots.
+        minimumNoticeMinutes: 48 * 60,
         bookingHorizonDays: 365,
         bufferBeforeMinutes: 0,
         bufferAfterMinutes: 0,
@@ -558,7 +559,12 @@ test("isolated launch verification covers services, ten bookings and administrat
   process.env.RESEND_FROM_EMAIL = "Siriranee Bookings <bookings@siriranee.example>";
   process.env.RESEND_BOOKING_TO_EMAIL = "owner@siriranee.example";
 
-  const publicDate = Temporal.PlainDate.from(localDate).add({ days: 1 }).toString();
+  // Tomorrow is always inside the legacy 48-hour window, so the availability
+  // lookup and successful submission below verify that it is ignored.
+  const publicDate = Temporal.Now.zonedDateTimeISO("Europe/Dublin")
+    .toPlainDate()
+    .add({ days: 1 })
+    .toString();
   const publicRequest = {
     customerName: "Demo Public Guest",
     phone: "+353 85 111 2222",
@@ -568,7 +574,8 @@ test("isolated launch verification covers services, ten bookings and administrat
     therapistId: primaryTherapist.id,
     durationMinutes: 60,
     localDate: publicDate,
-    localTime: "08:00",
+    // Published closing is 20:00: this request exercises the extra final hour.
+    localTime: "20:00",
     privacyAccepted: true,
     website: "",
   };
@@ -600,6 +607,15 @@ test("isolated launch verification covers services, ten bookings and administrat
       status: "sent" as const,
       attempted: true as const,
       providerMessageId: `isolated-therapist-email-${booking.id}`,
+    };
+  };
+  const customerEmailAttempts: string[] = [];
+  const sendCustomerBookingEmail = async (booking: { readonly id: string }) => {
+    customerEmailAttempts.push(booking.id);
+    return {
+      status: "sent" as const,
+      attempted: true as const,
+      providerMessageId: `isolated-customer-email-${booking.id}`,
     };
   };
   await assert.rejects(
@@ -641,18 +657,59 @@ test("isolated launch verification covers services, ten bookings and administrat
       ),
     CmsValidationError,
   );
+  for (const invalidDetails of [
+    { customerName: " " },
+    { phone: "" },
+    { phone: "-------" },
+    { email: "" },
+    { email: "not-an-email" },
+    { privacyAccepted: false },
+    { notes: "x".repeat(601) },
+  ]) {
+    const field = Object.keys(invalidDetails)[0];
+    await assert.rejects(
+      () => createPublicBooking({ ...publicRequest, ...invalidDetails }, {
+        idempotencyKey: `isolated-invalid-contact-${field}`,
+        requestId: "isolated-invalid-contact",
+        sendOwnerBookingEmail,
+        sendTherapistBookingEmail,
+      }),
+      (error: unknown) => error instanceof CmsValidationError && Boolean(error.fields[field]),
+    );
+  }
+  assert.equal((await repository.listBookings({ from: publicDate, to: publicDate })).length, 0);
+  assert.equal(ownerEmailAttempts.length, 0);
+  assert.equal(therapistEmailAttempts.length, 0);
+
+  const { getPublicAvailability } = await import("@/server/booking/public-availability");
+  const { getAdminAvailability } = await import("@/server/cms/booking-service");
+  assert.equal((await getPublicAvailability(publicRequest)).slots.at(-1)?.localTime, "20:00");
+  assert.equal((await getAdminAvailability(publicRequest)).at(-1)?.localTime, "20:00");
+  await assert.rejects(
+    createPublicBooking({ ...publicRequest, localTime: "20:30" }, {
+      idempotencyKey: "isolated-beyond-extended-booking-window",
+      requestId: "isolated-beyond-extended-booking-window",
+      sendOwnerBookingEmail,
+      sendTherapistBookingEmail,
+    }),
+    CmsConflictError,
+  );
+
   const publicBooking = await createPublicBooking(publicRequest, {
     idempotencyKey: "isolated-public-booking-request-0001",
     requestId: "isolated-public-booking",
     sendOwnerBookingEmail,
+    sendCustomerBookingEmail,
     sendTherapistBookingEmail,
   });
   assert.equal(publicBooking.source, "website");
-  assert.equal(publicBooking.status, "pending");
+  assert.equal(publicBooking.status, "confirmed");
   assert.equal(publicBooking.demo, false);
   assert.equal(publicBooking.assignedStaffId, primaryTherapist.id);
   assert.equal(publicBooking.assignedStaffName, primaryTherapist.name);
   assert.ok(publicBooking.privacyAcceptedAt);
+  assert.equal(publicBooking.localTime, "20:00");
+  assert.equal(Temporal.Instant.from(publicBooking.endsAt).toZonedDateTimeISO("Europe/Dublin").hour, 21);
 
   await repository.saveBooking(
     {
@@ -668,6 +725,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     idempotencyKey: "isolated-public-booking-request-0001",
     requestId: "isolated-public-booking-retry",
     sendOwnerBookingEmail,
+    sendCustomerBookingEmail,
     sendTherapistBookingEmail,
   });
   assert.equal(idempotentRetry.id, publicBooking.id);
@@ -675,7 +733,8 @@ test("isolated launch verification covers services, ten bookings and administrat
     (await repository.listBookings({ from: publicDate, to: publicDate })).length,
     1,
   );
-  assert.deepEqual(ownerEmailAttempts, [publicBooking.id]);
+  assert.deepEqual(ownerEmailAttempts, []);
+  assert.deepEqual(customerEmailAttempts, [publicBooking.id]);
 
   await assert.rejects(
     () =>
@@ -690,26 +749,21 @@ test("isolated launch verification covers services, ten bookings and administrat
       ),
     CmsConflictError,
   );
-  const overlappingPublicBooking = await createPublicBooking(publicRequest, {
-    idempotencyKey: "isolated-public-booking-request-0002",
-    requestId: "isolated-public-booking-overlap",
-    sendOwnerBookingEmail,
-    sendTherapistBookingEmail,
-  });
-  assert.equal(overlappingPublicBooking.status, "pending");
-  assert.equal(overlappingPublicBooking.startsAt, publicBooking.startsAt);
-  assert.equal(
-    overlappingPublicBooking.assignedStaffId,
-    publicBooking.assignedStaffId,
+  await assert.rejects(
+    createPublicBooking(publicRequest, {
+      idempotencyKey: "isolated-public-booking-request-0002",
+      requestId: "isolated-public-booking-overlap",
+      sendOwnerBookingEmail,
+      sendCustomerBookingEmail,
+      sendTherapistBookingEmail,
+    }),
+    CmsConflictError,
   );
   assert.equal(
     (await repository.listBookings({ from: publicDate, to: publicDate })).length,
-    2,
+    1,
   );
-  assert.deepEqual(ownerEmailAttempts, [
-    publicBooking.id,
-    overlappingPublicBooking.id,
-  ]);
+  assert.deepEqual(ownerEmailAttempts, []);
 
   const failedEmailDate = Temporal.PlainDate.from(publicDate)
     .add({ days: 1 })
@@ -718,21 +772,21 @@ test("isolated launch verification covers services, ten bookings and administrat
   const bookingWithFailedEmail = await createPublicBooking(
     {
       ...publicRequest,
-      customerName: "Demo Public Guest Without Email",
-      email: "",
+      customerName: "Demo Public Guest With Email Failure",
+      email: "demo.failure@example.invalid",
       localDate: failedEmailDate,
     },
     {
       idempotencyKey: "isolated-public-booking-request-0003",
       requestId: "isolated-public-booking-email-failure",
-      sendOwnerBookingEmail: async () => {
+      sendCustomerBookingEmail: async () => {
         failedEmailAttempts += 1;
         throw new Error("Simulated provider outage");
       },
       sendTherapistBookingEmail,
     },
   );
-  assert.equal(bookingWithFailedEmail.status, "pending");
+  assert.equal(bookingWithFailedEmail.status, "confirmed");
   assert.equal(failedEmailAttempts, 1);
   assert.equal(
     (await repository.listBookings({
@@ -744,7 +798,7 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.ok(
     (await repository.listNotifications(bookingWithFailedEmail.id, 20)).some(
       (notification) =>
-        notification.audience === "owner" &&
+        notification.audience === "customer" &&
         notification.channel === "email" &&
         notification.status === "indeterminate" &&
         notification.lastError === "resend-unexpected-error" &&
@@ -756,7 +810,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     publicBooking.id,
     20,
   );
-  assert.equal(publicNotifications.length, 3);
+  assert.equal(publicNotifications.length, 4);
   assert.ok(
     publicNotifications.some(
       (notification) =>
@@ -768,7 +822,7 @@ test("isolated launch verification covers services, ten bookings and administrat
     publicNotifications.some(
       (notification) =>
         notification.audience === "therapist" &&
-        notification.kind === "booking-requested" &&
+        notification.kind === "booking-assigned" &&
         notification.channel === "email" &&
         notification.status === "sent" &&
         notification.providerMessageId ===
@@ -784,32 +838,20 @@ test("isolated launch verification covers services, ten bookings and administrat
       {
         bookingId: publicBooking.id,
         therapistId: primaryTherapist.id,
-        event: "requested",
+        event: "assigned",
       },
     ],
   );
   assert.ok(
     publicNotifications.some(
       (notification) =>
-        notification.audience === "owner" &&
+        notification.audience === "customer" &&
         notification.channel === "email" &&
         notification.status === "sent" &&
-        notification.providerMessageId === "isolated-resend-email-id" &&
+        notification.providerMessageId === `isolated-customer-email-${publicBooking.id}` &&
         notification.attemptCount === 1,
     ),
   );
-
-  const confirmedPublicBooking = await updateAdminBooking(
-    publicBooking.id,
-    {
-      status: "confirmed",
-      internalNotes: "",
-      changeReason: "other-operational",
-    },
-    idempotentRetry.version,
-    context,
-  );
-  assert.equal(confirmedPublicBooking.status, "confirmed");
   await assert.rejects(
     () =>
       createPublicBooking(publicRequest, {
@@ -823,25 +865,7 @@ test("isolated launch verification covers services, ten bookings and administrat
       error.message ===
         "That time has just become unavailable. Please choose another.",
   );
-  const confirmedOverlappingBooking = await updateAdminBooking(
-    overlappingPublicBooking.id,
-    {
-      status: "confirmed",
-      internalNotes: "",
-      changeReason: "other-operational",
-    },
-    overlappingPublicBooking.version,
-    context,
-  );
-  assert.equal(confirmedOverlappingBooking.status, "confirmed");
-  assert.equal(
-    confirmedOverlappingBooking.startsAt,
-    confirmedPublicBooking.startsAt,
-  );
-  assert.deepEqual(ownerEmailAttempts, [
-    publicBooking.id,
-    overlappingPublicBooking.id,
-  ]);
+  assert.deepEqual(ownerEmailAttempts, []);
   const customerNotificationId =
     customerBookingConfirmationEmailNotificationId(publicBooking.id);
   assert.equal(
@@ -851,31 +875,25 @@ test("isolated launch verification covers services, ten bookings and administrat
     1,
   );
 
-  let customerEmailAttempts = 0;
   const failedConfirmation =
     await attemptCustomerBookingConfirmationEmail(
       productionModeRepository,
-      confirmedPublicBooking,
-      {
-        sender: async () => {
-          customerEmailAttempts += 1;
-          throw new Error("Simulated customer confirmation outage");
-        },
-      },
+      bookingWithFailedEmail,
+      { sender: async () => { throw new Error("Simulated repeated customer confirmation outage"); } },
     );
   assert.deepEqual(failedConfirmation, { status: "indeterminate" });
   assert.equal(
-    (await repository.getBooking(publicBooking.id))?.status,
+    (await repository.getBooking(bookingWithFailedEmail.id))?.status,
     "confirmed",
   );
 
   const recoveredConfirmation =
     await attemptCustomerBookingConfirmationEmail(
       productionModeRepository,
-      confirmedPublicBooking,
+      bookingWithFailedEmail,
       {
         sender: async () => {
-          customerEmailAttempts += 1;
+          failedEmailAttempts += 1;
           return {
             status: "sent" as const,
             attempted: true as const,
@@ -888,10 +906,10 @@ test("isolated launch verification covers services, ten bookings and administrat
   assert.deepEqual(
     await attemptCustomerBookingConfirmationEmail(
       productionModeRepository,
-      confirmedPublicBooking,
+      bookingWithFailedEmail,
       {
         sender: async () => {
-          customerEmailAttempts += 1;
+          failedEmailAttempts += 1;
           return {
             status: "sent" as const,
             attempted: true as const,
@@ -902,12 +920,12 @@ test("isolated launch verification covers services, ten bookings and administrat
     ),
     { status: "sent" },
   );
-  assert.equal(customerEmailAttempts, 2);
+  assert.equal(failedEmailAttempts, 2);
   const customerNotification = await repository.getNotification(
-    customerNotificationId,
+    customerBookingConfirmationEmailNotificationId(bookingWithFailedEmail.id),
   );
   assert.equal(customerNotification?.status, "sent");
-  assert.equal(customerNotification?.attemptCount, 2);
+  assert.equal(customerNotification?.attemptCount, 3);
   assert.equal(
     customerNotification?.providerMessageId,
     "isolated-customer-confirmation-id",
@@ -918,13 +936,13 @@ test("isolated launch verification covers services, ten bookings and administrat
   );
 
   const cancelledPublicBooking = await updateAdminBooking(
-    confirmedPublicBooking.id,
+    publicBooking.id,
     {
       status: "cancelled",
       internalNotes: "",
       changeReason: "other-operational",
     },
-    confirmedPublicBooking.version,
+    idempotentRetry.version,
     context,
   );
   assert.equal(cancelledPublicBooking.status, "cancelled");
@@ -970,14 +988,13 @@ test("isolated launch verification covers services, ten bookings and administrat
   const audits = await repository.listAudit(100);
   assert.equal(
     audits.filter((event) => event.action === "booking.created").length,
-    10,
+    12,
   );
   for (const action of [
     "service.created",
     "service.updated",
     "booking.updated",
     "booking.deleted",
-    "booking.requested",
     "user.created",
     "user.access-updated",
     "user.password-reset",

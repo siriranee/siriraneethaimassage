@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { getAvailabilitySlots } from "@/domain/booking/availability";
+import { validateBookingContact } from "@/domain/booking/contact-validation";
 import type { CmsBooking } from "@/domain/cms/types";
 import { bookingPrivacyNotice } from "@/domain/privacy";
 import { assertLivePublicBookingReady } from "@/server/booking/readiness";
@@ -13,15 +14,16 @@ import { getCmsRepository } from "@/server/cms/repositories";
 import { CmsConflictError } from "@/server/cms/repositories/repository";
 import {
   deliverOwnerBookingRequestEmail,
+  dispatchBookingMutationEmails,
   ensureOwnerBookingRequestEmail,
   getTherapistBookingEmailPlans,
   recordBookingNotificationPlan,
-  recordOwnerBookingRequestEmail,
   recordTherapistBookingEmailPlans,
   shouldRetryOwnerBookingEmail,
   attemptTherapistBookingEmail,
 } from "@/server/cms/notification-service";
 import type {
+  CustomerBookingEmailSender,
   OwnerBookingEmailSender,
   TherapistBookingEmailSender,
 } from "@/server/booking/resend-booking-email";
@@ -97,6 +99,7 @@ export async function createPublicBooking(
   input: {
     readonly idempotencyKey: string;
     readonly requestId: string;
+    readonly sendCustomerBookingEmail?: CustomerBookingEmailSender;
     readonly sendOwnerBookingEmail?: OwnerBookingEmailSender;
     readonly sendTherapistBookingEmail?: TherapistBookingEmailSender;
   },
@@ -120,23 +123,36 @@ export async function createPublicBooking(
   if (String(source.website ?? "").trim()) {
     throw new CmsValidationError("The booking request could not be accepted.");
   }
-  if (source.privacyAccepted !== true) {
-    throw new CmsValidationError("Accept the privacy notice to request a booking.");
+  if (
+    input.idempotencyKey.length < 16 ||
+    input.idempotencyKey.length > 200
+  ) {
+    throw new CmsValidationError("The booking request identifier is invalid.");
+  }
+
+  const repository = getCmsRepository();
+  const idempotencyKeyHash = hash(input.idempotencyKey);
+  const contactErrors = validateBookingContact(source);
+  const missingEmailOnly =
+    Object.keys(contactErrors).length === 1 &&
+    Boolean(contactErrors.email) &&
+    !String(source.email ?? "").trim();
+  const priorEmailFreeRequest = missingEmailOnly
+    ? await repository.findBookingByIdempotencyHash(idempotencyKeyHash)
+    : null;
+  const legacyEmailFreeReplay = Boolean(
+    priorEmailFreeRequest?.source === "website" &&
+    !priorEmailFreeRequest.customer.email,
+  );
+  if (Object.keys(contactErrors).length && !legacyEmailFreeReplay) {
+    throw new CmsValidationError("Please check the highlighted booking details.", contactErrors);
   }
 
   const customerName = text(source.customerName, "customerName", 2, 100);
   const phone = text(source.phone, "phone", 7, 30);
-  if (!/^\+?[\d\s().-]{7,30}$/.test(phone)) {
-    throw new CmsValidationError("Enter a valid phone number.", {
-      phone: "Enter a valid phone number.",
-    });
-  }
-  const email = optionalText(source.email, 254).toLowerCase();
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new CmsValidationError("Enter a valid email address.", {
-      email: "Enter a valid email address.",
-    });
-  }
+  const email = legacyEmailFreeReplay
+    ? ""
+    : text(source.email, "email", 1, 254).toLowerCase();
 
   const notes = optionalText(source.notes, 600);
   const serviceId = text(source.serviceId, "serviceId", 2, 120);
@@ -151,16 +167,7 @@ export async function createPublicBooking(
   ) {
     throw new CmsValidationError("Choose a valid treatment, date and time.");
   }
-  if (
-    input.idempotencyKey.length < 16 ||
-    input.idempotencyKey.length > 200
-  ) {
-    throw new CmsValidationError("The booking request identifier is invalid.");
-  }
-
-  const repository = getCmsRepository();
-  const idempotencyKeyHash = hash(input.idempotencyKey);
-  const requestFingerprintHash = hash(
+  const requestFingerprintHashForNotice = (privacyNoticeVersion: string) => hash(
     JSON.stringify({
       customerName,
       phone,
@@ -171,9 +178,10 @@ export async function createPublicBooking(
       durationMinutes,
       localDate,
       localTime,
-      privacyNoticeVersion: bookingPrivacyNotice.version,
+      privacyNoticeVersion,
     }),
   );
+  const requestFingerprintHash = requestFingerprintHashForNotice(bookingPrivacyNotice.version);
 
   const create = () =>
     repository.transaction(async (transaction) => {
@@ -181,12 +189,14 @@ export async function createPublicBooking(
         idempotencyKeyHash,
       );
       if (existing) {
-        if (existing.requestFingerprintHash !== requestFingerprintHash) {
+        if (existing.requestFingerprintHash !== requestFingerprintHashForNotice(existing.privacyNoticeVersion)) {
           throw new CmsConflictError(
             "This booking request identifier was already used for different details.",
           );
         }
-        await ensureOwnerBookingRequestEmail(transaction, existing);
+        if (existing.status === "pending") {
+          await ensureOwnerBookingRequestEmail(transaction, existing);
+        }
         return { booking: existing, created: false as const };
       }
 
@@ -263,11 +273,11 @@ export async function createPublicBooking(
         localDate,
         localTime,
         timezone: "Europe/Dublin",
-        status: "pending",
+        status: "confirmed",
         source: "website",
         assignedStaffId: therapist.id,
         assignedStaffName: therapist.name,
-        internalNotes: "Website request awaiting internal confirmation.",
+        internalNotes: "",
         privacyAcceptedAt: now,
         privacyNoticeVersion: bookingPrivacyNotice.version,
         idempotencyKeyHash,
@@ -283,20 +293,15 @@ export async function createPublicBooking(
       await recordBookingNotificationPlan(
         transaction,
         booking,
-        "booking-requested",
-        { channels: ["dashboard"] },
-      );
-      await recordOwnerBookingRequestEmail(
-        transaction,
-        booking,
+        "booking-confirmed",
       );
       await recordTherapistBookingEmailPlans(transaction, null, booking);
       await appendCmsAudit(transaction, {
         actor: { id: "public-booking", displayName: "Public booking form" },
-        action: "booking.requested",
+        action: "booking.created",
         entityType: "booking",
         entityId: booking.id,
-        summary: `Received website booking request ${booking.reference}.`,
+        summary: `Confirmed website booking ${booking.reference}.`,
         requestId: input.requestId,
       });
       return {
@@ -345,7 +350,27 @@ export async function createPublicBooking(
     }
   };
 
-  const attemptRequestEmails = async (booking: CmsBooking) => {
+  const attemptBookingEmails = async (booking: CmsBooking) => {
+    if (booking.status === "confirmed") {
+      try {
+        await dispatchBookingMutationEmails(repository, null, booking, {
+          ...(input.sendCustomerBookingEmail
+            ? { confirmation: { sender: input.sendCustomerBookingEmail } }
+            : {}),
+          ...(input.sendTherapistBookingEmail
+            ? { therapist: { sender: input.sendTherapistBookingEmail } }
+            : {}),
+        });
+      } catch {
+        // The booking and durable email jobs have already committed. A mail
+        // processing outage must not invite a second customer submission.
+        console.error(`Failed to process booking emails for booking ${booking.id}.`);
+      }
+      return;
+    }
+
+    // Requests made before automatic confirmation was enabled retain their
+    // original outbox and can still be retried with the same idempotency key.
     await Promise.all([
       attemptOwnerEmail(booking),
       attemptTherapistEmail(booking),
@@ -354,7 +379,7 @@ export async function createPublicBooking(
 
   try {
     const result = await create();
-    await attemptRequestEmails(result.booking);
+    await attemptBookingEmails(result.booking);
     return result.booking;
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
@@ -364,16 +389,18 @@ export async function createPublicBooking(
     );
     if (
       existing &&
-      existing.requestFingerprintHash === requestFingerprintHash
+      existing.requestFingerprintHash === requestFingerprintHashForNotice(existing.privacyNoticeVersion)
     ) {
       try {
-        await ensureOwnerBookingRequestEmail(repository, existing);
+        if (existing.status === "pending") {
+          await ensureOwnerBookingRequestEmail(repository, existing);
+        }
       } catch {
         console.error(
           `Failed to repair the owner booking email outbox for booking ${existing.id}.`,
         );
       }
-      await attemptRequestEmails(existing);
+      await attemptBookingEmails(existing);
       return existing;
     }
 

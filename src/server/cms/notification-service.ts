@@ -1291,9 +1291,9 @@ export async function dispatchBookingMutationEmails(
 ) {
   // Booking and outbox have already committed. A failed delivery must never
   // undo the booking or cause the mutation response to report a failed save.
-  // Owner alerts belong only to the initial website request. Later events send
-  // one operational update to the therapist, with no extra owner copy when
-  // those roles share an inbox. Customer notifications remain separate.
+  // Confirmed bookings notify the customer and assigned therapist. The owner
+  // sees the dashboard event; sending a former "new request" email here would
+  // incorrectly ask the owner to confirm an already-confirmed appointment.
   const confirmationEmail = current?.status !== "confirmed" && booking.status === "confirmed"
     ? await attemptCustomerBookingConfirmationEmail(repository, booking, options.confirmation) : undefined;
   const cancellationEmail = current?.status !== "cancelled" && booking.status === "cancelled"

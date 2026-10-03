@@ -1,6 +1,6 @@
 import { requireCmsApiUser } from "@/server/cms/auth/guards";
 import { getRequestId, isSameOriginMutation } from "@/server/cms/auth/origin";
-import { deleteAdminBooking, updateAdminBooking } from "@/server/cms/booking-service";
+import { deleteAdminBooking, isHistoricalAdminBooking, updateAdminBooking } from "@/server/cms/booking-service";
 import { cmsErrorResponse, cmsNoStoreJson, readCmsJsonObject } from "@/server/cms/http";
 import { dispatchBookingMutationEmails } from "@/server/cms/notification-service";
 import { getCmsBooking } from "@/server/cms/read-service";
@@ -40,7 +40,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       Number(body.expectedVersion),
       { actor: user, requestId: getRequestId(request) },
     );
-    const emails = await dispatchBookingMutationEmails(getCmsRepository(), current, booking);
+    const emails = isHistoricalAdminBooking(booking)
+      ? { therapistEmails: [] }
+      : await dispatchBookingMutationEmails(getCmsRepository(), current, booking);
     return cmsNoStoreJson({
       booking,
       ...emails,

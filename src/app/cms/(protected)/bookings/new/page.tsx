@@ -3,25 +3,20 @@ import { CmsNotice, CmsPageHeader, CmsPrimaryLink } from "@/components/cms/CmsUi
 import {
   currentCalendarDate,
   normalizeCalendarDate,
-  shiftCalendarDate,
 } from "@/domain/booking/calendar-month";
 import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
 import { getCmsMode } from "@/server/cms/config";
 import { getCmsContent } from "@/server/cms/content-service";
 
-function nextDublinDate() {
-  return shiftCalendarDate(currentCalendarDate("Europe/Dublin"), 1);
-}
-
 type PageProps = { readonly searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function CmsNewBookingPage({ searchParams }: PageProps) {
   await requireCmsPageUser("bookings:write");
   const params = await searchParams;
-  const requestedDate = normalizeCalendarDate(
+  const selectedDate = normalizeCalendarDate(
     typeof params.date === "string" ? params.date : "",
-  );
+  ) ?? currentCalendarDate("Europe/Dublin");
   const [content, mode] = await Promise.all([
     getCmsContent(),
     Promise.resolve(getCmsMode()),
@@ -50,7 +45,7 @@ export default async function CmsNewBookingPage({ searchParams }: PageProps) {
     <>
       <CmsPageHeader
         actions={<CmsPrimaryLink href="/cms/bookings" secondary>Back to bookings</CmsPrimaryLink>}
-        description="Record an appointment received by phone, WhatsApp, walk-in or the administrator. Availability is checked again atomically when saved."
+        description="Record an appointment received by phone, WhatsApp, walk-in or the administrator. New bookings are confirmed immediately; availability is checked again when saved."
         eyebrow="Booking operations"
         title="Add booking"
       />
@@ -61,7 +56,7 @@ export default async function CmsNewBookingPage({ searchParams }: PageProps) {
         </CmsNotice>
       ) : null}
       <AdminBookingForm
-        defaultDate={requestedDate ?? nextDublinDate()}
+        defaultDate={selectedDate}
         isMock={mode === "mock"}
         therapists={therapists}
         variants={variants}
