@@ -76,7 +76,7 @@ export async function getPublicAvailability(input: {
     };
   }
 
-  const liveReady = isLivePublicBookingReady(content);
+  const liveReady = await isLivePublicBookingReady(content, repository, therapist.id);
 
   if (mode === "mongodb" && !liveReady) {
     return {
@@ -183,7 +183,7 @@ export async function getPublicAvailabilityCalendar(input: {
   const maximumDate = minimumDate.add({
     days: content.bookingSettings.bookingHorizonDays,
   });
-  const liveReady = isLivePublicBookingReady(content);
+  const liveReady = await isLivePublicBookingReady(content, repository, therapist?.id);
   const status = liveReady ? "live" as const : "planning" as const;
 
   if (!service || !price || !therapist || !firstDate) {

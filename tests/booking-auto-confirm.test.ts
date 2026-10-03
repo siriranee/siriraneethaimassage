@@ -162,6 +162,86 @@ test("historical CMS bookings are confirmed without customer or therapist email 
   ).length, 0);
 });
 
+test("CMS refuses upcoming bookings without a therapist email but permits historical records", async () => {
+  const fixture = await setup();
+  const { createAdminBooking, getAdminAvailability } = await import("@/server/cms/booking-service");
+  const { CmsValidationError } = await import("@/server/cms/content-validation");
+  const contact = await fixture.repository.getTherapistContact(fixture.therapist.id);
+  assert.ok(contact);
+  await fixture.repository.saveTherapistContact({
+    ...contact,
+    notificationEmail: "",
+    version: contact.version + 1,
+  }, contact.version);
+
+  await assert.rejects(
+    getAdminAvailability({
+      serviceId: fixture.service.id,
+      therapistId: fixture.therapist.id,
+      durationMinutes: 60,
+      localDate: fixture.localDate,
+    }),
+    (error: unknown) => error instanceof CmsValidationError && /therapist's notification email/.test(error.message),
+  );
+  await assert.rejects(
+    createAdminBooking(fixture.input, fixture.context),
+    (error: unknown) => error instanceof CmsValidationError && Boolean(error.fields.therapistId),
+  );
+  assert.deepEqual(await fixture.repository.listBookings({ from: fixture.localDate, to: fixture.localDate }), []);
+
+  const pastDate = Temporal.Now.zonedDateTimeISO("Europe/Dublin")
+    .toPlainDate().subtract({ days: 1 }).toString();
+  const pastSlots = await getAdminAvailability({
+    serviceId: fixture.service.id,
+    therapistId: fixture.therapist.id,
+    durationMinutes: 60,
+    localDate: pastDate,
+  });
+  assert.ok(pastSlots.some((slot) => slot.localTime === fixture.input.localTime));
+  const historical = await createAdminBooking({
+    ...fixture.input,
+    localDate: pastDate,
+    email: "",
+  }, fixture.context);
+  assert.equal(historical.status, "confirmed");
+  assert.equal((await fixture.repository.listNotifications(historical.id)).filter(
+    (notification) => notification.channel === "email",
+  ).length, 0);
+});
+
+test("CMS refuses future reschedules and legacy approvals when therapist contact becomes invalid", async () => {
+  const fixture = await setup();
+  const { createAdminBooking, updateAdminBooking } = await import("@/server/cms/booking-service");
+  const { CmsValidationError } = await import("@/server/cms/content-validation");
+  let booking = await createAdminBooking(fixture.input, fixture.context);
+  const contact = await fixture.repository.getTherapistContact(fixture.therapist.id);
+  assert.ok(contact);
+  await fixture.repository.saveTherapistContact({
+    ...contact,
+    notificationEmail: "not-an-email",
+    version: contact.version + 1,
+  }, contact.version);
+
+  await assert.rejects(
+    updateAdminBooking(booking.id, {
+      localTime: "14:00",
+      changeReason: "customer-request",
+    }, booking.version, fixture.context),
+    (error: unknown) => error instanceof CmsValidationError && Boolean(error.fields.therapistId),
+  );
+  assert.deepEqual(await fixture.repository.getBooking(booking.id), booking);
+
+  booking = await fixture.repository.saveBooking({ ...booking, status: "pending" }, booking.version);
+  await assert.rejects(
+    updateAdminBooking(booking.id, {
+      status: "confirmed",
+      changeReason: "customer-request",
+    }, booking.version, fixture.context),
+    (error: unknown) => error instanceof CmsValidationError && Boolean(error.fields.therapistId),
+  );
+  assert.equal((await fixture.repository.getBooking(booking.id))?.status, "pending");
+});
+
 test("a same-day CMS slot that already started is historical", async (t) => {
   const now = Temporal.Now.zonedDateTimeISO("Europe/Dublin");
   if (now.hour < 9) {
@@ -211,6 +291,13 @@ test("an email-free historical booking cannot be moved into an upcoming appointm
 test("CMS create route does not report email failure for historical bookings", async () => {
   const route = await readFile(resolve(process.cwd(), "src/app/api/cms/bookings/route.ts"), "utf8");
   assert.match(route, /isHistoricalAdminBooking\(booking\)[\s\S]*?\? \{ therapistEmails: \[\] \}[\s\S]*?: await dispatchBookingMutationEmails/);
+});
+
+test("public booking route allows bounded email attempts to finish", async () => {
+  const route = await readFile(resolve(process.cwd(), "src/app/api/public/bookings/route.ts"), "utf8");
+  assert.match(route, /export const maxDuration = 60;/);
+  const planner = await readFile(resolve(process.cwd(), "src/components/booking/BookingPlanner.tsx"), "utf8");
+  assert.match(planner, /If the email does not arrive, use Check booking status or contact us/);
 });
 
 test("new website bookings confirm and send customer and therapist emails once", async () => {
@@ -273,6 +360,194 @@ test("new website bookings confirm and send customer and therapist emails once",
   assert.equal(replay.id, booking.id);
   assert.equal(replay.status, "confirmed");
   assert.deepEqual(sends, ["customer", "therapist:assigned"]);
+});
+
+test("public booking and availability fail closed when the only therapist has no private email", async () => {
+  const fixture = await setup();
+  const contact = await fixture.repository.getTherapistContact(fixture.therapist.id);
+  assert.ok(contact);
+  await fixture.repository.saveTherapistContact({
+    ...contact,
+    notificationEmail: "",
+    version: contact.version + 1,
+  }, contact.version);
+  enablePublicBookingMode(fixture.repository);
+
+  const { isLivePublicBookingReady } = await import("@/server/booking/readiness");
+  const { getPublicAvailability, getPublicAvailabilityCalendar } = await import("@/server/booking/public-availability");
+  const { createPublicBooking } = await import("@/server/booking/public-booking");
+  const publication = await fixture.repository.getPublishedContent();
+  assert.ok(publication);
+  assert.equal(await isLivePublicBookingReady(publication.snapshot, fixture.repository), false);
+
+  const availability = await getPublicAvailability({
+    serviceId: fixture.service.id,
+    therapistId: fixture.therapist.id,
+    durationMinutes: 60,
+    localDate: fixture.localDate,
+  });
+  assert.equal(availability.status, "disabled");
+  assert.deepEqual(availability.slots, []);
+  const calendar = await getPublicAvailabilityCalendar({
+    serviceId: fixture.service.id,
+    therapistId: fixture.therapist.id,
+    durationMinutes: 60,
+    month: fixture.localDate.slice(0, 7),
+  });
+  assert.equal(calendar.status, "disabled");
+  assert.deepEqual(calendar.days, []);
+
+  await assert.rejects(
+    createPublicBooking({
+      customerName: fixture.input.customerName,
+      phone: fixture.input.phone,
+      email: fixture.input.email,
+      serviceId: fixture.service.id,
+      therapistId: fixture.therapist.id,
+      durationMinutes: 60,
+      localDate: fixture.localDate,
+      localTime: fixture.input.localTime,
+      privacyAccepted: true,
+    }, {
+      idempotencyKey: "missing-therapist-contact-123456",
+      requestId: "missing-therapist-contact-test",
+    }),
+    /Public booking is disabled\./,
+  );
+  assert.deepEqual(await fixture.repository.listBookings({ from: fixture.localDate, to: fixture.localDate }), []);
+});
+
+test("a bookable therapist without email cannot be selected even when another is ready", async () => {
+  const fixture = await setup();
+  const content = await fixture.repository.getContent();
+  const unnotifiableTherapist = {
+    ...fixture.therapist,
+    id: "safety-test-unnotifiable-therapist",
+    slug: "safety-test-unnotifiable-therapist",
+    name: "Unnotifiable Therapist",
+  };
+  const updated = {
+    ...content,
+    revision: content.revision + 1,
+    team: [...content.team, unnotifiableTherapist],
+  };
+  await fixture.repository.saveContent(updated, content.revision);
+  await fixture.repository.savePublication({
+    id: "safety-test-contact-publication",
+    revision: updated.revision,
+    publishedAt: new Date().toISOString(),
+    publishedBy: fixture.actor.id,
+    snapshot: updated,
+  });
+  enablePublicBookingMode(fixture.repository);
+
+  const { isLivePublicBookingReady } = await import("@/server/booking/readiness");
+  const { getPublicAvailability } = await import("@/server/booking/public-availability");
+  const { createPublicBooking } = await import("@/server/booking/public-booking");
+  assert.equal(await isLivePublicBookingReady(updated, fixture.repository), true);
+  assert.equal(await isLivePublicBookingReady(updated, fixture.repository, unnotifiableTherapist.id), false);
+  const availability = await getPublicAvailability({
+    serviceId: fixture.service.id,
+    therapistId: unnotifiableTherapist.id,
+    durationMinutes: 60,
+    localDate: fixture.localDate,
+  });
+  assert.equal(availability.status, "disabled");
+  assert.deepEqual(availability.slots, []);
+  await assert.rejects(
+    createPublicBooking({
+      customerName: fixture.input.customerName,
+      phone: fixture.input.phone,
+      email: fixture.input.email,
+      serviceId: fixture.service.id,
+      therapistId: unnotifiableTherapist.id,
+      durationMinutes: 60,
+      localDate: fixture.localDate,
+      localTime: fixture.input.localTime,
+      privacyAccepted: true,
+    }, {
+      idempotencyKey: "unnotifiable-selected-therapist-123456",
+      requestId: "unnotifiable-selected-therapist-test",
+    }),
+    /Public booking is disabled\./,
+  );
+  assert.deepEqual(await fixture.repository.listBookings({ from: fixture.localDate, to: fixture.localDate }), []);
+});
+
+test("an unreadable private therapist contact disables public booking without breaking site rendering", async () => {
+  const fixture = await setup();
+  enablePublicBookingMode(fixture.repository);
+  const unavailableContacts = new Proxy(fixture.repository, {
+    get(target, property, receiver) {
+      if (property === "mode") return "mongodb";
+      if (property === "getTherapistContact") {
+        return async () => { throw new Error("Private contact storage is unavailable."); };
+      }
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as CmsRepository;
+  Reflect.set(globalThis, "__siriraneeCmsRepository", unavailableContacts);
+
+  const { getPublicSiteData } = await import("@/server/cms/public-adapter");
+  const { getPublicAvailability } = await import("@/server/booking/public-availability");
+  const site = await getPublicSiteData();
+  assert.equal(site.booking.live, false);
+  const availability = await getPublicAvailability({
+    serviceId: fixture.service.id,
+    therapistId: fixture.therapist.id,
+    durationMinutes: 60,
+    localDate: fixture.localDate,
+  });
+  assert.equal(availability.status, "disabled");
+  assert.deepEqual(availability.slots, []);
+});
+
+test("a failed customer email does not undo a confirmed website booking or suppress the therapist email", async () => {
+  const fixture = await setup();
+  enablePublicBookingMode(fixture.repository);
+  const { createPublicBooking } = await import("@/server/booking/public-booking");
+  const {
+    customerBookingConfirmationEmailNotificationId,
+    therapistBookingEmailNotificationId,
+  } = await import("@/server/cms/notification-service");
+  const customerEmail = async () => ({
+    status: "failed" as const,
+    attempted: false as const,
+    errorCode: "resend-configuration-missing",
+  });
+  let therapistSends = 0;
+  const booking = await createPublicBooking({
+    customerName: fixture.input.customerName,
+    phone: fixture.input.phone,
+    email: fixture.input.email,
+    notes: "",
+    serviceId: fixture.service.id,
+    therapistId: fixture.therapist.id,
+    durationMinutes: fixture.input.durationMinutes,
+    localDate: fixture.localDate,
+    localTime: fixture.input.localTime,
+    privacyAccepted: true,
+    website: "",
+  }, {
+    idempotencyKey: "confirmed-with-failed-email-123456",
+    requestId: "confirmed-with-failed-email-test",
+    sendCustomerBookingEmail: customerEmail,
+    sendTherapistBookingEmail: async () => {
+      therapistSends += 1;
+      return { status: "sent" as const, attempted: true as const, providerMessageId: randomUUID() };
+    },
+  });
+
+  assert.equal(booking.status, "confirmed");
+  assert.equal((await fixture.repository.getBooking(booking.id))?.status, "confirmed");
+  assert.equal(therapistSends, 1);
+  assert.equal((await fixture.repository.getNotification(
+    customerBookingConfirmationEmailNotificationId(booking.id),
+  ))?.status, "failed");
+  assert.equal((await fixture.repository.getNotification(
+    therapistBookingEmailNotificationId("assigned", booking.id, fixture.therapist.id, booking.version),
+  ))?.status, "sent");
 });
 
 test("an idempotent replay keeps a pre-deployment pending request and its original privacy notice", async () => {

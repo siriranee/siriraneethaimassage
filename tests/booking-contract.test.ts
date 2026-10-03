@@ -249,13 +249,14 @@ test("booking settings use the API response contract and gate public enablement"
   assert.match(form, /cancellationCutoffMinutes:\s*settings\.cancellationCutoffMinutes/);
   assert.doesNotMatch(form, /name="cancellationCutoffMinutes"/);
   assert.match(validation, /publicBookingEnabled[\s\S]*?!rulesConfirmed \|\| !openingHoursConfirmed/);
-  assert.match(readiness, /getCmsMode\(\) === "mongodb"/);
+  assert.match(readiness, /getCmsMode\(\) !== "mongodb"/);
   assert.match(readiness, /content\.site\.openingHoursConfirmed/);
   assert.match(readiness, /content\.bookingSettings\.rulesConfirmed/);
   assert.match(readiness, /content\.bookingSettings\.publicBookingEnabled/);
   assert.match(readiness, /CMS_PUBLIC_BOOKING_READY/);
   assert.match(readiness, /hasCmsPiiEncryptionKey\(\)/);
   assert.match(readiness, /getResendBookingEmailReadiness\(\)\.ready/);
+  assert.match(readiness, /hasTherapistNotificationAddress\(contactRepository, member\.id\)/);
   assert.doesNotMatch(
     readiness,
     /CMS_(?:PRIVACY_NOTICE_APPROVED|BOOKING_NOTIFICATION_READY|MONITORING_READY|RECOVERY_DRILL_VERIFIED)/,
@@ -279,8 +280,8 @@ test("booking mutations force confirmation, validate therapist assignment and re
   assert.match(service, /assignedStaffId:\s*therapist\?\.id \?\? ""/);
   assert.match(service, /if \(!therapist\)/);
   assert.match(service, /assignmentChanged/);
-  assert.match(service, /confirmingExistingRequest/);
-  assert.match(service, /ignoreBookingOccupancy:\s*confirmingExistingRequest/);
+  assert.doesNotMatch(service, /ignoreBookingOccupancy/);
+  assert.match(service, /bookings:\s*bookings\.filter/);
 });
 
 test("therapist lifecycle checks use a bounded-data future assignment query", async () => {

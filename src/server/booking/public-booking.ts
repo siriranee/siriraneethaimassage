@@ -205,7 +205,6 @@ export async function createPublicBooking(
       const publication = await transaction.getPublishedContent();
       if (!publication) throw new Error("Public booking is disabled.");
       const content = publication.snapshot;
-      assertLivePublicBookingReady(content);
 
       const service = content.services.find(
         (item) => item.id === serviceId,
@@ -230,6 +229,7 @@ export async function createPublicBooking(
           { therapistId: "Choose an available massage therapist." },
         );
       }
+      await assertLivePublicBookingReady(content, transaction, therapist.id);
 
       const { bookings, closures } =
         await readTransactionalAvailability(

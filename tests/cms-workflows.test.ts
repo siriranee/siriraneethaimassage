@@ -478,3 +478,22 @@ test("booking policy no longer exposes or applies a minimum notice setting", asy
   assert.doesNotMatch(availability, /settings\.minimumNoticeMinutes/);
   assert.match(availability, /startsAt\.epochMilliseconds < now\.epochMilliseconds/);
 });
+
+test("CMS maintenance bookings follow confirmed creation without sending live email", async () => {
+  const [workflow, seed] = await Promise.all([
+    source("scripts/test-therapist-workflow.ts"),
+    source("scripts/seed-test-bookings.ts"),
+  ]);
+
+  assert.match(workflow, /email: `therapist-workflow-\$\{therapist!\.slug\}@example\.invalid`/);
+  assert.match(workflow, /status: "confirmed"/);
+  assert.doesNotMatch(workflow, /status: "pending"|therapist-workflow:confirm/);
+  assert.match(workflow, /deleteAdminBooking\(current\.id, current\.version \|\| currentVersion/);
+  assert.doesNotMatch(workflow, /dispatchBookingMutationEmails|sendBookingEmail/);
+
+  assert.match(seed, /today\.subtract\(\{ days: dateOffset \}\)/);
+  assert.match(seed, /therapistId: therapist\.id/);
+  assert.match(seed, /email: ""/);
+  assert.match(seed, /status: "confirmed"/);
+  assert.doesNotMatch(seed, /dispatchBookingMutationEmails|sendBookingEmail/);
+});

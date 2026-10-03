@@ -777,7 +777,7 @@ export function BookingPlanner({
               <h3>{confirmation.status === "confirmed" ? "Booking confirmed" : "Booking received"}</h3>
               <p>
                 Reference: <strong>{confirmation.reference}</strong>. {confirmation.status === "confirmed"
-                  ? "Your appointment is confirmed. We’ll email the details to the address you provided."
+                  ? "Your appointment is confirmed. Save this reference. If the email does not arrive, use Check booking status or contact us."
                   : "Check the current status using this reference."}
               </p>
               <dl className={styles.confirmationDetails}>

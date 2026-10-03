@@ -67,7 +67,7 @@ async function main() {
   assert.ok(service && price, "A shared active treatment and duration are required.");
 
   if (!apply) {
-    console.log("Dry run: both therapist profiles and a shared treatment are ready for workflow testing.");
+    console.log("Dry run: both therapist profiles and a shared treatment are ready. --apply creates temporary future confirmed bookings and queued notification records, then deletes both; it does not dispatch emails.");
     process.exit(0);
   }
 
@@ -102,14 +102,16 @@ async function main() {
         {
           customerName: "Therapist CMS workflow test",
           phone: "0000000000",
-          email: "",
+          // The future booking contract requires an email. This script never
+          // dispatches its temporary notification plans to Resend.
+          email: `therapist-workflow-${therapist!.slug}@example.invalid`,
           customerNotes: "Automated CMS workflow fixture. Do not contact.",
           serviceId: service.id,
           therapistId: therapist!.id,
           durationMinutes: price.durationMinutes,
           localDate: selectedDate,
           localTime: selectedTimes[0],
-          status: "pending",
+          status: "confirmed",
           source: "administrator",
           internalNotes: "Temporary therapist workflow test; delete after verification.",
         },
@@ -122,18 +124,7 @@ async function main() {
       currentBookingId = created.id;
       currentVersion = created.version;
       assert.equal(created.assignedStaffId, therapist!.id);
-
-      const confirmed = await updateAdminBooking(
-        created.id,
-        {
-          status: "confirmed",
-          internalNotes: created.internalNotes,
-          changeReason: "other-operational",
-        },
-        created.version,
-        { actor, requestId: `therapist-workflow:confirm:${therapist!.slug}` },
-      );
-      currentVersion = confirmed.version;
+      assert.equal(created.status, "confirmed");
 
       await assert.rejects(
         () =>
@@ -152,15 +143,15 @@ async function main() {
       );
 
       const rescheduled = await updateAdminBooking(
-        confirmed.id,
+        created.id,
         {
           localDate: selectedDate,
           localTime: selectedTimes[1],
           status: "confirmed",
-          internalNotes: confirmed.internalNotes,
+          internalNotes: created.internalNotes,
           changeReason: "scheduling-correction",
         },
-        confirmed.version,
+        created.version,
         { actor, requestId: `therapist-workflow:reschedule:${therapist!.slug}` },
       );
       currentVersion = rescheduled.version;
@@ -203,7 +194,7 @@ async function main() {
       currentBookingId = "";
       assert.equal(await repository.getBooking(cancelled.id), null);
       assert.equal((await repository.listNotifications(cancelled.id, 50)).length, 0);
-      console.log(`Verified create, assign, confirm, guard, reschedule, cancel and cleanup for ${therapist!.name}.`);
+      console.log(`Verified confirmed create, assignment, guard, reschedule, cancel and cleanup for ${therapist!.name}.`);
     } finally {
       if (currentBookingId) {
         const current = await repository.getBooking(currentBookingId);

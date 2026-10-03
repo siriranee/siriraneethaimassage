@@ -11,6 +11,7 @@ import {
   isTerminalBookingStatus,
 } from "@/domain/booking/status";
 import { readTransactionalAvailability } from "@/server/booking/transactional-availability";
+import { hasTherapistNotificationAddress } from "@/server/booking/therapist-notification-readiness";
 import {
   bookingSources,
   bookingChangeReasons,
@@ -177,12 +178,24 @@ function assertPersistenceReady(repository: CmsRepository) {
   }
 }
 
+function missingTherapistNotificationError() {
+  return new CmsValidationError(
+    "Add this therapist's notification email before confirming an upcoming appointment.",
+    { therapistId: "Add a valid therapist notification email in Therapists first." },
+  );
+}
+
+async function assertTherapistNotificationReady(repository: CmsRepository, therapistId: string) {
+  if (!(await hasTherapistNotificationAddress(repository, therapistId))) {
+    throw missingTherapistNotificationError();
+  }
+}
+
 async function findSlot(
   repository: CmsRepository,
   input: Pick<BookingInput, "serviceId" | "therapistId" | "durationMinutes" | "localDate" | "localTime">,
   options: {
     readonly excludedBookingId?: string;
-    readonly ignoreBookingOccupancy?: boolean;
     readonly enforceWindow?: boolean;
   } = {},
 ) {
@@ -236,11 +249,9 @@ async function findSlot(
     enforceWindow: options.enforceWindow,
     weeklyHours: content.site.weeklyHours,
     closures,
-    bookings: options.ignoreBookingOccupancy
-      ? []
-      : bookings.filter(
-          (booking) => booking.id !== options.excludedBookingId,
-        ),
+    bookings: bookings.filter(
+      (booking) => booking.id !== options.excludedBookingId,
+    ),
   });
   const slot = slots.find((item) => item.localTime === input.localTime);
 
@@ -306,7 +317,7 @@ export async function getAdminAvailability(input: {
     repository.listClosures(input.localDate, input.localDate),
   ]);
 
-  return getAvailabilitySlots({
+  const slots = getAvailabilitySlots({
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
     therapistId: therapist?.id,
@@ -316,6 +327,16 @@ export async function getAdminAvailability(input: {
     closures,
     bookings,
   });
+  if (!therapist || await hasTherapistNotificationAddress(repository, therapist.id)) {
+    return slots;
+  }
+
+  // CMS can still record historical appointments without sending email.
+  const historicalSlots = slots.filter((slot) => Date.parse(slot.startsAt) <= Date.now());
+  if (!historicalSlots.length && slots.length) {
+    throw missingTherapistNotificationError();
+  }
+  return historicalSlots;
 }
 
 export async function createAdminBooking(
@@ -377,6 +398,9 @@ export async function createAdminBooking(
         "Enter the customer's email to send their confirmation.",
         { email: "Enter the customer's email for this upcoming appointment." },
       );
+    }
+    if (!historical) {
+      await assertTherapistNotificationReady(transaction, therapist.id);
     }
     const booking: CmsBooking = {
       id: randomUUID(),
@@ -562,11 +586,6 @@ export async function updateAdminBooking(
     if (
       appointmentChanged && (status === "pending" || status === "confirmed")
     ) {
-      const confirmingExistingRequest =
-        current.status === "pending" &&
-        status === "confirmed" &&
-        !timeChanged &&
-        !assignmentChanged;
       const result = await findSlot(
         transaction,
         {
@@ -578,10 +597,6 @@ export async function updateAdminBooking(
         },
         {
           excludedBookingId: current.id,
-          // Pending requests do not reserve capacity. Staff can therefore
-          // approve multiple already-received requests for the same time.
-          // Hours, closures, therapist eligibility and past dates still apply.
-          ignoreBookingOccupancy: confirmingExistingRequest,
         },
       );
       if (
@@ -593,6 +608,9 @@ export async function updateAdminBooking(
           "This historical booking has no customer email. Create a new booking with an email for the future appointment.",
           { localDate: "A future appointment needs a customer email to send its update." },
         );
+      }
+      if (status === "confirmed" && Date.parse(result.slot.startsAt) > Date.now()) {
+        await assertTherapistNotificationReady(transaction, nextTherapistId);
       }
       startsAt = result.slot.startsAt;
       endsAt = result.slot.endsAt;

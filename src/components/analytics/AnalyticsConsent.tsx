@@ -90,7 +90,7 @@ export function AnalyticsConsent() {
             <h2>Analytics cookies</h2>
             <p>
               With your permission, Google Analytics helps us understand visits
-              and booking requests. Booking contact details are not sent. You can
+              and confirmed website bookings. Booking contact details are not sent. You can
               change this choice anytime in the footer. {" "}
               <Link href="/privacy">Read the privacy notice</Link>.
             </p>

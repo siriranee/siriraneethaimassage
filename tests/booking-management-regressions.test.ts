@@ -89,7 +89,7 @@ test("stored notice does not block future CMS availability, creation or reschedu
   assert.equal(second.localTime, "15:00");
 });
 
-test("overlapping pending requests can both be confirmed for their original time", async () => {
+test("legacy pending approval cannot overlap a confirmed booking for the same therapist", async () => {
   const fixture = await setup();
   const {
     createAdminBooking,
@@ -105,16 +105,17 @@ test("overlapping pending requests can both be confirmed for their original time
     fixture.context,
   );
 
-  const firstConfirmed = await updateAdminBooking(
-    first.id,
-    { status: "confirmed", changeReason: "customer-request" },
-    first.version,
-    fixture.context,
+  await assert.rejects(
+    updateAdminBooking(
+      first.id,
+      { status: "confirmed", changeReason: "customer-request" },
+      first.version,
+      fixture.context,
+    ),
+    /outside opening hours, blocked or fully booked/,
   );
-  assert.equal(firstConfirmed.status, "confirmed");
   assert.equal(second.status, "confirmed");
-  assert.equal(firstConfirmed.startsAt, second.startsAt);
-  assert.equal(firstConfirmed.assignedStaffId, second.assignedStaffId);
+  assert.equal((await fixture.repository.getBooking(first.id))?.status, "pending");
   const availability = await getAdminAvailability({
     serviceId: fixture.service.id,
     therapistId: fixture.therapist.id,
@@ -122,6 +123,52 @@ test("overlapping pending requests can both be confirmed for their original time
     localDate: fixture.localDate,
   });
   assert.ok(!availability.some((slot) => slot.localTime === fixture.input.localTime));
+});
+
+test("legacy pending approval allows a simultaneous confirmed booking with another therapist", async () => {
+  const fixture = await setup();
+  const { createAdminBooking, updateAdminBooking } = await import("@/server/cms/booking-service");
+  const content = await fixture.repository.getContent();
+  const otherTherapist = {
+    ...fixture.therapist,
+    id: "second-safety-therapist",
+    slug: "second-safety-therapist",
+    name: "Demo Second Safety Therapist",
+    fullName: "Demo Second Safety Therapist",
+  };
+  await fixture.repository.saveContent({
+    ...content,
+    revision: content.revision + 1,
+    team: [...content.team, otherTherapist],
+  }, content.revision);
+  await fixture.repository.saveTherapistContact({
+    id: otherTherapist.id,
+    notificationEmail: "demo.second.therapist@example.invalid",
+    contactPhone: "",
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    updatedBy: fixture.actor.id,
+  });
+
+  const firstCreated = await createAdminBooking(fixture.input, fixture.context);
+  const first = await fixture.repository.saveBooking(
+    { ...firstCreated, status: "pending" }, firstCreated.version,
+  );
+  const second = await createAdminBooking({
+    ...fixture.input,
+    customerName: "Demo Second Safety Guest",
+    therapistId: otherTherapist.id,
+  }, fixture.context);
+
+  const firstConfirmed = await updateAdminBooking(
+    first.id,
+    { status: "confirmed", changeReason: "customer-request" },
+    first.version,
+    fixture.context,
+  );
+  assert.equal(firstConfirmed.status, "confirmed");
+  assert.equal(firstConfirmed.startsAt, second.startsAt);
+  assert.notEqual(firstConfirmed.assignedStaffId, second.assignedStaffId);
 });
 
 test("legacy pending confirmation still rejects closures and unavailable therapists", async (t) => {

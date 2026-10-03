@@ -20,6 +20,9 @@ import {
 } from "@/server/http/request-body";
 
 export const dynamic = "force-dynamic";
+// Booking and its email outboxes commit before the provider send attempts.
+// Allow the request enough time for bounded Resend retries to finish.
+export const maxDuration = 60;
 
 function json(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);

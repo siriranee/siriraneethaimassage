@@ -39,6 +39,15 @@ test("booking status shortcut unloads the analytics tag before opening the priva
   assert.match(page, /<a className=\{styles\.statusAction\} href="\/book\/status">/);
 });
 
+test("analytics consent and setup describe the immediate-confirmation booking flow", async () => {
+  const consent = await readFile(new URL("../src/components/analytics/AnalyticsConsent.tsx", import.meta.url), "utf8");
+  const setup = await readFile(new URL("../ANALYTICS_SETUP.md", import.meta.url), "utf8");
+  assert.match(consent, /confirmed website bookings/);
+  assert.match(setup, /new website booking is saved and confirmed/);
+  assert.match(setup, /not a completed treatment or payment/);
+  assert.doesNotMatch(setup, /booking request is pending/);
+});
+
 test("consented analytics sends canonical page views and one PII-free lead per booking", () => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");

@@ -252,7 +252,7 @@ export const getPublicSiteData = cache(async (): Promise<PublicSiteData> => {
         closes: entry.closes,
       }))
     : [];
-  const liveBooking = isLivePublicBookingReady(content);
+  const liveBooking = await isLivePublicBookingReady(content);
 
   return {
     name: source.name,

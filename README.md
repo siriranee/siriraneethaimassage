@@ -171,6 +171,11 @@ The normal production sequence is:
    pending bookings exist, verify their signed review links still require a
    deliberate confirmation click. Complete the privacy, retention, monitoring
    and isolated recovery-drill operational reviews before launch.
+   A Vercel Preview is not isolated staging by itself: before using it for a
+   real booking, verify a separate MongoDB database, an exact staging HTTPS
+   `NEXT_PUBLIC_SITE_URL` with matching `CMS_ORIGIN`, staging CMS credentials
+   and therapist contacts, and staging Resend settings. Preview deployments
+   must not inherit the production database or generate production email links.
 14. After end-to-end production testing and owner sign-off, set
    CMS_PUBLIC_BOOKING_READY=true and enable public booking in CMS settings.
 
