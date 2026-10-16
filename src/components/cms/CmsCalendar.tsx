@@ -15,6 +15,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CmsTherapistPortrait as TherapistPortrait } from "@/components/cms/CmsTherapistPortrait";
 import { CmsWorkSchedule } from "@/components/cms/CmsWorkSchedule";
 import { ClosureForm } from "@/components/cms/ClosureForm";
+import { DayOffConfirmation } from "@/components/cms/DayOffConfirmation";
 import { CalendarLegend } from "@/components/booking/CalendarLegend";
 import calendarStyles from "@/components/booking/BookingCalendar.module.css";
 import { CmsBookingEmailAttentionNotice } from "@/components/cms/CmsBookingEmailAttentionNotice";
@@ -167,6 +168,7 @@ export function CmsCalendar({
   const [blockMode, setBlockMode] = useState<"day" | "time" | null>(null);
   const [savedMessage, setSavedMessage] = useState("");
   const savedNoticeRef = useRef<HTMLParagraphElement>(null);
+  const dayOffTriggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (savedMessage) savedNoticeRef.current?.focus({ preventScroll: true });
   }, [savedMessage]);
@@ -469,14 +471,14 @@ export function CmsCalendar({
               <span>{formatCalendarDate(selectedDate)} · Dublin time</span>
             </div>
             <div className={styles.timeOffButtons}>
-              <button aria-expanded={blockMode === "day"} aria-controls={blockFormId} onClick={() => { setBlockMode(blockMode === "day" ? null : "day"); setSavedMessage(""); }} type="button"><Ban aria-hidden="true" /> Day off</button>
+              <button aria-haspopup="dialog" onClick={() => { setBlockMode("day"); setSavedMessage(""); }} ref={dayOffTriggerRef} type="button"><Ban aria-hidden="true" /> Day off</button>
               <button aria-expanded={blockMode === "time"} aria-controls={blockFormId} onClick={() => { setBlockMode(blockMode === "time" ? null : "time"); setSavedMessage(""); }} type="button">Block time</button>
               {canManageTeam && selectedTherapist ? <Link href={`/cms/team/${selectedTherapist.id}/edit#weekly-days-off`}>Weekly days off</Link> : null}
             </div>
           </div> : null}
           <div id={blockFormId}>
-            {blockMode && canManageCalendar && canBlockSelection ? <ClosureForm
-              defaultClosedAllDay={blockMode === "day"}
+            {blockMode === "time" && canManageCalendar && canBlockSelection ? <ClosureForm
+              defaultClosedAllDay={false}
               defaultDate={selectedDate}
               defaultTherapistId={selectedTherapistId}
               inline
@@ -485,6 +487,15 @@ export function CmsCalendar({
               therapists={therapists.filter((therapist) => therapist.canBlock)}
             /> : null}
           </div>
+          {blockMode === "day" && canManageCalendar && canBlockSelection ? <DayOffConfirmation
+            key={`${selectedDate}:${selectedTherapistId}`}
+            localDate={selectedDate}
+            therapistId={selectedTherapistId}
+            therapistName={selectedTherapistName}
+            triggerRef={dayOffTriggerRef}
+            onCancel={() => setBlockMode(null)}
+            onSaved={() => { setBlockMode(null); setSavedMessage("Day off saved. Booking availability has been updated."); }}
+          /> : null}
           {savedMessage ? <p className={styles.savedNotice} ref={savedNoticeRef} role="status" tabIndex={-1}>{savedMessage}</p> : null}
           {selectedWeeklyDayOff ? <p className={styles.timeOffNotice}>{selectedTherapistName} has a weekly day off on this weekday.{canManageTeam && selectedTherapist ? <> <Link href={`/cms/team/${selectedTherapist.id}/edit#weekly-days-off`}>Change weekly days off</Link></> : null}</p> : null}
           {selectedClosures.length ? <ul className={styles.closureList} aria-label="Days off and blocked time for this date">

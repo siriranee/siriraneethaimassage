@@ -207,8 +207,9 @@ prerequisite keeps direct booking safely off.
 Use **CMS > Therapists** to create a therapist record or edit an existing one.
 
 For a temporary day off, open **CMS > Calendar**, select the date and the
-therapist's pill, then choose **Day off** and **Save day off**. Choose **Block
-time** for a start/end time instead. The form shows who it applies to; selecting
+therapist's pill, then choose **Day off** and **Confirm day off** in the popup.
+The confirmation shows the therapist and date without an extra form. Choose **Block
+time** for a start/end time instead. Each action shows who it applies to; selecting
 **All therapists** blocks the whole business. Use **Edit / reopen** and clear
 **Closure active** to release a block while retaining its history.
 

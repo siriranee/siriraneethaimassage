@@ -1,0 +1,44 @@
+.dialog {
+  width: min(29rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 1.5rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 1.2rem;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: 0 1.5rem 5rem rgb(var(--color-purple-950-rgb) / 0.25);
+}
+
+.dialog::backdrop {
+  background: rgb(var(--color-purple-950-rgb) / 0.5);
+}
+
+.icon {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-purple-100);
+  color: var(--color-purple-700);
+}
+
+.icon svg { width: 1.35rem; height: 1.35rem; }
+.dialog h2 { margin: 0.9rem 0 0.6rem; color: var(--color-purple-950); font-size: var(--fs-xl); }
+.dialog p { margin: 0 0 1rem; line-height: 1.6; overflow-wrap: anywhere; }
+.date { display: grid; gap: 0.3rem; margin-bottom: 1rem; padding: 0.9rem; border-radius: 0.7rem; background: var(--color-purple-50); color: var(--color-purple-950); }
+.date span, .hint { color: var(--color-muted); font-size: var(--fs-sm); }
+.error { padding: 0.8rem; border: 1px solid var(--color-danger); border-radius: 0.65rem; background: var(--color-danger-surface); color: var(--color-danger); font-size: var(--fs-sm); }
+.actions { display: flex; justify-content: flex-end; gap: 0.65rem; flex-wrap: wrap; }
+.actions button { min-height: 2.85rem; padding: 0.65rem 1rem; border: 1px solid var(--color-line-strong); border-radius: 0.65rem; background: var(--color-surface); color: var(--color-purple-800); font: inherit; font-size: var(--fs-sm); font-weight: 800; cursor: pointer; }
+.actions .confirm { border-color: var(--color-purple-700); background: var(--color-purple-700); color: var(--color-on-brand); }
+.actions button:focus-visible { outline: 3px solid var(--color-gold-500); outline-offset: 3px; }
+.actions button:disabled { opacity: 0.65; cursor: wait; }
+
+@media (max-width: 420px) {
+  .dialog { padding: 1.15rem; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .actions button { padding-inline: 0.6rem; }
+}
