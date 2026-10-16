@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { CmsTherapistPortrait } from "@/components/cms/CmsTherapistPortrait";
+import { isTherapistWeeklyDayOff } from "@/domain/booking/cms-calendar";
 import {
   buildScheduleRange,
   buildScheduleRows,
@@ -24,6 +25,7 @@ type Props = {
   readonly therapists: readonly CmsCalendarTherapist[];
   readonly closures: readonly CmsCalendarClosure[];
   readonly hours: CmsWeeklyHours | undefined;
+  readonly canManageTeam?: boolean;
 };
 
 const pixelsPerMinute = 2.4;
@@ -48,7 +50,7 @@ function useDublinMinute(date: string) {
   return minute;
 }
 
-export function CmsWorkSchedule({ date, bookings, therapists, closures, hours }: Props) {
+export function CmsWorkSchedule({ date, bookings, therapists, closures, hours, canManageTeam = false }: Props) {
   const currentMinute = useDublinMinute(date);
   const timedBookings = useMemo(() => bookings.flatMap((booking) => {
     const interval = scheduleBookingDisplayInterval(booking.localTime, booking.durationMinutes, booking.endsAt, date);
@@ -71,16 +73,18 @@ export function CmsWorkSchedule({ date, bookings, therapists, closures, hours }:
     { startMinute: closingMinute, endMinute: range.endMinute },
   ]);
   const gridRowByMinute = new Map([...rows.map((row, index) => [row.startMinute, index + 2] as const), [range.endMinute, rows.length + 2]]);
-  const allDayClosure = closures.find((closure) => closure.closedAllDay);
+  const allDayClosure = closures.find((closure) => closure.closedAllDay && !closure.therapistId);
   const closed = hours?.open === false || Boolean(allDayClosure);
   const columns = therapists.map((therapist) => {
     const entries = layoutScheduleIntervals(timedBookings.filter(({ booking }) =>
       therapist.id === "unassigned" ? !booking.assignedStaffId.trim() : booking.assignedStaffId === therapist.id));
-    return { therapist, entries, width: Math.max(220, ...entries.map((entry) => entry.laneCount * 175)) };
+    const daysOff = closures.filter((closure) => closure.closedAllDay && closure.therapistId === therapist.id);
+    const weeklyDayOff = isTherapistWeeklyDayOff(date, therapist.weeklyDaysOff);
+    return { therapist, entries, daysOff, weeklyDayOff, width: Math.max(220, ...entries.map((entry) => entry.laneCount * 175)) };
   });
   const gridStyle: CSSProperties = {
     gridTemplateColumns: `4.5rem ${columns.map((column) => `minmax(${column.width}px, 1fr)`).join(" ")}`,
-    gridTemplateRows: `5rem ${rows.map((row) => `minmax(${(row.endMinute - row.startMinute) * pixelsPerMinute}px, auto)`).join(" ")} 1.5rem`,
+    gridTemplateRows: `minmax(5rem, auto) ${rows.map((row) => `minmax(${(row.endMinute - row.startMinute) * pixelsPerMinute}px, auto)`).join(" ")} 1.5rem`,
     minWidth: `calc(4.5rem + ${columns.reduce((width, column) => width + column.width, 0)}px)`,
   } as CSSProperties;
   const intervalStyle = (startMinute: number, endMinute: number): CSSProperties => ({
@@ -95,19 +99,33 @@ export function CmsWorkSchedule({ date, bookings, therapists, closures, hours }:
         <span><i className={styles.confirmedKey} />Confirmed</span>
         <span><i className={styles.pendingKey} />Pending</span>
         <span><i className={styles.completedKey} />Completed</span>
-        <span><i className={styles.closedKey} />Shop closed / blocked</span>
+        <span><i className={styles.closedKey} />Closed / day off / blocked</span>
         <small>Dublin time · Scroll to see more times and therapists</small>
       </div>
-      {closed ? <p className={styles.closedNotice}>{allDayClosure?.reason || "Day off — closed in the weekly business hours."} Existing appointments are still shown.</p> : null}
+      {closed ? <p className={styles.closedNotice}>
+        {allDayClosure ? `Shop closed${allDayClosure.reason ? ` — ${allDayClosure.reason}.` : "."}` : "Shop closed — closed in the weekly business hours."} Existing appointments are still shown.
+        {allDayClosure ? <> <Link href={`/cms/calendar/closures/${allDayClosure.id}/edit?date=${date}`}>Edit / reopen shop</Link></> : null}
+      </p> : null}
       {!bookings.length ? <p className={styles.emptyNotice}>No appointments for this selection. Therapist columns remain visible.</p> : null}
       {columns.length ? (
         <div className={styles.scrollArea} tabIndex={0} role="region" aria-label="Daily therapist work schedule, Dublin time">
           <div className={styles.canvas} style={gridStyle}>
             <div className={styles.corner}>Dublin<br />time</div>
-            {columns.map(({ therapist }, columnIndex) => (
+            {columns.map(({ therapist, daysOff, weeklyDayOff }, columnIndex) => (
               <div className={styles.therapistHeader} style={{ gridColumn: columnIndex + 2, gridRow: 1 }} key={therapist.id}>
                 <CmsTherapistPortrait {...therapist} />
-                <strong>{therapist.name}</strong>
+                <div className={styles.therapistDetails}>
+                  <strong>{therapist.name}</strong>
+                  {daysOff.map((closure) => <Link className={styles.dayOffBadge} key={closure.id}
+                    href={`/cms/calendar/closures/${closure.id}/edit?date=${date}`}
+                    aria-label={`${therapist.name}: day off${closure.reason ? `, ${closure.reason}` : ""}. Edit or reopen this day.`}>
+                    Day off · Edit / reopen
+                  </Link>)}
+                  {weeklyDayOff ? canManageTeam ? <Link className={styles.dayOffBadge}
+                    href={`/cms/team/${therapist.id}/edit#weekly-days-off`}
+                    aria-label={`${therapist.name}: weekly day off. Edit weekly days off.`}>Weekly day off · Edit</Link>
+                    : <span className={styles.dayOffBadge} aria-label={`${therapist.name}: weekly day off`}>Weekly day off</span> : null}
+                </div>
               </div>
             ))}
             {rows.map((row, index) => <Fragment key={row.startMinute}>
@@ -117,20 +135,20 @@ export function CmsWorkSchedule({ date, bookings, therapists, closures, hours }:
               {row.startMinute % 15 === 0 ? <div className={styles.gridLine} data-hour={row.startMinute % 60 === 0 || undefined} style={{ gridRow: index + 2 }} aria-hidden="true" /> : null}
             </Fragment>)}
             <div className={styles.timeRuler} style={{ gridRow: rows.length + 2 }} aria-hidden="true"><span className={styles.timeLabel}>{formatScheduleTime(range.endMinute)}</span></div>
-            {columns.map(({ therapist, entries }, columnIndex) => (
+            {columns.map(({ therapist, entries, daysOff, weeklyDayOff }, columnIndex) => (
               <Fragment key={therapist.id}>
                 <div className={styles.lane} style={{ gridColumn: columnIndex + 2, gridRow: `2 / ${rows.length + 2}` }} aria-hidden="true" />
-                {closed ? <div className={styles.allDayBlocked} style={{ gridColumn: columnIndex + 2, gridRow: `2 / ${rows.length + 2}` }} aria-hidden="true" /> : null}
-                {!closed && hours?.open ? <>
+                {closed || daysOff.length || weeklyDayOff ? <div className={styles.allDayBlocked} style={{ gridColumn: columnIndex + 2, gridRow: `2 / ${rows.length + 2}` }} aria-hidden="true" /> : null}
+                {!closed && !daysOff.length && !weeklyDayOff && hours?.open ? <>
                   {range.startMinute < openingMinute ? <div aria-hidden="true" className={styles.offHours} style={{ ...intervalStyle(range.startMinute, openingMinute), gridColumn: columnIndex + 2 }} /> : null}
                   {range.endMinute > closingMinute ? <div aria-hidden="true" className={styles.offHours} style={{ ...intervalStyle(closingMinute, range.endMinute), gridColumn: columnIndex + 2 }} /> : null}
                 </> : null}
                 {partialClosures.map(({ closure, startMinute, endMinute }) => (
-                  <Link className={styles.closureBlock} style={{ ...intervalStyle(startMinute, endMinute), gridColumn: columnIndex + 2 }} key={closure.id}
+                  !closure.therapistId || closure.therapistId === therapist.id ? <Link className={styles.closureBlock} style={{ ...intervalStyle(startMinute, endMinute), gridColumn: columnIndex + 2 }} key={closure.id}
                     href={`/cms/calendar/closures/${closure.id}/edit?date=${date}`}
-                    aria-label={`${therapist.name}: shop blocked ${closure.startsAtLocal} to ${closure.endsAtLocal}, ${closure.reason}`}>
-                    <strong>{closure.startsAtLocal}–{closure.endsAtLocal}</strong><span>{closure.reason || "Shop blocked"}</span>
-                  </Link>
+                    aria-label={`${therapist.name}: ${closure.therapistId ? "therapist" : "shop"} blocked ${closure.startsAtLocal} to ${closure.endsAtLocal}${closure.reason ? `, ${closure.reason}` : ""}`}>
+                    <strong>{closure.startsAtLocal}–{closure.endsAtLocal}</strong><span>{closure.reason || (closure.therapistId ? "Therapist blocked" : "Shop blocked")}</span>
+                  </Link> : null
                 ))}
                 {entries.map(({ item, lane, laneCount }) => {
                   const { booking, startMinute, endMinute } = item;
@@ -166,7 +184,7 @@ export function CmsWorkSchedule({ date, bookings, therapists, closures, hours }:
         <strong>Appointments needing time review</strong>
         {invalidBookings.map((booking) => <Link href={`/cms/bookings/${booking.id}`} key={booking.id}>{booking.reference} · {booking.customerName}</Link>)}
       </div> : null}
-      <p className={styles.note}>Rows expand to fit booking details; use the time labels to read appointment times. Tap an appointment to view or manage it. Striped time applies to the whole shop, not individual therapist shifts.</p>
+      <p className={styles.note}>Rows expand to fit booking details; use the time labels to read appointment times. Tap an appointment to view or manage it. Striped time marks unavailable hours in each therapist’s column. Existing appointments remain visible on days off.</p>
     </div>
   );
 }

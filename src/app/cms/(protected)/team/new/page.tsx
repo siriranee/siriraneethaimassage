@@ -15,6 +15,7 @@ const blankTherapist: CmsTeamEditorRecord = {
   imageUrl: "",
   imageAlt: "",
   serviceIds: [],
+  weeklyDaysOff: [],
   publicProfile: true,
   operationalActive: true,
   archived: false,

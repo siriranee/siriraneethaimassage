@@ -10,14 +10,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { CmsTherapistPortrait as TherapistPortrait } from "@/components/cms/CmsTherapistPortrait";
 import { CmsWorkSchedule } from "@/components/cms/CmsWorkSchedule";
+import { ClosureForm } from "@/components/cms/ClosureForm";
 import { CalendarLegend } from "@/components/booking/CalendarLegend";
 import calendarStyles from "@/components/booking/BookingCalendar.module.css";
 import { CmsBookingEmailAttentionNotice } from "@/components/cms/CmsBookingEmailAttentionNotice";
-import { cmsCalendarHref as calendarHref, filterCmsCalendarBookings } from "@/domain/booking/cms-calendar";
+import { cmsCalendarHref as calendarHref, filterCmsCalendarBookings, filterCmsCalendarClosures, isTherapistWeeklyDayOff } from "@/domain/booking/cms-calendar";
 import {
   buildCalendarMonthCells,
   calendarWeekdayLabels,
@@ -53,6 +54,8 @@ export type CmsCalendarTherapist = {
   readonly name: string;
   readonly imageUrl: string;
   readonly imageAlt: string;
+  readonly weeklyDaysOff?: readonly number[];
+  readonly canBlock?: boolean;
 };
 
 export type CmsCalendarClosure = {
@@ -63,6 +66,7 @@ export type CmsCalendarClosure = {
   readonly endsAtLocal: string;
   readonly reason: string;
   readonly publicLabel: string;
+  readonly therapistId?: string;
 };
 
 type CmsCalendarProps = {
@@ -74,6 +78,8 @@ type CmsCalendarProps = {
   readonly emailAttention: readonly (CmsBookingEmailAttention & { readonly assignedStaffId: string })[];
   readonly closures: readonly CmsCalendarClosure[];
   readonly canManageBookings: boolean;
+  readonly canManageCalendar: boolean;
+  readonly canManageTeam: boolean;
   readonly closedWeekdays: readonly boolean[];
   readonly weeklyHours: readonly CmsWeeklyHours[];
 };
@@ -107,6 +113,7 @@ function dayAriaLabel(
   closures: readonly CmsCalendarClosure[],
   selected: boolean,
   dayOff: boolean,
+  therapistDaysOff: number,
 ) {
   const pendingCount = bookings.filter(
     (booking) => booking.status === "pending",
@@ -125,7 +132,11 @@ function dayAriaLabel(
   }
   if (dayOff) {
     details.push("Day off");
-  } else if (partialClosureCount) {
+  }
+  if (therapistDaysOff && !dayOff) {
+    details.push(`${therapistDaysOff} therapist${therapistDaysOff === 1 ? "" : "s"} off`);
+  }
+  if (partialClosureCount) {
     details.push(
       `${partialClosureCount} partial closure${partialClosureCount === 1 ? "" : "s"}`,
     );
@@ -144,16 +155,27 @@ export function CmsCalendar({
   emailAttention,
   closures,
   canManageBookings,
+  canManageCalendar,
+  canManageTeam,
   closedWeekdays,
   weeklyHours,
 }: CmsCalendarProps) {
   const calendarHeadingId = useId();
   const calendarStatusId = useId();
   const agendaHeadingId = useId();
+  const blockFormId = useId();
+  const [blockMode, setBlockMode] = useState<"day" | "time" | null>(null);
+  const [savedMessage, setSavedMessage] = useState("");
+  const savedNoticeRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (savedMessage) savedNoticeRef.current?.focus({ preventScroll: true });
+  }, [savedMessage]);
   const searchParams = useSearchParams();
   const requestedDate = normalizeCalendarDate(searchParams.get("date") ?? "");
   const selectedDate = requestedDate?.startsWith(`${month}-`) ? requestedDate : initialSelectedDate;
   const selectedTherapistId = searchParams.get("therapistId") ?? "";
+  const selectedTherapist = therapists.find((therapist) => therapist.id === selectedTherapistId);
+  const canBlockSelection = !selectedTherapistId || selectedTherapist?.canBlock === true;
   const selectedTherapistName = selectedTherapistId === "unassigned"
     ? "Unassigned"
     : therapists.find((therapist) => therapist.id === selectedTherapistId)?.name ?? "Selected therapist";
@@ -167,7 +189,7 @@ export function CmsCalendar({
     [emailAttention, selectedTherapistId],
   );
   const bookingsByDate = useMemo(() => groupByDate(filteredBookings), [filteredBookings]);
-  const closuresByDate = useMemo(() => groupByDate(closures), [closures]);
+  const closuresByDate = useMemo(() => groupByDate(filterCmsCalendarClosures(closures, selectedTherapistId)), [closures, selectedTherapistId]);
   const selectedBookings = useMemo(
     () =>
       [...(bookingsByDate.get(selectedDate) ?? [])].sort(
@@ -194,6 +216,7 @@ export function CmsCalendar({
     selectedDate,
     closedWeekdays,
   );
+  const selectedWeeklyDayOff = isTherapistWeeklyDayOff(selectedDate, selectedTherapist?.weeklyDaysOff);
   const previousMonth = shiftCalendarMonth(month, -1);
   const nextMonth = shiftCalendarMonth(month, 1);
   const todayMonth = today.slice(0, 7);
@@ -208,11 +231,15 @@ export function CmsCalendar({
   }, [therapists, bookings, emailAttention, selectedTherapistId]);
 
   function selectDate(localDate: string) {
+    setBlockMode(null);
+    setSavedMessage("");
     window.history.replaceState(null, "", calendarHref(month, localDate, selectedTherapistId));
   }
 
   function selectTherapist(therapistId: string) {
     if (therapistId === selectedTherapistId) return;
+    setBlockMode(null);
+    setSavedMessage("");
     window.history.pushState(null, "", calendarHref(month, selectedDate, therapistId));
   }
 
@@ -294,16 +321,20 @@ export function CmsCalendar({
               (booking) => booking.status === "pending",
             ).length;
             const allDayClosure = dayClosures.some(
-              (closure) => closure.closedAllDay,
+              (closure) => closure.closedAllDay && (!closure.therapistId || closure.therapistId === selectedTherapistId),
             );
             const regularDayOff = isRegularDayOff(
               localDate,
               closedWeekdays,
             );
-            const dayOff = regularDayOff || allDayClosure;
+            const dayOff = regularDayOff || allDayClosure || isTherapistWeeklyDayOff(localDate, selectedTherapist?.weeklyDaysOff);
+            const therapistDaysOff = !selectedTherapistId ? new Set([
+              ...dayClosures.filter((closure) => closure.closedAllDay && closure.therapistId).map((closure) => closure.therapistId),
+              ...therapists.filter((therapist) => isTherapistWeeklyDayOff(localDate, therapist.weeklyDaysOff)).map((therapist) => therapist.id),
+            ]).size : 0;
             const hasPartialClosure = dayClosures.some(
               (closure) => !closure.closedAllDay,
-            );
+            ) || therapistDaysOff > 0;
             const selected = selectedDate === localDate;
             const isToday = today === localDate;
 
@@ -316,6 +347,7 @@ export function CmsCalendar({
                   dayClosures,
                   selected,
                   dayOff,
+                  therapistDaysOff,
                 )}
                 aria-pressed={selected}
                 className={`${calendarStyles.calendarDay} ${
@@ -364,7 +396,7 @@ export function CmsCalendar({
             </li>
             <li>
               <i aria-hidden="true" className={styles.indicatorClosure} />
-              Partial closure
+              Therapist off / blocked time
             </li>
           </CalendarLegend>
         </div>
@@ -381,6 +413,7 @@ export function CmsCalendar({
             {selectedTherapistId ? ` · ${selectedTherapistName}` : ""}
             {selectedPendingCount ? ` · ${selectedPendingCount} pending` : ""}
             {selectedRegularDayOff ? " · Day off" : ""}
+            {selectedWeeklyDayOff ? " · Weekly day off" : ""}
             {selectedClosures.length
               ? ` · ${selectedClosures.length} active closure${selectedClosures.length === 1 ? "" : "s"}`
               : ""}
@@ -397,9 +430,6 @@ export function CmsCalendar({
           {canManageBookings ? <div className={styles.agendaActions}>
             <Link href={`/cms/bookings/new?date=${selectedDate}`}>
               <Plus aria-hidden="true" /> Add booking
-            </Link>
-            <Link href={`/cms/calendar/closures?date=${selectedDate}`}>
-              <Ban aria-hidden="true" /> Block this day
             </Link>
           </div> : null}
         </header>
@@ -433,6 +463,36 @@ export function CmsCalendar({
               ) : null}
             </div>
           </fieldset>
+          {canManageCalendar && canBlockSelection ? <div className={styles.timeOffActions}>
+            <div>
+              <strong>{selectedTherapist ? `Time off for ${selectedTherapist.name}` : "Time off for all therapists"}</strong>
+              <span>{formatCalendarDate(selectedDate)} · Dublin time</span>
+            </div>
+            <div className={styles.timeOffButtons}>
+              <button aria-expanded={blockMode === "day"} aria-controls={blockFormId} onClick={() => { setBlockMode(blockMode === "day" ? null : "day"); setSavedMessage(""); }} type="button"><Ban aria-hidden="true" /> Day off</button>
+              <button aria-expanded={blockMode === "time"} aria-controls={blockFormId} onClick={() => { setBlockMode(blockMode === "time" ? null : "time"); setSavedMessage(""); }} type="button">Block time</button>
+              {canManageTeam && selectedTherapist ? <Link href={`/cms/team/${selectedTherapist.id}/edit#weekly-days-off`}>Weekly days off</Link> : null}
+            </div>
+          </div> : null}
+          <div id={blockFormId}>
+            {blockMode && canManageCalendar && canBlockSelection ? <ClosureForm
+              defaultClosedAllDay={blockMode === "day"}
+              defaultDate={selectedDate}
+              defaultTherapistId={selectedTherapistId}
+              inline
+              key={`${selectedDate}:${selectedTherapistId}:${blockMode}`}
+              onSaved={() => { setBlockMode(null); setSavedMessage("Time off saved. Booking availability has been updated."); }}
+              therapists={therapists.filter((therapist) => therapist.canBlock)}
+            /> : null}
+          </div>
+          {savedMessage ? <p className={styles.savedNotice} ref={savedNoticeRef} role="status" tabIndex={-1}>{savedMessage}</p> : null}
+          {selectedWeeklyDayOff ? <p className={styles.timeOffNotice}>{selectedTherapistName} has a weekly day off on this weekday.{canManageTeam && selectedTherapist ? <> <Link href={`/cms/team/${selectedTherapist.id}/edit#weekly-days-off`}>Change weekly days off</Link></> : null}</p> : null}
+          {selectedClosures.length ? <ul className={styles.closureList} aria-label="Days off and blocked time for this date">
+            {selectedClosures.map((closure) => <li key={closure.id}>
+              <div><strong>{closure.therapistId ? therapists.find((therapist) => therapist.id === closure.therapistId)?.name ?? "Former therapist" : "All therapists"} · {closure.closedAllDay ? "Day off" : `${closure.startsAtLocal}–${closure.endsAtLocal}`}</strong><span>{closure.reason}</span></div>
+              {canManageCalendar ? <Link href={`/cms/calendar/closures/${closure.id}/edit?date=${selectedDate}`}>Edit / reopen</Link> : null}
+            </li>)}
+          </ul> : null}
           <p className={styles.scheduleStatus} role="status" aria-live="polite">
             {selectedBookings.length} appointment{selectedBookings.length === 1 ? "" : "s"}
             {selectedTherapistId ? ` · ${selectedTherapistName}` : " · All therapists"}
@@ -444,6 +504,7 @@ export function CmsCalendar({
             therapists={scheduleTherapists}
             closures={selectedClosures}
             hours={hours}
+            canManageTeam={canManageTeam}
           />
         </div>
       </section>

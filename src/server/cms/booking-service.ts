@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { Temporal } from "@js-temporal/polyfill";
 
 import {
   dublinInstant,
@@ -244,6 +245,7 @@ async function findSlot(
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
     therapistId: therapist?.id,
+    therapistWeeklyDaysOff: therapist?.weeklyDaysOff,
     settings: content.bookingSettings,
     now,
     enforceWindow: options.enforceWindow,
@@ -321,6 +323,7 @@ export async function getAdminAvailability(input: {
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
     therapistId: therapist?.id,
+    therapistWeeklyDaysOff: therapist?.weeklyDaysOff,
     settings: content.bookingSettings,
     enforceWindow: false,
     weeklyHours: content.site.weeklyHours,
@@ -695,6 +698,7 @@ export async function deleteAdminBooking(
 }
 
 type ClosureInput = {
+  readonly therapistId: string;
   readonly localDate: string;
   readonly closedAllDay: boolean;
   readonly startsAtLocal: string;
@@ -705,7 +709,7 @@ type ClosureInput = {
   readonly repeatWeeklyCount: number;
 };
 
-function parseClosureInput(value: unknown, allowRepeat: boolean): ClosureInput {
+function parseClosureInput(value: unknown, allowRepeat: boolean, currentTherapistId = ""): ClosureInput {
   const source = value && typeof value === "object"
     ? (value as Record<string, unknown>)
     : {};
@@ -713,8 +717,15 @@ function parseClosureInput(value: unknown, allowRepeat: boolean): ClosureInput {
   const closedAllDay = source.closedAllDay === true;
   const startsAtLocal = String(source.startsAtLocal ?? "").trim();
   const endsAtLocal = String(source.endsAtLocal ?? "").trim();
+  const therapistId = source.therapistId === undefined
+    ? currentTherapistId
+    : optionalText(source.therapistId, 120, "therapistId");
 
-  if (!datePattern.test(localDate)) {
+  let validDate = false;
+  try {
+    validDate = datePattern.test(localDate) && Temporal.PlainDate.from(localDate).toString() === localDate;
+  } catch {}
+  if (!validDate) {
     throw new CmsValidationError("Choose a valid closure date.", {
       localDate: "Choose a valid closure date.",
     });
@@ -741,6 +752,7 @@ function parseClosureInput(value: unknown, allowRepeat: boolean): ClosureInput {
   }
 
   return {
+    therapistId,
     localDate,
     closedAllDay,
     startsAtLocal: closedAllDay ? "" : startsAtLocal,
@@ -758,6 +770,26 @@ function addDays(localDate: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function validateClosureLocalTimes(input: ClosureInput) {
+  // Keep legacy blocks deactivatable even when their local clock time cannot
+  // identify a unique Dublin instant during the daylight-saving transition.
+  if (!input.active || input.closedAllDay) return;
+  const fields: Record<string, string> = {};
+  for (const field of ["startsAtLocal", "endsAtLocal"] as const) {
+    try {
+      dublinInstant(input.localDate, input[field]);
+    } catch {
+      fields[field] = `Choose a valid, unambiguous Dublin time on ${input.localDate}. The clocks change on this date.`;
+    }
+  }
+  if (Object.keys(fields).length) {
+    throw new CmsValidationError(
+      `This time block includes a clock-change time on ${input.localDate}. Choose a different start or end time.`,
+      fields,
+    );
+  }
+}
+
 async function assertClosureHasNoBookingConflict(
   repository: CmsRepository,
   input: ClosureInput,
@@ -769,9 +801,11 @@ async function assertClosureHasNoBookingConflict(
   );
   const active = bookings.filter(
     (booking) =>
-      booking.status === "pending" || booking.status === "confirmed",
+      (booking.status === "pending" || booking.status === "confirmed") &&
+      (!input.therapistId || booking.assignedStaffId === input.therapistId),
   );
   if (!active.length) return;
+  const { bookingSettings } = await repository.getContent();
 
   const closureStart = input.closedAllDay
     ? Number.NEGATIVE_INFINITY
@@ -780,14 +814,24 @@ async function assertClosureHasNoBookingConflict(
     ? Number.POSITIVE_INFINITY
     : dublinInstant(input.localDate, input.endsAtLocal).epochMilliseconds;
   const conflicts = active.some((booking) => {
-    const starts = new Date(booking.startsAt).getTime();
-    const ends = new Date(booking.endsAt).getTime();
+    const starts = new Date(booking.startsAt).getTime() - bookingSettings.bufferBeforeMinutes * 60_000;
+    const ends = new Date(booking.endsAt).getTime() + bookingSettings.bufferAfterMinutes * 60_000;
     return starts < closureEnd && closureStart < ends;
   });
   if (conflicts) {
     throw new CmsConflictError(
-      "This closure conflicts with an active booking. Reschedule or cancel it first.",
+      "This day off or time block conflicts with an active booking. Reassign, reschedule or cancel it first.",
     );
+  }
+}
+
+async function assertClosureTherapistExists(repository: CmsRepository, input: ClosureInput) {
+  if (!input.active || !input.therapistId) return;
+  const content = await repository.getContent();
+  if (!content.team.some((member) => member.id === input.therapistId && !member.archived)) {
+    throw new CmsValidationError("Choose an existing therapist for this day off or time block.", {
+      therapistId: "Choose a therapist from the team, or all therapists.",
+    });
   }
 }
 
@@ -800,9 +844,12 @@ export async function createCmsClosure(
     { length: input.repeatWeeklyCount },
     (_, index) => addDays(input.localDate, index * 7),
   );
+  for (const localDate of dates) validateClosureLocalTimes({ ...input, localDate });
 
   const repository = getCmsRepository();
   return repository.transaction(async (transaction) => {
+    if (input.therapistId) await transaction.lockTherapist(input.therapistId);
+    await assertClosureTherapistExists(transaction, input);
     for (const localDate of dates) {
       await transaction.lockBookingDate(localDate);
       await assertClosureHasNoBookingConflict(transaction, { ...input, localDate });
@@ -813,6 +860,7 @@ export async function createCmsClosure(
     for (const localDate of dates) {
       const closure: CmsClosure = {
         id: randomUUID(),
+        therapistId: input.therapistId,
         localDate,
         closedAllDay: input.closedAllDay,
         startsAtLocal: input.startsAtLocal,
@@ -846,18 +894,24 @@ export async function updateCmsClosure(
   expectedVersion: number,
   context: MutationContext,
 ) {
-  const input = parseClosureInput(value, false);
   const repository = getCmsRepository();
   return repository.transaction(async (transaction) => {
     const current = (await transaction.listClosures()).find((item) => item.id === closureId);
     if (!current) throw new Error("Closure not found.");
     if (current.version !== expectedVersion) throw new CmsConflictError();
+    const input = parseClosureInput(value, false, current.therapistId);
+    validateClosureLocalTimes(input);
+    for (const therapistId of [...new Set([current.therapistId, input.therapistId])].filter((id): id is string => !!id).sort()) {
+      await transaction.lockTherapist(therapistId);
+    }
+    await assertClosureTherapistExists(transaction, input);
     for (const date of [...new Set([current.localDate, input.localDate])].sort()) {
       await transaction.lockBookingDate(date);
     }
     await assertClosureHasNoBookingConflict(transaction, input);
     const updated: CmsClosure = {
       ...current,
+      therapistId: input.therapistId,
       localDate: input.localDate,
       closedAllDay: input.closedAllDay,
       startsAtLocal: input.startsAtLocal,

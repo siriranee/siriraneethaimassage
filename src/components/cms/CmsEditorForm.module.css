@@ -4,6 +4,9 @@
   padding-bottom: 5rem;
 }
 
+.inlineForm { padding-bottom: 0; }
+.inlineForm .saveBar { position: static; }
+
 .formFields {
   display: grid;
   min-inline-size: 0;

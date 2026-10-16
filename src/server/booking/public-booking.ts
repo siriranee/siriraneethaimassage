@@ -240,6 +240,7 @@ export async function createPublicBooking(
         localDate,
         durationMinutes,
         therapistId: therapist.id,
+        therapistWeeklyDaysOff: therapist.weeklyDaysOff,
         settings: content.bookingSettings,
         weeklyHours: content.site.weeklyHours,
         closures,

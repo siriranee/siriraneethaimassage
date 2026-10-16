@@ -649,6 +649,18 @@ export function parseTeamUpdate(
     current.serviceIds,
     options.validServiceIds,
   );
+  const weeklyDaysOffInput = source.weeklyDaysOff === undefined
+    ? current.weeklyDaysOff ?? []
+    : source.weeklyDaysOff;
+  if (
+    !Array.isArray(weeklyDaysOffInput) ||
+    weeklyDaysOffInput.some((day) => !Number.isInteger(day) || day < 1 || day > 7)
+  ) {
+    throw new CmsValidationError("Choose valid weekly days off.", {
+      weeklyDaysOff: "Select weekdays from Monday to Sunday.",
+    });
+  }
+  const weeklyDaysOff = [...new Set<number>(weeklyDaysOffInput)].sort((first, second) => first - second);
   if (operationalActive && !options.notificationEmail) {
     throw new CmsValidationError(
       "Add a therapist notification email before enabling online assignment.",
@@ -699,6 +711,7 @@ export function parseTeamUpdate(
     imageUrl,
     imageAlt: imageUrl ? imageAlt : "",
     serviceIds,
+    weeklyDaysOff,
     publicProfile: archived
       ? false
       : source.publicProfile === undefined

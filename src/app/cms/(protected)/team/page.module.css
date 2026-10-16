@@ -151,6 +151,7 @@
   color: var(--color-muted);
   font-size: var(--fs-sm);
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .facts dt svg {
@@ -177,7 +178,8 @@
   border-top: 1px solid var(--color-line);
 }
 
-.editLink {
+.editLink,
+.scheduleLink {
   display: inline-flex;
   min-height: 2.7rem;
   align-items: center;
@@ -191,6 +193,22 @@
   transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
 }
 
+.scheduleLink {
+  background: var(--color-surface);
+  color: var(--color-purple-800);
+}
+
+.scheduleLink:hover,
+.scheduleLink:focus-visible {
+  background: var(--color-purple-50);
+  border-color: var(--color-purple-700);
+}
+
+.scheduleLink:focus-visible {
+  outline: 0.18rem solid var(--color-purple-700);
+  outline-offset: 0.12rem;
+}
+
 .editLink {
   margin-left: auto;
   border-color: var(--color-purple-700);
@@ -198,7 +216,8 @@
   color: var(--color-on-brand);
 }
 
-.editLink svg {
+.editLink svg,
+.scheduleLink svg {
   width: 1rem;
   height: 1rem;
 }

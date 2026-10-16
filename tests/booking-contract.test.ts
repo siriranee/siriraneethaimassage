@@ -306,7 +306,7 @@ test("therapist lifecycle checks use a bounded-data future assignment query", as
   assert.match(futureQuery, /endsAt: \{ \$gt: afterIso \}/);
   assert.match(futureQuery, /status: "confirmed"/);
   assert.match(futureQuery, /status: "pending"/);
-  assert.match(futureQuery, /projection: \{ _id: 0, reference: 1, serviceId: 1 \}/);
+  assert.match(futureQuery, /projection: \{ _id: 0, reference: 1, serviceId: 1, localDate: 1 \}/);
   assert.doesNotMatch(futureQuery, /decodeBooking|customerEncrypted|\.limit\(/);
 });
 
@@ -544,13 +544,14 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
   assert.match(page, /closedWeekdays=\{content\.site\.weeklyHours\.map/);
   assert.match(page, /<CmsCalendar/);
   assert.match(page, /isApprovedImageUrlForOwnership\(member\.imageUrl, cloudinaryOwnership\) \? member\.imageUrl : ""/);
-  assert.match(page, /key=\{`\$\{month\}:\$\{selectedDate\}`\}/);
+  assert.match(page, /key=\{month\}/);
+  assert.doesNotMatch(page, /key=\{`\$\{month\}:\$\{selectedDate\}`\}/);
   assert.doesNotMatch(page, /Calendar view|value="week"/);
 
   assert.match(calendar, /<CalendarLegend>/);
   assert.match(
     calendar,
-    /className=\{styles\.operationalKey\}>[\s\S]*?<CalendarLegend>[\s\S]*?Appointments[\s\S]*?Pending[\s\S]*?Partial closure[\s\S]*?<\/CalendarLegend>/,
+    /className=\{styles\.operationalKey\}>[\s\S]*?<CalendarLegend>[\s\S]*?Appointments[\s\S]*?Pending[\s\S]*?Therapist off \/ blocked time[\s\S]*?<\/CalendarLegend>/,
   );
   assert.doesNotMatch(calendar, /<strong>CMS indicators<\/strong>/);
   assert.doesNotMatch(calendar, /aria-label="CMS calendar indicators"/);
@@ -566,10 +567,10 @@ test("CMS calendar mirrors the month picker with operational booking data", asyn
   assert.match(calendar, /aria-pressed=\{selected\}/);
   assert.match(calendar, /window\.history\.replaceState/);
   assert.match(calendar, /onClick=\{\(\) => selectDate\(today\)\}/);
-  assert.match(calendar, /Block this day/);
+  assert.match(calendar, /Block time/);
   assert.match(calendar, /Appointments/);
   assert.match(calendar, /Pending/);
-  assert.match(calendar, /Partial closure/);
+  assert.match(calendar, /Therapist off \/ blocked time/);
   assert.match(calendar, /isRegularDayOff/);
   assert.match(calendar, /weeklyHours\[weekday === 0 \? 6 : weekday - 1\]/);
   assert.doesNotMatch(calendarStyles, /\.agendaBookingMain|\.agendaBookingDetails|\.agendaBookingFooter/);

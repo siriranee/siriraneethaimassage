@@ -4,6 +4,7 @@ import { ClosureForm } from "@/components/cms/ClosureForm";
 import { CmsNotice, CmsPageHeader, CmsPrimaryLink } from "@/components/cms/CmsUi";
 import { normalizeCalendarDate } from "@/domain/booking/calendar-month";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
+import { getCmsContent } from "@/server/cms/content-service";
 import { listCmsClosures } from "@/server/cms/read-service";
 
 type PageProps = {
@@ -22,12 +23,14 @@ export default async function CmsEditClosurePage({ params, searchParams }: PageP
   );
   const closure = (await listCmsClosures()).find((item) => item.id === closureId);
   if (!closure) notFound();
-  const closuresHref = `/cms/calendar/closures?date=${returnDate ?? closure.localDate}`;
+  const content = await getCmsContent();
+  const therapists = content.team.filter((member) => !member.archived || member.id === closure.therapistId).map(({ id, name }) => ({ id, name }));
+  const closuresHref = `/cms/calendar/closures?${new URLSearchParams({ date: returnDate ?? closure.localDate, ...(closure.therapistId ? { therapistId: closure.therapistId } : {}) }).toString()}`;
   return (
     <>
       <CmsPageHeader actions={<CmsPrimaryLink href={closuresHref} secondary>Back to closures</CmsPrimaryLink>} description="Change a blocked period or deactivate it without deleting its operational history." eyebrow="Availability" title={`Closure · ${closure.localDate}`} />
       <CmsNotice title="Soft deactivation preserves history">Turning a closure off releases its time while keeping the reason and audit event available.</CmsNotice>
-      <ClosureForm closure={closure} defaultDate={closure.localDate} />
+      <ClosureForm closure={closure} defaultDate={closure.localDate} therapists={therapists} />
     </>
   );
 }

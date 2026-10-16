@@ -39,6 +39,7 @@ import {
   type TeamSaveRequestState,
 } from "./team-save-feedback";
 import { useUnsavedChanges } from "./useUnsavedChanges";
+import { therapistWeekdays } from "./team-weekly-days";
 
 import styles from "./CmsEditorForm.module.css";
 import teamStyles from "./TeamEditorForm.module.css";
@@ -66,6 +67,7 @@ const teamFieldOrder = [
   "shortBio",
   "imageAlt",
   "serviceIds",
+  "weeklyDaysOff",
   "notificationEmail",
   "contactPhone",
 ] as const;
@@ -78,11 +80,15 @@ const teamFieldLabels: Readonly<Record<string, string>> = {
   shortBio: "Short introduction",
   imageAlt: "Portrait description",
   serviceIds: "Treatments offered",
+  weeklyDaysOff: "Weekly days off",
   notificationEmail: "Therapist notification email",
   contactPhone: "Therapist contact phone",
 };
 
 function normaliseTeamFieldName(name: string) {
+  if (name === "weeklyDaysOff" || name.startsWith("weeklyDaysOff.")) {
+    return "weeklyDaysOff";
+  }
   return name === "serviceIds" || name.startsWith("serviceIds.")
     ? "serviceIds"
     : name;
@@ -106,6 +112,9 @@ function fieldControl(
   if (field === "serviceIds") {
     return form.querySelector<HTMLInputElement>('input[name="serviceIds"]');
   }
+  if (field === "weeklyDaysOff") {
+    return form.querySelector<HTMLInputElement>('input[name="weeklyDaysOff"]');
+  }
   const control = form.elements.namedItem(field);
   return control instanceof HTMLInputElement ||
     control instanceof HTMLTextAreaElement
@@ -119,6 +128,7 @@ function operationalAssignmentEnabled(form: HTMLFormElement) {
 }
 
 function clientFieldError(form: HTMLFormElement, field: string) {
+  if (field === "weeklyDaysOff") return "";
   if (field === "serviceIds") {
     return operationalAssignmentEnabled(form) &&
       !form.querySelector<HTMLInputElement>('input[name="serviceIds"]:checked')
@@ -216,6 +226,7 @@ export function TeamEditorForm({
   const [publicProfile, setPublicProfile] = useState(member.publicProfile);
   const [operationalActive, setOperationalActive] = useState(member.operationalActive);
   const [archived, setArchived] = useState(Boolean(member.archived));
+  const [weeklyDaysOff, setWeeklyDaysOff] = useState<readonly number[]>(member.weeklyDaysOff ?? []);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -364,6 +375,7 @@ export function TeamEditorForm({
         imageUrl: nextImageUrl,
         imageAlt: data.get("imageAlt"),
         serviceIds: data.getAll("serviceIds"),
+        weeklyDaysOff: data.getAll("weeklyDaysOff").map(Number),
         notificationEmail: data.get("notificationEmail"),
         contactPhone: data.get("contactPhone"),
         publicProfile: data.get("publicProfile") === "on",
@@ -411,6 +423,7 @@ export function TeamEditorForm({
       setPublicProfile(result.member.publicProfile);
       setOperationalActive(result.member.operationalActive);
       setArchived(Boolean(result.member.archived));
+      setWeeklyDaysOff(result.member.weeklyDaysOff ?? []);
       markSaved();
       setFeedback({
         tone: "success",
@@ -636,6 +649,54 @@ export function TeamEditorForm({
               {fieldError("serviceIds") ? <p className={teamStyles.fieldError} id="serviceIds-error">{fieldError("serviceIds")}</p> : null}
             </fieldset>
           </div>
+        </section>
+
+        <section className={`${styles.section} ${teamStyles.weeklyDaysSection}`} id="weekly-days-off">
+          <header className={styles.sectionHeader}>
+            <h2>Weekly days off</h2>
+            <p>Choose the days this therapist takes off every week. Leave all days unselected for no regular days off.</p>
+          </header>
+          <fieldset
+            aria-describedby={describedBy("weeklyDaysOff", "weekly-days-off-hint")}
+            aria-invalid={Boolean(fieldError("weeklyDaysOff"))}
+            className={teamStyles.serviceFieldset}
+          >
+            <legend>Repeat every week</legend>
+            <div className={teamStyles.weekdayGrid}>
+              {therapistWeekdays.map((day) => (
+                <label className={teamStyles.weekdayChoice} key={day.value}>
+                  <input
+                    checked={weeklyDaysOff.includes(day.value)}
+                    name="weeklyDaysOff"
+                    onChange={(event) => {
+                      const checked = event.currentTarget.checked;
+                      setWeeklyDaysOff((current) => checked
+                        ? [...current, day.value]
+                        : current.filter((value) => value !== day.value));
+                    }}
+                    type="checkbox"
+                    value={day.value}
+                  />
+                  <span>{day.label}</span>
+                </label>
+              ))}
+            </div>
+            <p aria-live="polite" className={teamStyles.weeklyDaysSummary}>
+              {weeklyDaysOff.length === 7
+                ? "Off every day. No appointments can be booked with this therapist."
+                : weeklyDaysOff.length
+                  ? `Off every ${therapistWeekdays.filter((day) => weeklyDaysOff.includes(day.value)).map((day) => day.label).join(", ")}.`
+                  : "No weekly days off selected. Spa opening hours and calendar blocks still apply."}
+            </p>
+            <p id="weekly-days-off-hint">
+              Changes take effect as soon as you save, using the spa&apos;s local time.
+              Reschedule any conflicting appointments before saving. Appointments are never cancelled automatically.
+            </p>
+            {fieldError("weeklyDaysOff") ? <p className={teamStyles.fieldError} id="weeklyDaysOff-error">{fieldError("weeklyDaysOff")}</p> : null}
+          </fieldset>
+          <p className={teamStyles.calendarHint}>
+            For time off on specific dates, use the <Link href="/cms/calendar">calendar</Link>.
+          </p>
         </section>
 
         <section className={styles.section}>

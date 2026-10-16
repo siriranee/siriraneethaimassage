@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   ImageOff,
   MailCheck,
   MailWarning,
@@ -15,6 +16,7 @@ import {
   CmsPrimaryLink,
   CmsStatusBadge,
 } from "@/components/cms/CmsUi";
+import { therapistWeekdays } from "@/components/cms/team-weekly-days";
 import { compareCmsTeamMembersByName } from "@/domain/cms/team";
 import { isApprovedImageUrlForOwnership } from "@/lib/media/cloudinary-delivery";
 import { requireCmsPageUser } from "@/server/cms/auth/guards";
@@ -52,7 +54,7 @@ export default async function CmsTeamPage() {
     <>
       <CmsPageHeader
         actions={headerActions}
-        description="Manage therapist records, online booking visibility, treatment eligibility and private contact details."
+        description="Manage therapist records, weekly days off, online booking visibility and treatment eligibility."
         eyebrow="People & availability"
         title="Therapists"
       />
@@ -128,9 +130,26 @@ export default async function CmsTeamPage() {
                       </dt>
                       <dd>{hasEmail ? "Ready" : "Email needed"}</dd>
                     </div>
+                    <div>
+                      <dt>
+                        <CalendarDays aria-hidden="true" /> Weekly days off
+                      </dt>
+                      <dd>
+                        {member.weeklyDaysOff?.length === 7
+                          ? "Every day"
+                          : therapistWeekdays.filter((day) => member.weeklyDaysOff?.includes(day.value)).map((day) => day.shortLabel).join(", ") || "None set"}
+                      </dd>
+                    </div>
                   </dl>
 
                   <div className={styles.cardActions}>
+                    <Link
+                      aria-label={`Set weekly days off for ${member.name}`}
+                      className={styles.scheduleLink}
+                      href={`/cms/team/${member.id}/edit#weekly-days-off`}
+                    >
+                      <CalendarDays aria-hidden="true" /> Weekly days off
+                    </Link>
                     <Link
                       className={styles.editLink}
                       href={`/cms/team/${member.id}/edit`}

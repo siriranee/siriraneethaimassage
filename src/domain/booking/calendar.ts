@@ -2,6 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 
 import {
   getAvailabilitySlots,
+  closureAppliesToTherapist,
   type AvailabilityInput,
 } from "@/domain/booking/availability";
 
@@ -57,11 +58,12 @@ export function classifyAvailabilityCalendarDay(
   const hasAllDayClosure = input.closures.some(
     (closure) =>
       closure.active &&
+      closureAppliesToTherapist(closure, input.therapistId) &&
       closure.localDate === input.localDate &&
       closure.closedAllDay,
   );
 
-  if (!regularHours?.open || hasAllDayClosure) {
+  if (!regularHours?.open || hasAllDayClosure || input.therapistWeeklyDaysOff?.includes(date.dayOfWeek)) {
     return { state: "day-off", availableSlotCount: 0 };
   }
 

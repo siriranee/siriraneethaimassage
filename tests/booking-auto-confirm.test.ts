@@ -243,11 +243,10 @@ test("CMS refuses future reschedules and legacy approvals when therapist contact
 });
 
 test("a same-day CMS slot that already started is historical", async (t) => {
-  const now = Temporal.Now.zonedDateTimeISO("Europe/Dublin");
-  if (now.hour < 9) {
-    t.skip("No 08:00 same-day slot has started yet in Dublin.");
-    return;
-  }
+  // Exercise the same-day distinction on every run, including before the
+  // business opens in Dublin. Node restores this clock when the test ends.
+  const now = Temporal.ZonedDateTime.from("2026-10-16T12:00:00+01:00[Europe/Dublin]");
+  t.mock.timers.enable({ apis: ["Date"], now: now.epochMilliseconds });
   const fixture = await setup();
   const { createAdminBooking } = await import("@/server/cms/booking-service");
   const booking = await createAdminBooking({

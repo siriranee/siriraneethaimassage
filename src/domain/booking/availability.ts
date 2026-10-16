@@ -30,6 +30,7 @@ export type AvailabilityInput = {
   readonly durationMinutes: number;
   /** When supplied, availability also enforces one appointment at a time for this therapist. */
   readonly therapistId?: string;
+  readonly therapistWeeklyDaysOff?: readonly number[];
   readonly settings: CmsBookingSettings;
   readonly weeklyHours: readonly CmsWeeklyHours[];
   readonly closures: readonly CmsClosure[];
@@ -150,9 +151,11 @@ function intersectsClosure(
   start: number,
   end: number,
   closures: readonly CmsClosure[],
+  therapistId?: string,
 ) {
   for (const closure of closures) {
     if (!closure.active || closure.localDate !== localDate) continue;
+    if (!closureAppliesToTherapist(closure, therapistId)) continue;
     if (closure.closedAllDay) return true;
 
     try {
@@ -165,6 +168,13 @@ function intersectsClosure(
   }
 
   return false;
+}
+
+export function closureAppliesToTherapist(
+  closure: Pick<CmsClosure, "therapistId">,
+  therapistId?: string,
+) {
+  return !closure.therapistId || closure.therapistId === therapistId;
 }
 
 export function getAvailabilitySlots(input: AvailabilityInput): readonly AvailabilitySlot[] {
@@ -198,7 +208,7 @@ export function getAvailabilitySlots(input: AvailabilityInput): readonly Availab
   }
 
   const hours = input.weeklyHours[date.dayOfWeek - 1];
-  if (!hours?.open) return [];
+  if (!hours?.open || input.therapistWeeklyDaysOff?.includes(date.dayOfWeek)) return [];
 
   const openMinutes = parseMinutes(hours.opens);
   const closeMinutes = parseMinutes(hours.closes);
@@ -251,7 +261,7 @@ export function getAvailabilitySlots(input: AvailabilityInput): readonly Availab
     ) {
       continue;
     }
-    if (intersectsClosure(input.localDate, occupiedStart, occupiedEnd, input.closures)) {
+    if (intersectsClosure(input.localDate, occupiedStart, occupiedEnd, input.closures, input.therapistId)) {
       continue;
     }
 

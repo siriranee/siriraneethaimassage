@@ -400,6 +400,7 @@ export function BookingPlanner({
     })
       .then(async (response) => {
         const result = (await response.json()) as PublicAvailabilityResponse;
+        if (controller.signal.aborted) return;
         if (!response.ok) throw new Error(result.message);
 
         const slots = result.slots ?? [];

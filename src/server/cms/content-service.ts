@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { Temporal } from "@js-temporal/polyfill";
 
 import {
   CMS_CONTENT_SCHEMA_VERSION,
@@ -377,6 +378,9 @@ function normaliseTeamRecords(
       imageAlt:
         typeof stored.imageAlt === "string" ? stored.imageAlt.trim() : "",
       serviceIds,
+      weeklyDaysOff: Array.isArray(stored.weeklyDaysOff)
+        ? [...new Set<number>(stored.weeklyDaysOff.filter((day) => Number.isInteger(day) && day >= 1 && day <= 7))].sort((first, second) => first - second)
+        : [],
       publicProfile: !archived && stored.publicProfile === true,
       operationalActive:
         !archived && stored.operationalActive === true && serviceIds.length > 0,
@@ -817,6 +821,19 @@ export async function updateCmsTeamMember(
     if (invalidatedBooking) {
       throw new CmsConflictError(
         `Reassign future booking ${invalidatedBooking.reference} before deactivating, archiving or removing this therapist's treatment eligibility.`,
+      );
+    }
+    const newlyBlockedWeekdays = (updated.weeklyDaysOff ?? []).filter(
+      (day) => !existing.weeklyDaysOff?.includes(day),
+    );
+    const dayOffConflict = newlyBlockedWeekdays.length
+      ? futureAssignedBookings.find((booking) =>
+          newlyBlockedWeekdays.includes(Temporal.PlainDate.from(booking.localDate).dayOfWeek),
+        )
+      : undefined;
+    if (dayOffConflict) {
+      throw new CmsConflictError(
+        `Weekly day off conflicts with booking ${dayOffConflict.reference} on ${dayOffConflict.localDate}. Reassign, reschedule or cancel that appointment before saving this day off.`,
       );
     }
 

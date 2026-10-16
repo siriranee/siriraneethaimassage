@@ -105,6 +105,71 @@
   font-weight: 750;
 }
 
+.weeklyDaysSection {
+  scroll-margin-top: 12rem;
+}
+
+.weekdayGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.weekdayChoice {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  font-weight: 750;
+}
+
+.weekdayChoice input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--color-purple-700);
+}
+
+.weekdayChoice:has(input:checked) {
+  border-color: var(--color-purple-600);
+  background: var(--color-purple-100);
+  color: var(--color-purple-950);
+}
+
+.weekdayChoice:has(input:focus-visible) {
+  outline: 0.2rem solid var(--color-gold-500);
+  outline-offset: 0.12rem;
+}
+
+.weekdayChoice:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.serviceFieldset > .weeklyDaysSummary {
+  color: var(--color-purple-950);
+  font-weight: 750;
+}
+
+.calendarHint {
+  margin: 0.85rem 0 0;
+  color: var(--color-muted);
+  font-size: var(--fs-sm);
+}
+
+.calendarHint a {
+  color: var(--color-purple-700);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 .archiveChoice {
   border-color: rgb(153 27 27 / 0.22);
   background: var(--color-danger-surface);

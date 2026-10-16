@@ -66,6 +66,8 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
       name: member.name,
       imageUrl: isApprovedImageUrlForOwnership(member.imageUrl, cloudinaryOwnership) ? member.imageUrl : "",
       imageAlt: member.imageAlt,
+      weeklyDaysOff: member.weeklyDaysOff,
+      canBlock: !member.archived,
     }]),
   );
   // Include cancelled bookings: a hidden appointment can still need email review.
@@ -115,6 +117,7 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
       endsAtLocal: closure.endsAtLocal,
       reason: closure.reason,
       publicLabel: closure.publicLabel,
+      therapistId: closure.therapistId,
     }));
 
   return (
@@ -140,11 +143,13 @@ export default async function CmsCalendarPage({ searchParams }: PageProps) {
       <CmsCalendar
         bookings={calendarBookings}
         canManageBookings={canManageBookings}
+        canManageCalendar={canCmsRole(user.role, "calendar:write")}
+        canManageTeam={canCmsRole(user.role, "content:write")}
         closedWeekdays={content.site.weeklyHours.map((hours) => !hours.open)}
         closures={calendarClosures}
         emailAttention={emailAttention}
         initialSelectedDate={selectedDate}
-        key={`${month}:${selectedDate}`}
+        key={month}
         month={month}
         therapists={[...therapistProfiles.values()].sort((first, second) => first.name.localeCompare(second.name))}
         today={today}

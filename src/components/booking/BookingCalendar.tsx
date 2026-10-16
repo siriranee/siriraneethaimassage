@@ -145,6 +145,7 @@ export function BookingCalendar({
     })
       .then(async (response) => {
         const result = (await response.json()) as Partial<CalendarResponse>;
+        if (controller.signal.aborted) return;
         if (!response.ok) {
           throw new Error(
             typeof result.message === "string"

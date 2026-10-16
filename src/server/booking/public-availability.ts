@@ -3,7 +3,7 @@ import "server-only";
 import { Temporal } from "@js-temporal/polyfill";
 
 import { classifyAvailabilityCalendarDay } from "@/domain/booking/calendar";
-import { getAvailabilitySlots } from "@/domain/booking/availability";
+import { closureAppliesToTherapist, getAvailabilitySlots } from "@/domain/booking/availability";
 import { isLivePublicBookingReady } from "@/server/booking/readiness";
 import { getCmsMode } from "@/server/cms/config";
 import { getPublishedCmsContent } from "@/server/cms/content-service";
@@ -94,6 +94,7 @@ export async function getPublicAvailability(input: {
     localDate: input.localDate,
     durationMinutes: input.durationMinutes,
     therapistId: therapist.id,
+    therapistWeeklyDaysOff: therapist.weeklyDaysOff,
     settings: content.bookingSettings,
     weeklyHours: content.site.weeklyHours,
     closures,
@@ -223,6 +224,7 @@ export async function getPublicAvailabilityCalendar(input: {
       localDate,
       durationMinutes: input.durationMinutes,
       therapistId: therapist.id,
+      therapistWeeklyDaysOff: therapist.weeklyDaysOff,
       settings: content.bookingSettings,
       weeklyHours: content.site.weeklyHours,
       closures,
@@ -234,6 +236,7 @@ export async function getPublicAvailabilityCalendar(input: {
     const allDayClosure = closures.find(
       (closure) =>
         closure.active &&
+        closureAppliesToTherapist(closure, therapist.id) &&
         closure.closedAllDay &&
         closure.localDate === localDate,
     );

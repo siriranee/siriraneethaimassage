@@ -20,3 +20,18 @@ export function cmsCalendarHref(
   if (therapistId) params.set("therapistId", therapistId);
   return `/cms/calendar?${params.toString()}`;
 }
+
+/** All view retains individual blocks without treating them as shop closures. */
+export function filterCmsCalendarClosures<T extends { readonly therapistId?: string }>(
+  closures: readonly T[],
+  therapistId: string,
+): readonly T[] {
+  return therapistId
+    ? closures.filter((closure) => !closure.therapistId || closure.therapistId === therapistId)
+    : closures;
+}
+
+export function isTherapistWeeklyDayOff(localDate: string, weeklyDaysOff: readonly number[] = []) {
+  const weekday = new Date(`${localDate}T12:00:00Z`).getUTCDay();
+  return weeklyDaysOff.includes(weekday === 0 ? 7 : weekday);
+}

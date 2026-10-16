@@ -566,7 +566,7 @@ export class MockCmsRepository implements CmsRepository {
             (booking.status === "confirmed" || booking.status === "pending"),
         )
         .sort((first, second) => first.startsAt.localeCompare(second.startsAt))
-        .map(({ reference, serviceId }) => ({ reference, serviceId })),
+        .map(({ reference, serviceId, localDate }) => ({ reference, serviceId, localDate })),
     );
   }
 

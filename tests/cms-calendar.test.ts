@@ -102,7 +102,25 @@ test("schedule blocks include booking and contact details without hiding shorter
 import {
   cmsCalendarHref,
   filterCmsCalendarBookings,
+  filterCmsCalendarClosures,
+  isTherapistWeeklyDayOff,
 } from "@/domain/booking/cms-calendar";
+
+test("calendar retains shop closures and filters therapist days off by exact scope", () => {
+  const closures = [{ id: "shop" }, { id: "a", therapistId: "a" }, { id: "b", therapistId: "b" }];
+  assert.deepEqual(filterCmsCalendarClosures(closures, "a").map(({ id }) => id), ["shop", "a"]);
+  assert.deepEqual(filterCmsCalendarClosures(closures, "b").map(({ id }) => id), ["shop", "b"]);
+  assert.deepEqual(filterCmsCalendarClosures(closures, "unassigned").map(({ id }) => id), ["shop"]);
+  assert.deepEqual(filterCmsCalendarClosures(closures, ""), closures);
+});
+
+test("weekly day off calendar uses Monday-first weekdays including Dublin DST Sundays", () => {
+  assert.equal(isTherapistWeeklyDayOff("2026-10-19", [1]), true);
+  assert.equal(isTherapistWeeklyDayOff("2026-10-20", [1]), false);
+  assert.equal(isTherapistWeeklyDayOff("2026-10-25", [7]), true);
+  assert.equal(isTherapistWeeklyDayOff("2026-03-29", [7]), true);
+  assert.equal(isTherapistWeeklyDayOff("2026-10-19"), false);
+});
 
 const bookings = Object.freeze([
   Object.freeze({

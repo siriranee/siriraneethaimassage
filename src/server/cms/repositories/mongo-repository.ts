@@ -889,15 +889,15 @@ export class MongoCmsRepository implements CmsRepository {
         },
         {
           ...this.options(),
-          projection: { _id: 0, reference: 1, serviceId: 1 },
+          projection: { _id: 0, reference: 1, serviceId: 1, localDate: 1 },
         },
       )
       .sort({ startsAt: 1 })
       .toArray();
 
     return rows.flatMap((row) =>
-      typeof row.reference === "string" && typeof row.serviceId === "string"
-        ? [{ reference: row.reference, serviceId: row.serviceId }]
+      typeof row.reference === "string" && typeof row.serviceId === "string" && typeof row.localDate === "string"
+        ? [{ reference: row.reference, serviceId: row.serviceId, localDate: row.localDate }]
         : [],
     );
   }

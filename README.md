@@ -89,6 +89,13 @@ This validates public routes, metadata, canonical links, accessibility
 relationships, structured data, internal links, rendered images, booking
 handoffs, redirects, robots, sitemap, security headers and CMS no-index rules.
 
+For therapist days-off API integration checks, start a separate local server
+with `CMS_MODE=mock`, then run `npm.cmd run test:days-off-http`. The runner
+verifies loopback and mock mode before creating disposable treatment, therapist,
+booking and closure fixtures. It tests public/CMS availability, booking conflicts,
+weekly rules, reopening, stale versions and request guards. Fixtures reset when
+the mock server stops. This does not test live MongoDB concurrency or email delivery.
+
 ## Production CMS setup
 
 Copy [.env.example](.env.example) into the deployment provider's encrypted
@@ -198,6 +205,19 @@ prerequisite keeps direct booking safely off.
 ## Therapist setup
 
 Use **CMS > Therapists** to create a therapist record or edit an existing one.
+
+For a temporary day off, open **CMS > Calendar**, select the date and the
+therapist's pill, then choose **Day off** and **Save day off**. Choose **Block
+time** for a start/end time instead. The form shows who it applies to; selecting
+**All therapists** blocks the whole business. Use **Edit / reopen** and clear
+**Closure active** to release a block while retaining its history.
+
+For a recurring weekly day off, open **CMS > Therapists > Set weekly days off**,
+select the weekdays and save the therapist. Clear a weekday to make it available
+again. These rules take effect immediately in Dublin time for both customer and
+CMS bookings. Existing conflicting appointments or pending requests must be
+reassigned, rescheduled or cancelled first; saving time off never cancels them.
+
 Customer-facing fields include the booking-link slug, display name, role, short
 introduction and portrait. Therapist lists are ordered alphabetically. The
 public therapist listing/profile pages are intentionally not published. Select

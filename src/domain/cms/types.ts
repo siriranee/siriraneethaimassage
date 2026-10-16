@@ -172,6 +172,8 @@ export type CmsTeamRecord = {
   readonly imageUrl: string;
   readonly imageAlt: string;
   readonly serviceIds: readonly string[];
+  /** ISO weekdays: Monday = 1 through Sunday = 7. Missing means no weekly days off. */
+  readonly weeklyDaysOff?: readonly number[];
   readonly publicProfile: boolean;
   readonly operationalActive: boolean;
   readonly archived?: boolean;
@@ -352,11 +354,13 @@ export type CmsBookingOccupancy = {
 
 export type CmsFutureTherapistBooking = Pick<
   CmsBooking,
-  "reference" | "serviceId"
+  "reference" | "serviceId" | "localDate"
 >;
 
 export type CmsClosure = {
   readonly id: string;
+  /** Missing or empty applies to the whole shop, including legacy closures. */
+  readonly therapistId?: string;
   readonly localDate: string;
   readonly closedAllDay: boolean;
   readonly startsAtLocal: string;
