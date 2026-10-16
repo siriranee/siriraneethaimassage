@@ -654,6 +654,17 @@ export class MockCmsRepository implements CmsRepository {
     return clone(closure);
   }
 
+  async deleteClosure(id: string, expectedVersion: number) {
+    const index = this.state.closures.findIndex((closure) => closure.id === id);
+    if (index < 0) return false;
+    if (this.state.closures[index].version !== expectedVersion) {
+      throw new CmsConflictError();
+    }
+
+    this.state.closures.splice(index, 1);
+    return true;
+  }
+
   async listNotifications(bookingId?: string, limit = 200) {
     return clone(
       this.state.notifications

@@ -473,7 +473,6 @@ export function CmsCalendar({
             <div className={styles.timeOffButtons}>
               <button aria-haspopup="dialog" onClick={() => { setBlockMode("day"); setSavedMessage(""); }} ref={dayOffTriggerRef} type="button"><Ban aria-hidden="true" /> Day off</button>
               <button aria-expanded={blockMode === "time"} aria-controls={blockFormId} onClick={() => { setBlockMode(blockMode === "time" ? null : "time"); setSavedMessage(""); }} type="button">Block time</button>
-              {canManageTeam && selectedTherapist ? <Link href={`/cms/team/${selectedTherapist.id}/edit#weekly-days-off`}>Weekly days off</Link> : null}
             </div>
           </div> : null}
           <div id={blockFormId}>
@@ -498,12 +497,6 @@ export function CmsCalendar({
           /> : null}
           {savedMessage ? <p className={styles.savedNotice} ref={savedNoticeRef} role="status" tabIndex={-1}>{savedMessage}</p> : null}
           {selectedWeeklyDayOff ? <p className={styles.timeOffNotice}>{selectedTherapistName} has a weekly day off on this weekday.{canManageTeam && selectedTherapist ? <> <Link href={`/cms/team/${selectedTherapist.id}/edit#weekly-days-off`}>Change weekly days off</Link></> : null}</p> : null}
-          {selectedClosures.length ? <ul className={styles.closureList} aria-label="Days off and blocked time for this date">
-            {selectedClosures.map((closure) => <li key={closure.id}>
-              <div><strong>{closure.therapistId ? therapists.find((therapist) => therapist.id === closure.therapistId)?.name ?? "Former therapist" : "All therapists"} · {closure.closedAllDay ? "Day off" : `${closure.startsAtLocal}–${closure.endsAtLocal}`}</strong><span>{closure.reason}</span></div>
-              {canManageCalendar ? <Link href={`/cms/calendar/closures/${closure.id}/edit?date=${selectedDate}`}>Edit / reopen</Link> : null}
-            </li>)}
-          </ul> : null}
           <p className={styles.scheduleStatus} role="status" aria-live="polite">
             {selectedBookings.length} appointment{selectedBookings.length === 1 ? "" : "s"}
             {selectedTherapistId ? ` · ${selectedTherapistName}` : " · All therapists"}

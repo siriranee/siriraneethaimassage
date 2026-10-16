@@ -131,6 +131,7 @@ export interface CmsRepository {
     closure: CmsClosure,
     expectedVersion?: number,
   ): Promise<CmsClosure>;
+  deleteClosure(id: string, expectedVersion: number): Promise<boolean>;
 
   listNotifications(
     bookingId?: string,

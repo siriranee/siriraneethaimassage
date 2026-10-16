@@ -108,6 +108,11 @@ async function addClosure(body, expected = 201) {
 async function updateClosure(closure, extra, expected = 200) {
   return (await request(`/api/cms/closures/${closure.id}`, { method: "PATCH", expected, body: { ...closure, expectedVersion: closure.version, ...extra } })).body.closure;
 }
+async function deleteClosure(closure) {
+  const result = (await request(`/api/cms/closures/${closure.id}`, { method: "DELETE", body: { expectedVersion: closure.version } })).body;
+  assert.deepEqual(result.deleted, { id: closure.id, localDate: closure.localDate, therapistId: closure.therapistId || "" });
+  assert.ok(!(await allClosures()).some((item) => item.id === closure.id));
+}
 async function updateAlpha(extra, expected = 200) {
   const result = await request(`/api/cms/team/${alpha.id}`, { method: "PATCH", expected, body: { ...alpha, expectedVersion: alpha.version, ...extra } });
   if (expected === 200) alpha = result.body.member;
@@ -269,6 +274,54 @@ await check("booking reschedule cannot enter a blocked therapist day", async () 
   await request(`/api/cms/bookings/${existingBooking.id}`, { method: "PATCH", expected: 409, body: { localDate: nextDate, expectedVersion: existingBooking.version, changeReason: "customer-request" } });
   assert.equal((await request(`/api/cms/bookings/${existingBooking.id}`)).body.booking.localDate, bookingDate);
   await updateClosure(closure, { active: false });
+});
+
+await check("delete day off checks authentication, origin and version before reopening availability", async () => {
+  const closure = await addClosure(dayOff(alpha.id, testDate));
+  const path = `/api/cms/closures/${closure.id}`;
+  const body = { expectedVersion: closure.version };
+  assert.equal((await slots(alpha.id, testDate)).length, 0);
+  await request(path, { method: "DELETE", body, auth: false, expected: 401 });
+  await request(path, { method: "DELETE", body, requestOrigin: "http://untrusted.invalid", expected: 403 });
+  await request(path, { method: "DELETE", body: { expectedVersion: closure.version + 1 }, expected: 409 });
+  await request(path, { method: "DELETE", body: {}, expected: 422 });
+  assert.ok((await allClosures()).some((item) => item.id === closure.id));
+  assert.equal((await slots(alpha.id, testDate)).length, 0);
+  await deleteClosure(closure);
+  assert.deepEqual(await slots(alpha.id, testDate), baselineAlpha);
+  assert.deepEqual(await slots(beta.id, testDate), baselineBeta);
+  assert.equal((await calendarDay(alpha.id, testDate)).state, "available");
+  await request(path, { method: "DELETE", body, expected: 400 });
+});
+
+await check("deleting one block preserves remaining blocks and weekly days off", async () => {
+  const partial = await addClosure(dayOff(alpha.id, testDate, {
+    closedAllDay: false, startsAtLocal: baselineAlpha[2].localTime,
+    endsAtLocal: Temporal.PlainTime.from(baselineAlpha[2].localTime).add({ hours: 1 }).toString().slice(0, 5),
+  }));
+  const partialSlots = await slots(alpha.id, testDate);
+  assert.ok(partialSlots.length < baselineAlpha.length);
+  const full = await addClosure(dayOff(alpha.id, testDate));
+  await deleteClosure(full);
+  assert.deepEqual(await slots(alpha.id, testDate), partialSlots);
+  await deleteClosure(partial);
+  assert.deepEqual(await slots(alpha.id, testDate), baselineAlpha);
+  await updateAlpha({ weeklyDaysOff: [weeklyDay] });
+  const business = await addClosure(dayOff("", testDate));
+  assert.equal((await slots(beta.id, testDate)).length, 0);
+  await deleteClosure(business);
+  assert.equal((await slots(alpha.id, testDate)).length, 0);
+  assert.deepEqual((await readAlpha()).weeklyDaysOff, [weeklyDay]);
+  assert.deepEqual(await slots(beta.id, testDate), baselineBeta);
+  await updateAlpha({ weeklyDaysOff: [] });
+});
+
+await check("deleting an inactive day off preserves the existing appointment", async () => {
+  const closure = await addClosure(dayOff(alpha.id, bookingDate, { active: false }));
+  const before = (await request(`/api/cms/bookings/${existingBooking.id}`)).body.booking;
+  await deleteClosure(closure);
+  assert.deepEqual((await request(`/api/cms/bookings/${existingBooking.id}`)).body.booking, before);
+  assert.ok((await slots(alpha.id, bookingDate)).some((slot) => slot.localTime === before.localTime && slot.available === false));
 });
 
 // Keep the two therapists and treatment available for a follow-up browser pass.

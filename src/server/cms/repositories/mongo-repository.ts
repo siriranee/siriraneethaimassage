@@ -1014,6 +1014,26 @@ export class MongoCmsRepository implements CmsRepository {
     return closure;
   }
 
+  async deleteClosure(id: string, expectedVersion: number) {
+    const db = await this.db();
+    const collection = db.collection<CmsMongoDocument>(collections.closures);
+    const result = await collection.deleteOne(
+      { _id: id, version: expectedVersion },
+      this.options(),
+    );
+
+    if (result.deletedCount !== 1) {
+      const current = await collection.findOne(
+        { _id: id },
+        { ...this.options(), projection: { _id: 1 } },
+      );
+      if (current) throw new CmsConflictError();
+      return false;
+    }
+
+    return true;
+  }
+
   async listNotifications(bookingId?: string, limit = 200) {
     const db = await this.db();
     const rows = await db

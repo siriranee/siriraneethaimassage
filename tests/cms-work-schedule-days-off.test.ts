@@ -144,7 +144,7 @@ test("month view distinguishes individual days off from a whole-business closure
   assert.match(selected, /aria-label="Friday 16 October 2026 — no appointments, Day off, selected"/);
   const other = await renderCalendar({ selectedTherapistId: "therapist-b", closures: [scoped] });
   assert.match(other, /aria-label="Friday 16 October 2026 — no appointments, selected"/);
-  assert.doesNotMatch(other, /Days off and blocked time for this date/);
+  assert.doesNotMatch(all + selected + other, /Days off and blocked time for this date/);
 });
 
 test("calendar weekly and temporary days off count each therapist only once", async () => {
@@ -160,7 +160,7 @@ test("calendar uses the URL selection after server refresh and scopes time-off a
   const html = await renderCalendar({ selectedDate: "2026-10-17", initialDate: date, selectedTherapistId: "therapist-b" });
   assert.match(html, /Time off for Therapist B/);
   assert.match(html, /Saturday 17 October 2026/);
-  assert.match(html, /href="\/cms\/team\/therapist-b\/edit#weekly-days-off"/);
+  assert.doesNotMatch(html, />Weekly days off<\/a>/);
   assert.match(html, /aria-label="Saturday 17 October 2026 — no appointments, selected"/);
 });
 

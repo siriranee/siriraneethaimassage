@@ -212,6 +212,9 @@ The confirmation shows the therapist and date without an extra form. Choose **Bl
 time** for a start/end time instead. Each action shows who it applies to; selecting
 **All therapists** blocks the whole business. Use **Edit / reopen** and clear
 **Closure active** to release a block while retaining its history.
+To remove a day off completely, open **Edit / reopen** and use **Delete day off**
+at the top, then confirm. This removes only that saved date's block; weekly days
+off, other blocks and existing appointments stay unchanged.
 
 For a recurring weekly day off, open **CMS > Therapists > Set weekly days off**,
 select the weekdays and save the therapist. Clear a weekday to make it available

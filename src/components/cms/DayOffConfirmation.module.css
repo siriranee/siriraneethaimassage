@@ -34,6 +34,7 @@
 .actions { display: flex; justify-content: flex-end; gap: 0.65rem; flex-wrap: wrap; }
 .actions button { min-height: 2.85rem; padding: 0.65rem 1rem; border: 1px solid var(--color-line-strong); border-radius: 0.65rem; background: var(--color-surface); color: var(--color-purple-800); font: inherit; font-size: var(--fs-sm); font-weight: 800; cursor: pointer; }
 .actions .confirm { border-color: var(--color-purple-700); background: var(--color-purple-700); color: var(--color-on-brand); }
+.actions .danger { border-color: var(--color-danger); background: var(--color-danger); color: var(--color-on-brand); }
 .actions button:focus-visible { outline: 3px solid var(--color-gold-500); outline-offset: 3px; }
 .actions button:disabled { opacity: 0.65; cursor: wait; }
 

@@ -935,3 +935,40 @@ export async function updateCmsClosure(
     return updated;
   });
 }
+
+export async function deleteCmsClosure(
+  closureId: string,
+  expectedVersion: number,
+  context: MutationContext,
+) {
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    throw new CmsValidationError("The day off or time block version is invalid.");
+  }
+
+  const repository = getCmsRepository();
+  return repository.transaction(async (transaction) => {
+    const current = (await transaction.listClosures()).find((item) => item.id === closureId);
+    if (!current) throw new Error("Closure not found.");
+    if (current.version !== expectedVersion) throw new CmsConflictError();
+
+    if (current.therapistId) await transaction.lockTherapist(current.therapistId);
+    await transaction.lockBookingDate(current.localDate);
+    const deleted = await transaction.deleteClosure(current.id, current.version);
+    if (!deleted) throw new Error("Closure not found.");
+
+    await appendCmsAudit(transaction, {
+      actor: context.actor,
+      action: "calendar.closure-deleted",
+      entityType: "closure",
+      entityId: current.id,
+      summary: `Deleted calendar closure for ${current.localDate}.`,
+      requestId: context.requestId,
+    });
+
+    return {
+      id: current.id,
+      localDate: current.localDate,
+      therapistId: current.therapistId ?? "",
+    } as const;
+  });
+}
